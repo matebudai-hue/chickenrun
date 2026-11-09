@@ -1,6 +1,6 @@
 # Chicken Run
 
-Önálló, magyar nyelvű, többjátékos tréningjáték. A főoldal a tréneri vezérlőpult. Az Új futam és QR-kód gomb megnyitja a várót, a Játék indítása gomb sorsolja a párokat az addig csatlakozott játékosokból. A játékosok a QR-kóddal vagy a szobakóddal, fiók nélkül csatlakoznak. Az opcionális nevet vagy becenevet csak a tréner látja. Egy szobában legfeljebb 40 résztvevő játszhat.
+Önálló, magyar nyelvű, többjátékos tréningjáték. A főoldal a tréneri vezérlőpult. Az Új futam és QR-kód gomb megnyitja a várót, a Játék indítása gomb sorsolja a párokat az addig csatlakozott játékosokból. A játékosok a QR-kóddal vagy a szobakóddal, fiók nélkül csatlakoznak. Az opcionális nevet vagy becenevet a tréner látja, és a párosítási listát névvel is kivetítheti. Egy szobában legfeljebb 40 résztvevő játszhat.
 
 ## Játékmenet
 

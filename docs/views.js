@@ -74,7 +74,7 @@ export function join(room, previousName) {
     waitingPage(room, "Csatlakozz a futamhoz", "Fiók nélkül játszol. A párodnak névtelen maradsz.",
       '<form id="player-form" class="stack">'+field("player-label", "Név vagy becenév · opcionális", "Például: Dóra",
         'maxlength="40" autocomplete="off" value="'+escape(previousName)+'"')+
-      '<p class="small-text">A nevet csak a tréner látja. Az üzenetváltást a tréner a megbeszéléshez visszanézheti.</p><button class="button primary">Csatlakozom</button></form>')+'</div>';
+      '<p class="small-text">A tréner a megbeszélésen névvel vagy becenévvel is megmutathatja a párosításokat, és visszanézheti az üzeneteket.</p><button class="button primary">Csatlakozom</button></form>')+'</div>';
 }
 
 const matchOutcome = pair => pair.result === "a" ? escape(pair.names[0])+" tért ki"
