@@ -57,7 +57,8 @@ test("concurrent decisions commit once and reveal both choices at 50 m", async (
   assert.equal((await room("state",a)).body.history.length,6);
 });
 
-test("messages are pair-only, duplicate messages do not repeat, odd player gets a bot",async()=>{
+test("messages are pair-only, duplicate messages do not repeat, odd player gets a bot",async t=>{
+  t.mock.timers.enable({apis:["Date"],now:1_800_000_000_000});
   const {room,host,players}=await create(5);
   const statuses=await Promise.all(players.map(p=>room("state",p)));
   assert.equal(statuses.filter(x=>x.body.number > 0).length,5);
@@ -67,7 +68,10 @@ test("messages are pair-only, duplicate messages do not repeat, odd player gets 
   const botOpponent = players[statuses.findIndex(x => x.body.number === botPair.number)];
   const senderIndex = statuses.findIndex(x => x.body.number !== botPair.number);
   const sender = players[senderIndex];
-  const finished = await room("decision",botOpponent,{number:botPair.number,step:0,choice:"yield"});
+  const submitted = await room("decision",botOpponent,{number:botPair.number,step:0,choice:"yield"});
+  assert.equal(submitted.body.waiting,true);
+  t.mock.timers.tick(15_000);
+  const finished = await room("state",botOpponent);
   assert.equal(finished.body.report[0].bot,true);
   assert.deepEqual(finished.body.history.map(h => [h.own,h.other]),[["yield","go"]]);
   const message={number:statuses[senderIndex].body.number,step:0,id:secret(),text:"<b>Haladok!</b>"};
@@ -116,9 +120,12 @@ test("finished players requeue once and are paired with different willing humans
   assert.equal((await room("state",players[0])).body.report.length,2);
 });
 
-test("a lone player can play the bot, cancel waiting, and keep the report", async () => {
+test("a lone player can play the bot, cancel waiting, and keep the report", async t => {
+  t.mock.timers.enable({apis:["Date"],now:1_800_000_000_000});
   const {room,players:[player]} = await create(1);
-  const played = await room("decision",player,{number:1,step:0,choice:"yield"});
+  await room("decision",player,{number:1,step:0,choice:"yield"});
+  t.mock.timers.tick(15_000);
+  const played = await room("state",player);
   assert.equal(played.body.outcome,"own");
   assert.equal((await room("requeue",player,{number:1})).body.queued,true);
   const cancelled = await room("cancel",player,{number:1});
@@ -203,4 +210,50 @@ test("all chat survives the player chat window and rematches, with access restri
   await room("stop",host.token,{});
   assert.deepEqual((await room(query,host.token)).body.pairs[0].messages,first);
   assert.equal((await room("transcript",host.token)).body.pairs.find(p=>p.number===number).messages.length,60);
+});
+
+test("bot plans split evenly between late yields and going all the way", async t => {
+  t.mock.timers.enable({apis:["Date"],now:1_800_000_000_000});
+  let random = 0;
+  t.mock.method(Math,"random",() => random);
+  for (let draw=0;draw<6;draw++) {
+    random = (draw+.5)/6;
+    const {room,players:[player]} = await create(1);
+    const lastStep = draw < 3 ? 4 + draw : 6;
+    for (let step=0;step<=lastStep;step++) {
+      await room("decision",player,{number:1,step,choice:"go"});
+      t.mock.timers.tick(15_000);
+      const {body} = await room("state",player);
+      assert.equal(body.history.at(-1).other,step===lastStep && draw<3 ? "yield" : "go");
+      assert.equal(body.result,step===lastStep ? draw<3 ? "b" : "crash" : null);
+    }
+  }
+});
+
+test("the bot deadline is durable, stays hidden, and is settled just once", async t => {
+  const now = 1_800_000_000_000;
+  t.mock.timers.enable({apis:["Date"],now});
+  let random = .99999;
+  t.mock.method(Math,"random",() => random);
+  const {room,host,players:[player]} = await create(1);
+  const body = {number:1,step:0,choice:"go"};
+  assert.equal((await room("decision",player,body)).body.waiting,true);
+  t.mock.timers.tick(5_000);
+  assert.equal((await room("decision",player,body)).body.waiting,true);
+  t.mock.timers.tick(9_999);
+  assert.equal((await room("state",player)).body.history.length,0);
+  assert.equal((await room("state",host.token)).body.pairs[0].ready,1);
+  t.mock.timers.tick(1);
+  const [{body:coach},{body:human}] = await Promise.all([room("state",host.token),room("state",player)]);
+  assert.equal(human.distance,800);
+  assert.equal(human.history.length,1);
+  assert.deepEqual(coach.pairs[0].history[0].submitted,[now,now+15_000]);
+  assert.equal(coach.pairs[0].history.length,1);
+
+  random = 0;
+  await room("decision",player,{...body,step:1});
+  t.mock.timers.tick(9_999);
+  assert.equal((await room("state",player)).body.history.length,1);
+  t.mock.timers.tick(1);
+  assert.equal((await room("state",player)).body.history.length,2);
 });

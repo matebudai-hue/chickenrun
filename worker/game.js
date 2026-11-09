@@ -2,6 +2,8 @@ export const DISTANCES = [1000, 800, 600, 400, 200, 50, 10];
 const LIFE = 8 * 60 * 60 * 1000;
 const MAX_PLAYERS = 40;
 const MAX_MESSAGES = 10;
+const BOT_FIRST_YIELD_STEP = DISTANCES.indexOf(200);
+const BOT_YIELD_STEPS = DISTANCES.length - BOT_FIRST_YIELD_STEP;
 const ONLINE_WINDOW = 45_000;
 const CODE_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const encoder = new TextEncoder();
@@ -127,6 +129,10 @@ function view(room, auth, online) {
     history: playerHistory(pair, seat),
   };
 }
+function botPlan() {
+  const draw = Math.floor(Math.random() * (BOT_YIELD_STEPS * 2));
+  return draw < BOT_YIELD_STEPS ? BOT_FIRST_YIELD_STEP + draw : null;
+}
 function addPair(room, a, b) {
   // The archive holds new messages. Keep any older messages that predate it.
   const previous = [activePair(room, a).pair, b === null ? undefined : activePair(room, b).pair];
@@ -140,7 +146,7 @@ function addPair(room, a, b) {
   room.pairs.push({
     players: [a, b], startedAt: Date.now(), step: 0, choices: [null, null], result: null, history: [],
     messages: [], sent: [0, 0],
-    ...(b === null ? { botYieldAt: 2 + Math.floor(Math.random() * 5) } : {}),
+    ...(b === null ? { botYieldAt: botPlan() } : {}),
   });
   room.phase = "running";
 }
@@ -182,10 +188,14 @@ function decide(room, pair, seat, input) {
   pair.choices[seat] = input.choice;
   submitted[seat] = now;
   if (pair.players[1] === null) {
-    pair.choices[1] = pair.step >= pair.botYieldAt ? "yield" : "go";
-    submitted[1] = now;
+    pair.botDueAt = now + 10_000 + Math.floor(Math.random() * 5001);
+  } else if (pair.choices.every(Boolean)) {
+    resolveStep(room, pair, now);
   }
-  if (!pair.choices.every(Boolean)) return true;
+  return true;
+}
+function resolveStep(room, pair, now) {
+  const submitted = pair.submitted;
   const [a, b] = pair.choices;
   pair.history.push({ distance: DISTANCES[pair.step], choices: [...pair.choices], at: now, submitted: [...submitted] });
   if (a === "yield" && b === "yield") pair.result = "both";
@@ -199,14 +209,28 @@ function decide(room, pair, seat, input) {
     pair.sent = [0, 0];
   }
   finishIfDone(room);
-  return true;
+}
+function botIsDue(pair, now) {
+  return !pair.result && Number.isFinite(pair.botDueAt) && pair.botDueAt <= now;
+}
+function settleBots(room, now) {
+  let changed = false;
+  for (const pair of room.pairs) {
+    if (!botIsDue(pair, now)) continue;
+    pair.choices[1] = Number.isInteger(pair.botYieldAt) && pair.step >= pair.botYieldAt ? "yield" : "go";
+    pair.submitted[1] = pair.botDueAt;
+    delete pair.botDueAt;
+    resolveStep(room, pair, now);
+    changed = true;
+  }
+  return changed;
 }
 function send(pair, number, seat, input) {
   const text = typeof input.text === "string" ? input.text.trim() : "";
   if (!text || text.length > 240) reject(400, "Az üzenet 1–240 karakter lehet.");
   if (typeof input.id !== "string" || !/^[a-f0-9]{32}$/.test(input.id)) reject(400, "Érvénytelen üzenet.");
   if (pair.messages.some(m => m.seat === seat && m.id === input.id)) return false;
-  if (pair.result || input.step !== pair.step) reject(409, "Ez a döntési pont már lezárult.");
+  if (pair.result || input.step !== pair.step || botIsDue(pair, Date.now())) reject(409, "Ez a döntési pont már lezárult.");
   if (pair.sent[seat] >= MAX_MESSAGES) reject(429, "Ebben a lépésben már elküldted a tíz üzenetedet.");
   pair.legacyMessages ??= pair.messages.filter(message => message.at === undefined);
   const message = { seat, id: input.id, text, at: Date.now(), distance: DISTANCES[pair.step] };
@@ -337,7 +361,15 @@ export async function api(request, store, defer) {
       return json({ pairs: await transcript(store, roomCode, room, number) });
     }
     if (action === "state") {
-      const { room } = await getRoom(store, roomCode);
+      let { room } = await getRoom(store, roomCode);
+      if (room.host !== auth && !room.players.some(player => player.key === auth)) {
+        reject(403, "Ehhez a szobához nincs hozzáférésed.");
+      }
+      // An authenticated poll settles durable deadlines, even after a reload.
+      const now = Date.now();
+      if (room.pairs.some(pair => botIsDue(pair, now))) {
+        room = await change(store, roomCode, current => settleBots(current, Date.now()));
+      }
       return json(await stateView(store, roomCode, room, auth, url.searchParams.has("pulse"), defer));
     }
     const input = await readBody(request);

@@ -4,7 +4,7 @@
 
 ## Játékmenet
 
-- Az első párosítás véletlen. Páratlan létszámnál a pár nélkül maradt résztvevő egy automatikus tesztjátékost kap.
+- Az első párosítás véletlen. Páratlan létszámnál a pár nélkül maradt résztvevő egy automatikus tesztjátékost kap. A tesztjátékos 50% eséllyel választ kitérési pontot (200, 50 vagy 10 méter), egyébként végig halad. A résztvevő döntése után 10–15 másodperccel dönt.
 - Az autók 1000 méterre indulnak egymástól. A következő döntési pontok 800, 600, 400, 200, 50 és 10 méternél vannak.
 - A választás akkor válik láthatóvá, amikor mindkét fél beküldte. Kitérésnél véget ér a játék. Ha 10 méternél is mindketten haladnak, ütköznek. A párok játék közben üzenhetnek egymásnak.
 - Az **Új játékot indítok** gombbal a résztvevő várólistára kerül. A rendszer olyan másik résztvevőt keres, aki ugyanezt választotta, és akivel az előző játékban egyikük sem volt párban.
