@@ -4,6 +4,7 @@ const files = {
   "/style.css": "text/css; charset=utf-8",
   "/app.js": "text/javascript; charset=utf-8",
   "/connection.js": "text/javascript; charset=utf-8",
+  "/live-race.js": "text/javascript; charset=utf-8",
   "/story.js": "text/javascript; charset=utf-8",
   "/views.js": "text/javascript; charset=utf-8",
   "/display-latin.woff2": "font/woff2",
@@ -23,6 +24,7 @@ await Promise.all([
   writeFile("dist/server/assets.js", "export default "+JSON.stringify(assets)+";\n"),
   copyFile("worker/index.js", "dist/server/index.js"),
   copyFile("worker/game.js", "dist/server/game.js"),
+  copyFile("worker/race.js", "dist/server/race.js"),
   copyFile(".openai/hosting.json", "dist/.openai/hosting.json"),
 ]);
 

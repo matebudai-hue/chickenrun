@@ -261,3 +261,15 @@ dialog::backdrop{background:#161b14cc}
   .metric small{font-size:.66rem}
   .projection .heading{padding-left:.65rem}
 }
+.race-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;margin:0;padding:.58rem .7rem .7rem;border:1px solid var(--line);background:var(--paper)}
+.race-modes legend{padding:0 .3rem;font:700 .72rem var(--mono);text-transform:uppercase}
+.race-modes label{display:flex;align-items:center;gap:.55rem;padding:.55rem;border:1px solid var(--line);cursor:pointer}
+.race-modes label:has(:checked){border-color:#8a691e;box-shadow:inset 3px 0 var(--gold)}
+.race-modes input{width:1.18rem;min-height:0;flex:none;accent-color:#836021}
+.race-modes small{display:block;color:var(--muted);font-size:.74rem;font-weight:500}
+.timed-race progress{display:block;width:100%;height:4px;border:0;accent-color:var(--gold);margin:0}
+.timed-race .distance b{font-weight:inherit}
+.timed-action{grid-template-columns:1fr}
+.live-road{position:relative}
+.race-flash{position:absolute;inset:50% auto auto 50%;transform:translate(-50%,-50%);padding:.26rem .52rem;background:#191e18;border:1px solid var(--gold);font:700 .9rem var(--mono);color:var(--gold);pointer-events:none}
+@media(max-width:540px){.race-modes{grid-template-columns:1fr}}

@@ -69,3 +69,12 @@ test("the names and pairing times appear only in the explicitly selected project
   assert.match(named,/<td>–<\/td>/);
   assert.doesNotMatch(named,/Eset 1/);
 });
+
+test("continuous replay shows a message, the turn request and the actual exit in time order", () => {
+  const pair = {timed:true,turns:[{at:110,distance:93,target:50},null],history:[
+    {distance:50,at:140,choices:["yield","go"]},
+  ]};
+  const messages = [{at:105,distance:96,seat:1,text:"Ide figyelj"}];
+  assert.deepEqual(pairStory(pair,messages).map(event=>event.kind),["message","turn","reveal"]);
+  assert.deepEqual(pairStory(pair,messages,[]).map(event=>event.kind),["turn","reveal"]);
+});

@@ -1,6 +1,7 @@
-import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration } from "./story.js?v=10";
+import { animateRace } from "./live-race.js?v=11";
+import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration } from "./story.js?v=11";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=10";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=11";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -27,6 +28,8 @@ let state, signature, loadFailure, errorRetry, pollTimer;
 let busy = false, polling = false, generation = 0, lastPulse = 0;
 let selectedTab = "overview", filter = "all", draft = "", messageRequest, confirmAction;
 let reveal, revealTimer;
+let selectedGameMode = "steps";
+let raceOffset = 0, stopAnimation, turnPending = false;
 let selection = readSelection();
 let showPairings = saved.get(projectionModeKey) === "pairings";
 let pendingDecision;
@@ -87,14 +90,20 @@ function resolveDecision(next) {
   saved.remove(decisionKey);
 }
 
-function update(next) {
+function update(next, started = performance.now()) {
+  if (Number.isFinite(next.serverAt)) {
+    const received = performance.now();
+    raceOffset = next.serverAt + Math.min((received - started) / 2, 200) - received;
+    delete next.serverAt;
+    if (!next.result) next.distance = next.race.marks[0][0];
+  }
   const previous = state;
   if (previous?.number !== next.number) {
     draft = "";
     messageRequest = undefined;
   }
   if (!isTrainer) {
-    const transition = nextReveal(previous,next);
+    const transition = next.race ? null : nextReveal(previous,next);
     if (transition) {
       reveal = transition;
       clearTimeout(revealTimer);
@@ -123,11 +132,12 @@ async function poll() {
   const stamp = generation;
   const pulse = !isTrainer && Date.now() - lastPulse > 12_000;
   try {
+    const started = performance.now();
     const next = await readState(endpoint("state")+(pulse ? "?pulse=1" : ""), auth);
     if (stamp !== generation) return;
     if (pulse) lastPulse = Date.now();
     setConnection("ok", "Kapcsolat rendben");
-    update(next);
+    update(next,started);
   } catch (error) {
     if (stamp !== generation) return;
     if (error.status === 403 || error.status === 404) {
@@ -139,7 +149,7 @@ async function poll() {
     }
   } finally {
     polling = false;
-    if (!loadFailure) nextPoll(document.hidden ? 4500 : state?.phase === "closed" ? 3000 : 1000+Math.random()*250);
+    if (!loadFailure) nextPoll(document.hidden ? 4500 : state?.phase === "closed" ? 3000 : state?.race && !state.result ? 400+Math.random()*100 : 1000+Math.random()*250);
   }
 }
 
@@ -165,9 +175,10 @@ async function perform(path, body, success, retry, label = "Kérés küldése…
   showNotice();
   setConnection("working", label);
   try {
+    const started = performance.now();
     const next = await command(path, auth, body, () => setConnection("slow", "Lassú kapcsolat · ellenőrzés…"));
     setConnection("ok", "Kapcsolat rendben");
-    success(next);
+    success(next,started);
   } catch (error) {
     if (error.retryable) {
       setConnection("slow", navigator.onLine ? "A kapcsolat bizonytalan" : "Nincs internetkapcsolat");
@@ -190,7 +201,7 @@ async function perform(path, body, success, retry, label = "Kérés küldése…
 }
 
 function mutate(action, body = {}, onSuccess = update) {
-  const labels = { decision: "Döntés küldése…", requeue: "Új partner keresése…", start: "Párosítás…" };
+  const labels = { turn: "Kitérés küldése…", decision: "Döntés küldése…", requeue: "Új partner keresése…", start: "Párosítás…" };
   return perform(endpoint(action), body, onSuccess, () => mutate(action, body, onSuccess), labels[action]);
 }
 
@@ -296,11 +307,15 @@ async function downloadTrainerReport(button) {
       const decisions = pair.history.map(row => ({
         at:row.at ?? 0, cells:[pair.number,"Döntés",row.distance,time(row.at),a,moves[row.choices[0]],b,moves[row.choices[1]],"","",outcome],
       }));
+      const turns = (pair.turns ?? []).flatMap((turn,seat) => turn ? [{
+        at:turn.at, cells:[pair.number,"Kitérési kérés",turn.distance,time(turn.at),a,"",b,"",pair.names[seat],
+          "Kért pont: "+turn.target+" m",outcome],
+      }] : []);
       const chat = (messages.get(pair.number) ?? []).map(row => ({
         at:row.at ?? 0, cells:[pair.number,"Üzenet",row.distance,time(row.at),a,"",b,"",pair.names[row.seat],row.text,outcome],
       }));
-      return decisions.length || chat.length
-        ? [...chat,...decisions].sort((first,second) => first.at-second.at).map(row => row.cells)
+      return decisions.length || chat.length || turns.length
+        ? [...chat,...decisions,...turns].sort((first,second) => first.at-second.at).map(row => row.cells)
         : [[pair.number,"Kimenetel","","",a,"",b,"","","",outcome]];
     });
     downloadCsv(headings,rows,"treneri");
@@ -329,13 +344,15 @@ function renderPairStory(section, pair, messages, projected, loading = false) {
           pair.number+'" data-quote="'+event.index+'" aria-pressed="'+selected+'">'+
           (selected ? "Idézet elrejtése" : "Idézet kivetítése")+'</button>' : "";
       content = '<strong>'+names[event.seat]+'</strong><blockquote>'+escape(event.text)+'</blockquote>'+quoteButton;
+    } else if (event.kind === "turn") {
+      content = '<strong>'+names[event.seat]+'</strong> · Kitérést kért '+event.target+' m-nél';
     } else if (event.kind === "choice") {
       content = '<strong>'+names[event.seat]+'</strong> · '+moves[event.choice]+' <small>(beküldve)</small>';
     } else {
       const points = pair.distances ?? legacyPoints;
       const next = points[points.indexOf(event.distance)+1];
       const bothGo = event.choices.every(choice => choice === "go");
-      const summary = bothGo ? next ? "Tovább "+next+" méterre" : "Ütközés"
+      const summary = bothGo ? !pair.timed && next ? "Tovább "+next+" méterre" : "Ütközés"
         : event.choices.every(choice => choice === "yield") ? "Mindketten kitértek" : names[event.choices.indexOf("yield")]+" tért ki";
       content = '<strong>'+summary+'</strong><span class="story-choices">'+
         names[0]+': '+moves[event.choices[0]]+' · '+names[1]+': '+moves[event.choices[1]]+'</span>';
@@ -415,10 +432,11 @@ function render() {
   const active = document.activeElement;
   const focusId = screen.contains(active) ? active.id : "";
   const caret = focusId === "message-input" ? [active.selectionStart,active.selectionEnd] : null;
+  stopAnimation?.();
   const log = document.querySelector("#messages");
   const oldScroll = log?.scrollTop ?? 0;
   const stickToBottom = !log || log.scrollHeight-log.clientHeight-oldScroll < 36;
-  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reveal, showPairings };
+  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reveal, showPairings, selectedGameMode, turnPending };
   if (!room) {
     const previous = saved.get("cr:last-host");
     screen.innerHTML = mode === "player" ? enterCode() : home(codeValid.test(previous ?? "") ? previous : null, roomLink);
@@ -443,6 +461,7 @@ function render() {
     paintChat();
     const nextLog = document.querySelector("#messages");
     if (nextLog) nextLog.scrollTop = stickToBottom ? nextLog.scrollHeight : oldScroll;
+    if (state.race && !state.result) stopAnimation = animateRace(screen,state.race,() => performance.now()+raceOffset,() => busy);
   }
   paintQr(document.querySelector("#inline-qr"));
   const restore = focusId && document.getElementById(focusId);
@@ -462,6 +481,9 @@ function sendDecision(choice) {
 }
 
 retryButton.addEventListener("click", () => errorRetry?.());
+screen.addEventListener("change", event => {
+  if (event.target.name === "game-mode") selectedGameMode = event.target.value;
+});
 screen.addEventListener("input", event => {
   if (event.target.id === "message-input") draft = event.target.value;
 });
@@ -485,10 +507,10 @@ screen.addEventListener("submit", event => {
     if (!messageRequest || messageRequest.text !== text || messageRequest.number !== number || messageRequest.step !== step) {
       messageRequest = { number, step, text, id:secret() };
     }
-    void mutate("message",messageRequest,next => {
+    void mutate("message",messageRequest,(next,started) => {
       if (draft.trim() === text) draft = "";
       messageRequest = undefined;
-      update(next);
+      update(next,started);
     });
   }
 });
@@ -497,7 +519,15 @@ screen.addEventListener("click", event => {
   if (!button || busy) return;
   const action = button.dataset.do;
   if (action === "create") createRoom();
-  else if (action === "start") void mutate("start",{count:state.count});
+  else if (action === "start") void mutate("start",{count:state.count,mode:selectedGameMode});
+  else if (action === "turn" && !turnPending) {
+    turnPending = true;
+    render();
+    void mutate("turn",{number:state.number}).finally(() => {
+      turnPending = false;
+      render();
+    });
+  }
   else if (action === "go" || action === "yield") sendDecision(action);
   else if (action === "retry-decision") sendDecision(pendingDecision.choice);
   else if (action === "requeue" || action === "cancel") void mutate(action,{number:state.number ?? 0});

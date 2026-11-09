@@ -5,7 +5,7 @@ import { memoryStore } from "../local.mjs";
 
 const base = "https://example.test";
 const secret = () => crypto.randomUUID().replaceAll("-", "");
-async function create(n = 2, store = memoryStore()) {
+async function create(n = 2, store = memoryStore(), mode = "steps") {
   const call = async (path, token, body) => {
     const res = await api(new Request(base+path, {
       method: body === undefined ? "GET" : "POST",
@@ -22,7 +22,7 @@ async function create(n = 2, store = memoryStore()) {
     assert.equal((await room("join",who,{label:labels[index]})).status, 200);
   }
   assert.equal((await room("start",players[0],{})).status, 403);
-  assert.equal((await room("start",host.token,{})).status, 200);
+  assert.equal((await room("start",host.token,{mode})).status, 200);
   return { room, host, players, labels };
 }
 
@@ -272,4 +272,59 @@ test("a pair created before the 100 m decision keeps its original distances", as
   }
   assert.equal((await room("state",players[0])).body.distance,50);
   assert.deepEqual((await room("state",host.token)).body.pairs[0].distances,[1000,800,600,400,200,50,10]);
+});
+
+test("continuous race hides the partner's request and resolves two turns at the same mark once", async t => {
+  t.mock.timers.enable({apis:["Date"],now:1_800_000_000_000});
+  const {room,host,players:[a,b]} = await create(2,memoryStore(),"timed");
+  const initial = (await room("state",a)).body;
+  assert.equal(initial.mode,"timed");
+  assert.equal(initial.distance,1500);
+  assert.equal(initial.race.marks.at(-1)[1],45_000);
+  assert.equal(initial.race.startsAt - initial.serverAt,3000);
+  assert.equal((await room("turn",a,{number:1})).status,409);
+  t.mock.timers.tick(38_500);
+  const turn = await room("turn",a,{number:1});
+  assert.equal(turn.body.race.target,50);
+  assert.equal(turn.body.result,null);
+  const partner = (await room("state",b)).body;
+  assert.equal(partner.race.target,null);
+  assert.equal(partner.history.length,0);
+  await room("message",b,{number:1,text:"Még várok.",id:secret()});
+  await room("turn",b,{number:1});
+  t.mock.timers.tick(3_499);
+  assert.equal((await room("state",a)).body.result,null);
+  t.mock.timers.tick(451);
+  const [first,second] = await Promise.all([room("state",a),room("state",b)]);
+  assert.equal(first.body.outcome,"both");
+  assert.deepEqual(first.body.history.map(row=>row.distance),[50]);
+  assert.equal(second.body.report[0].target,50);
+  const admin = (await room("state",host.token)).body.pairs[0];
+  assert.ok(admin.turns.every(row=>row.target === 50));
+  assert.equal(admin.history.length,1);
+});
+
+test("continuous race ends at 45 seconds if nobody exits and the last exit is at 10 m", async t => {
+  t.mock.timers.enable({apis:["Date"],now:1_800_000_000_000});
+  const {room,host,players:[a]} = await create(2,memoryStore(),"timed");
+  t.mock.timers.tick(46_000);
+  assert.equal((await room("turn",a,{number:1})).status,409);
+  assert.equal((await room("state",a)).body.result,null);
+  t.mock.timers.tick(2450);
+  assert.equal((await room("state",a)).body.result,"crash");
+  const pair = (await room("state",host.token)).body.pairs[0];
+  assert.equal(pair.history[0].at - pair.startedAt,45_000);
+  assert.equal(pair.history[0].distance,0);
+  assert.deepEqual(pair.turns,[null,null]);
+});
+
+test("the timed test driver yields at the drawn mark without waiting for the human", async t => {
+  t.mock.timers.enable({apis:["Date"],now:1_800_000_000_000});
+  t.mock.method(Math,"random",() => 0);
+  const {room,players:[player]} = await create(1,memoryStore(),"timed");
+  assert.equal((await room("state",player)).body.race.target,null);
+  t.mock.timers.tick(33_450);
+  const finished = (await room("state",player)).body;
+  assert.equal(finished.outcome,"other");
+  assert.equal(finished.distance,200);
 });

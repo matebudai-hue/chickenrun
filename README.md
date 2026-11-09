@@ -4,6 +4,8 @@
 
 ## Játékmenet
 
+A tréner a váróban választ a döntési pontonkénti és a folyamatos játékmód között. A folyamatos futam 1500 méterről indul és legfeljebb 45 másodpercig tart. Az autók haladnak, a Kitérek gomb a következő távolságjelzésnél hajtja végre a kitérést. Az utolsó kitérési pont 10 méter. A tesztjátékos itt is az öt útvonal egyikét sorsolja, és a kijelölt pontnál tér ki.
+
 - Az első párosítás véletlen. Páratlan létszámnál a pár nélkül maradt résztvevő egy automatikus tesztjátékost kap. A tesztjátékos öt egyenlő esélyű útvonal közül sorsol: kitérés 200, 100, 50 vagy 10 méternél, illetve továbbhaladás az utolsó ponton is. A résztvevő döntése után 10–15 másodperccel dönt.
 - Az autók 1000 méterre indulnak egymástól. A következő döntési pontok 800, 600, 400, 200, 100, 50 és 10 méternél vannak.
 - A választás akkor válik láthatóvá, amikor mindkét fél beküldte. Kitérésnél véget ér a játék. Ha 10 méternél is mindketten haladnak, ütköznek. A párok játék közben üzenhetnek egymásnak.

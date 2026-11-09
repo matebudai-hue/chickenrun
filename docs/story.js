@@ -2,7 +2,7 @@ export const legacyPoints = [1000, 800, 600, 400, 200, 50, 10];
 export const revealDuration = 560;
 
 export function carPositions(distance, firstYields = false, secondYields = false) {
-  const spread = 37 + 243 * Math.pow(distance / 1000, .62);
+  const spread = 37 + 243 * Math.pow(Math.min(distance,1000) / 1000, .62) + 46 * Math.max(0,distance - 1000) / 500;
   return [
     [380 - spread, firstYields ? 31 : 105],
     [380 + spread, secondYields ? 180 : 105],
@@ -38,6 +38,12 @@ export function pairStory(pair, messages, visibleQuotes = null) {
   messages.forEach((message,index) => {
     if (!projected || visibleQuotes.includes(index)) events.push({ ...message, kind:"message", index });
   });
+  if (pair.timed) {
+    (pair.turns ?? []).forEach((turn,seat) => {
+      if (turn) events.push({ ...turn, seat, kind:"turn" });
+    });
+    return events.sort((a,b) => (a.at ?? 0) - (b.at ?? 0));
+  }
   return events.sort((a,b) =>
     (b.distance ?? Infinity) - (a.distance ?? Infinity) ||
     (a.at ?? 0) - (b.at ?? 0) ||
