@@ -1,6 +1,6 @@
 import { changeSelection, nextReveal, pairStory, points, revealDuration } from "./story.js?v=5";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=5";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=7";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -19,6 +19,7 @@ const decisionKey = "cr:pending-decision:"+room;
 const joinKey = "cr:pending-join:"+room;
 const createKey = "cr:pending-create";
 const selectionKey = "cr:projection:"+room;
+const projectionModeKey = "cr:projection-mode:"+room;
 
 let auth = saved.get(roomKey);
 let state, signature, loadFailure, errorRetry, pollTimer;
@@ -26,6 +27,7 @@ let busy = false, polling = false, generation = 0, lastPulse = 0;
 let selectedTab = "overview", filter = "all", draft = "", messageRequest, confirmAction;
 let reveal, revealTimer;
 let selection = readSelection();
+let showPairings = saved.get(projectionModeKey) === "pairings";
 let pendingDecision;
 try { pendingDecision = JSON.parse(saved.get(decisionKey)); } catch {}
 const transcriptCache = new Map();
@@ -414,7 +416,7 @@ function render() {
   const log = document.querySelector("#messages");
   const oldScroll = log?.scrollTop ?? 0;
   const stickToBottom = !log || log.scrollHeight-log.clientHeight-oldScroll < 36;
-  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reveal };
+  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reveal, showPairings };
   if (!room) {
     const previous = saved.get("cr:last-host");
     screen.innerHTML = mode === "player" ? enterCode() : home(codeValid.test(previous ?? "") ? previous : null, roomLink);
@@ -429,7 +431,7 @@ function render() {
   } else if (!state) {
     screen.innerHTML = waitingPage(room,"Kapcsolódás…","A futam állását töltjük be.");
   } else if (mode === "projector") {
-    screen.innerHTML = projector(state,room,selection);
+    screen.innerHTML = projector(state,room,selection,showPairings);
     paintPairStories();
   } else if (isTrainer) {
     screen.innerHTML = trainer(state,context);
@@ -517,6 +519,12 @@ screen.addEventListener("click", event => {
     render();
   } else if (action === "project-pair") selectStory(Number(button.dataset.number));
   else if (action === "project-quote") selectStory(Number(button.dataset.number),Number(button.dataset.quote));
+  else if (action === "project-pairings") {
+    showPairings = !showPairings;
+    if (showPairings) saved.set(projectionModeKey,"pairings");
+    else saved.remove(projectionModeKey);
+    render();
+  }
 });
 screen.addEventListener("toggle", event => {
   if (event.target.matches("details[open]")) paintPairStories();
@@ -533,10 +541,11 @@ dialog.addEventListener("click", event => {
   if ("copy" in button.dataset) void copyLink(button);
 });
 window.addEventListener("storage", event => {
-  if (event.key === selectionKey && isTrainer) {
-    selection = readSelection();
-    if (state) render();
-  }
+  if (!isTrainer) return;
+  if (event.key === selectionKey) selection = readSelection();
+  else if (event.key === projectionModeKey) showPairings = saved.get(projectionModeKey) === "pairings";
+  else return;
+  if (state) render();
 });
 window.addEventListener("online", () => nextPoll());
 window.addEventListener("offline", () => setConnection("slow","Nincs internetkapcsolat"));

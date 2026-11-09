@@ -216,3 +216,8 @@ dialog::backdrop{background:#12262fcc}
   .outcome-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
   .story-body{grid-template-columns:4.4em minmax(0,1fr);padding:.36rem .45rem}
 }
+.projection-pairs{width:min(100%,1000px);margin:.55rem auto;text-align:left}
+.projection-pairs table{font-size:clamp(1rem,2.05vw,1.45rem)}
+.projection-pairs thead th{font-size:.8em}
+.projection-pairs td:nth-child(2){font-variant-numeric:tabular-nums;white-space:nowrap}
+#project-pairings[aria-pressed="true"]{background:#dceee7;border-color:#78a896;color:#143e33}

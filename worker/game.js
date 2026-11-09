@@ -87,6 +87,7 @@ function view(room, auth, online) {
         ready: pair.result ? 0 : pair.choices.filter(Boolean).length, result: pair.result,
         names: pair.players.map(id => playerName(room, id)), history: pair.history, bot: pair.players.includes(null),
         messageCount: pair.messageCount ?? pair.messages.length,
+        startedAt: pair.startedAt,
       };
     });
     return {
@@ -137,7 +138,7 @@ function addPair(room, a, b) {
     }
   }
   room.pairs.push({
-    players: [a, b], step: 0, choices: [null, null], result: null, history: [],
+    players: [a, b], startedAt: Date.now(), step: 0, choices: [null, null], result: null, history: [],
     messages: [], sent: [0, 0],
     ...(b === null ? { botYieldAt: 2 + Math.floor(Math.random() * 5) } : {}),
   });

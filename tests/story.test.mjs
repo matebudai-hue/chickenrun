@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { projector, time } from "../docs/views.js";
 import { carPositions, changeSelection, nextReveal, pairGroups, pairStory, points } from "../docs/story.js";
 
 test("both cars move inward at each distance, meet at impact and leave the lane when yielding", () => {
@@ -47,4 +48,24 @@ test("only finished human pairs contribute to human result counts", () => {
   const bot = {result:"a",bot:true};
   const stopped = {result:"stopped",bot:false};
   assert.deepEqual(pairGroups([human,bot,stopped,{result:null}]),{human:[human],test:[bot],stopped:[stopped]});
+});
+
+test("the names and pairing times appear only in the explicitly selected projection view", () => {
+  const state = {phase:"finished",queue:[],pairs:[
+    {number:1,result:"both",names:["Dóra <vezető>","Márk"],startedAt:Date.UTC(2026,10,9,9,15)},
+    {number:2,result:"both",names:["Márk","Júlia"]},
+  ]};
+  const selected = [{number:1,quotes:[]}];
+  const hidden = projector(state,"ABCDEFGH",selected);
+  assert.match(hidden,/Eset 1/);
+  assert.doesNotMatch(hidden,/Dóra|Márk|Júlia/);
+  const named = projector(state,"ABCDEFGH",selected,true);
+  assert.match(named,/1\. játék/);
+  assert.match(named,/2\. játék/);
+  assert.ok(named.includes(time(state.pairs[0].startedAt)));
+  assert.match(named,/Dóra &lt;vezető&gt;/);
+  assert.match(named,/Márk/);
+  assert.match(named,/Júlia/);
+  assert.match(named,/<td>–<\/td>/);
+  assert.doesNotMatch(named,/Eset 1/);
 });

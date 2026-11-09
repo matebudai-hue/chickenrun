@@ -107,6 +107,9 @@ test("finished players requeue once and are paired with different willing humans
   assert.ok(report.every(r => r.outcome === "both" && r.history[0].own === "yield" && r.history[0].at > 0));
   const admin = (await room("state",host.token)).body;
   assert.equal(admin.pairs.length,4);
+  assert.ok(admin.pairs.every(pair => Number.isFinite(pair.startedAt) && pair.startedAt > 0));
+  assert.ok(admin.pairs.slice(2).every(pair => pair.startedAt >= admin.pairs[1].startedAt));
+  assert.ok(second.every(player => !("startedAt" in player)));
   assert.ok(admin.pairs.every(p => p.names.length === 2 && p.history[0].choices.every(c => c === "yield")));
   await room("stop",host.token,{});
   assert.equal((await room("requeue",players[0],{number:second[0].number})).status,409);

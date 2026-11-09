@@ -137,7 +137,7 @@ function resultSummary(groups) {
     (groups.stopped.length ? '<p class="muted">Tréner által lezárt, félbemaradt játék: '+groups.stopped.length+'</p>' : '')+'</div>';
 }
 export function trainer(s, context) {
-  const { room, tab, opened, roomLink, selection, filter } = context;
+  const { room, tab, opened, roomLink, selection, filter, showPairings } = context;
   const lobby = s.phase === "lobby", closed = s.phase === "closed", active = s.pairs.filter(p => !p.result);
   const online = s.roster?.filter(p => p.online).length ?? 0;
   const hasPresence = s.roster?.some(p => p.online !== undefined);
@@ -166,8 +166,12 @@ export function trainer(s, context) {
       [["all","Mind"],["human","Ember–ember"],["test","Tesztjátékosos"],["stopped","Félbemaradt"]].map(([key,label]) =>
         '<button id="filter-'+key+'" class="button small secondary" data-do="filter" data-filter="'+key+
         '" aria-pressed="'+(filter === key)+'">'+label+'</button>').join("")+'</div>';
-    body = card("Futamriport", '<div class="row between"><p class="muted">A kivetítőn '+selection.length+' / 2 kiválasztott eset.</p>'+
-      action("download-host","Döntések és üzenetek letöltése · CSV","secondary",!s.pairs.some(p=>p.result))+'</div>'+resultSummary(groups)+filters+
+    const projectionLabel = showPairings ? "Párosítások nevekkel" : selection.length+" / 2 név nélküli eset";
+    const showNames = '<button id="project-pairings" type="button" class="button secondary" data-do="project-pairings"'+
+      ' aria-pressed="'+showPairings+'"'+(s.pairs.length ? "" : " disabled")+'>'+
+      (showPairings ? "Vissza a név nélküli nézetre" : "Párosítások kivetítése nevekkel")+'</button>';
+    body = card("Futamriport", '<div class="row between"><p class="muted">Kivetítő · '+projectionLabel+'</p><div class="row">'+
+      showNames+action("download-host","Döntések és üzenetek letöltése · CSV","secondary",!s.pairs.some(p=>p.result))+'</div></div>'+resultSummary(groups)+filters+
       (cases.length ? pairList(cases.slice().reverse(),opened,selection) : empty("Itt nincs lezárt játék", "A befejezett esetek a megfelelő csoportban jelennek meg.")));
   } else if (tab === "players") {
     body = card("Játékosok és kapcsolatok", '<p class="muted">A kapcsolat az utolsó bejelentkezések alapján frissül.</p>'+roster(s));
@@ -183,15 +187,23 @@ export function trainer(s, context) {
   return '<div class="cockpit">'+toolbar+metrics+nav+body+'</div>';
 }
 
-export function projector(s, room, selection) {
+function namedPairings(pairs) {
+  if (!pairs.length) return empty("Még nincs párosítás", "A játék indítása után itt jelennek meg a párok.");
+  const rows = pairs.map(pair => '<tr><th scope="row">'+pair.number+'. játék</th><td>'+time(pair.startedAt)+'</td>'+
+    '<td>'+escape(pair.names[0])+'</td><td>'+escape(pair.names[1])+'</td></tr>').join("");
+  return '<div class="table-wrap projection-pairs"><table><thead><tr><th scope="col">Játék</th><th scope="col">Kezdés</th>'+
+    '<th scope="col">Egyik játékos</th><th scope="col">Másik játékos</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+export function projector(s, room, selection, showPairings = false) {
   const lobby = s.phase === "lobby", active = s.pairs.filter(p=>!p.result).length;
   const cases = selection.map(entry => s.pairs.find(pair => pair.number === entry.number && pair.result)).filter(Boolean);
   const stories = '<div class="projection-stories">'+cases.map((pair,index) =>
     card("Eset "+(index+1), '<section data-transcript="'+pair.number+'"><div data-transcript-body></div></section>','projection-case')).join("")+'</div>';
   return '<div class="projection">'+header("KIVETÍTŐ · "+room, "Chicken Run",
-    lobby ? "Olvasd be a QR-kódot, vagy add meg a szobakódot." : cases.length ? "Kiválasztott esetek" : "A futam összesített állása")+
+    lobby ? "Olvasd be a QR-kódot, vagy add meg a szobakódot." : showPairings ? "Ki kivel játszott?" : cases.length ? "Kiválasztott esetek" : "A futam összesített állása")+
     (lobby ? card("Belépés",'<div class="qr" id="inline-qr"></div><p class="qr-code">'+room+'</p><p>'+s.count+' résztvevő csatlakozott</p>',"invite")
-      : cases.length ? stories : resultSummary(pairGroups(s.pairs))+
+      : showPairings ? namedPairings(s.pairs) : cases.length ? stories : resultSummary(pairGroups(s.pairs))+
         '<p class="projection-status">'+active+' aktív pár · '+s.queue.length+' játékos vár új partnerre</p>')+'</div>';
 }
 export function personalReport(state, opened) {
