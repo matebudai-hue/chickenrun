@@ -1,4 +1,5 @@
-import { carPositions, pairGroups, legacyPoints, revealDuration } from "./story.js?v=12";
+import { carPositions, pairGroups, legacyPoints } from "./story.js?v=12";
+import { nightRoad } from "./live-race.js?v=13";
 
 export const moves = { go: "Halad", yield: "Kitér" };
 export const outcomes = {
@@ -24,22 +25,19 @@ const card = (title, body, extra = "") => '<section class="card '+extra+'"><h2>'
 const field = (id, label, placeholder, attrs = "") =>
   '<label for="'+id+'">'+label+'</label><input id="'+id+'" name="'+id+'" placeholder="'+placeholder+'" '+attrs+'>';
 
-function vehicle(other, [x,y], from, elapsed) {
+function vehicle(other, [x,y]) {
   const color = other ? "#a6e4ec" : "#ffb34a";
-  const animation = from ? ' class="car-motion" style="--dx:'+(from[0]-x)+'px;--dy:'+(from[1]-y)+'px;--delay:-'+elapsed+'ms"' : "";
-  return '<g transform="translate('+x+' '+y+')"><g'+animation+'><g transform="'+(other?'rotate(180)':'rotate(0)')+'"><path d="M36-9 129-27v54L36 9Z" fill="url(#beam)"/>'+
+  return '<g transform="translate('+x+' '+y+')"><g transform="'+(other?'rotate(180)':'rotate(0)')+'"><path d="M36-9 129-27v54L36 9Z" fill="url(#beam)"/>'+
     '<rect x="-36" y="-14" width="75" height="30" rx="10" fill="#0b1920" opacity=".8" transform="translate(0 4)"/>'+
     '<rect x="-26" y="-17" width="15" height="34" rx="3" fill="#0a1318"/><rect x="16" y="-17" width="15" height="34" rx="3" fill="#0a1318"/>'+
     '<path d="M-26-14H23q14 0 14 11v6q0 11-14 11h-49q-10 0-10-10v-8q0-10 10-10Z" fill="'+color+'" stroke="#f1f5ee" stroke-opacity=".6"/>'+
     '<path d="M-12-10h20l9 6v8l-9 6h-20l-7-5V-5Z" fill="#263d47"/><path d="M-5-10v20m13-18v16" stroke="#52747d" stroke-width="2"/>'+
     '<path d="M33-9v5m0 8v5" stroke="#fff6d7" stroke-width="4" stroke-linecap="round"/>'+
-    '<path d="M-32-8v4m0 8v4" stroke="#a63438" stroke-width="2.5" stroke-linecap="round"/></g></g></g>';
+    '<path d="M-32-8v4m0 8v4" stroke="#a63438" stroke-width="2.5" stroke-linecap="round"/></g></g>';
 }
 
-function road(distance = 1000, first = false, second = false, reveal = null) {
-  const [a,b] = carPositions(distance,first,second);
-  const elapsed = reveal ? performance.now() - reveal.started : 0;
-  const [previousA,previousB] = reveal && elapsed < revealDuration ? carPositions(reveal.distance) : [];
+function road(distance) {
+  const [a,b] = carPositions(distance);
   return '<svg class="road" viewBox="0 0 760 210" aria-hidden="true">'+
     '<defs><linearGradient id="beam"><stop stop-color="#fff3ca" stop-opacity=".6"/><stop offset="1" stop-color="#fff3ca" stop-opacity="0"/></linearGradient>'+
     '<pattern id="road-grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0v24" fill="none" stroke="#5d655a" opacity=".4"/></pattern></defs>'+
@@ -49,7 +47,7 @@ function road(distance = 1000, first = false, second = false, reveal = null) {
     '<path d="M0 58h760M0 152h760" stroke="#3b4038" stroke-width="1"/>'+
     '<path d="M0 105h760" stroke="#aba78a" stroke-width="2" stroke-dasharray="20 15" opacity=".65"/>'+
     '<path d="M380 57v97m-9-94h18m-18 90h18" stroke="#d9d2b6" stroke-dasharray="3 5" opacity=".52"/>'+
-    '<path d="M18 25h24m-12-12v24m688 148h24m-12-12v24" stroke="#8e987c" opacity=".65"/>'+    vehicle(false,a,previousA,elapsed)+vehicle(true,b,previousB,elapsed)+'</svg>';
+    '<path d="M18 25h24m-12-12v24m688 148h24m-12-12v24" stroke="#8e987c" opacity=".65"/>'+    vehicle(false,a)+vehicle(true,b)+'</svg>';
 }
 
 function coverArt() {
@@ -267,69 +265,56 @@ function rematch(s) {
     '<p class="muted">Legfeljebb 30 másodpercig keresünk új partnert.</p>';
 }
 
-function conversation(finished) {
-  const form = '<form id="chat-form" class="chat-form"><input id="message-input" name="message" aria-label="Üzeneted" placeholder="Üzenet a párodnak…" maxlength="240" autocomplete="off" required><button class="button secondary">Küldés</button></form><p id="chat-status" class="muted" role="status" hidden></p>';
-  return card("Üzenetek",(finished ? "" : form)+'<div class="messages" id="messages" role="log" aria-label="Párbeszéd"></div>'+
-    '<p class="muted chat-privacy">Az üzeneteket a párod és a tréner látja.</p>',"chat-card");
+function conversation(opened, finished) {
+  const input = '<form id="chat-form" class="chat-form"><input id="message-input" name="message" aria-label="Üzeneted" placeholder="Üzenet a párodnak…" maxlength="240" autocomplete="off" required><button class="button secondary">Küldés</button></form><p id="chat-status" class="muted" role="status" hidden></p>';
+  return '<div class="night-comms"><details id="night-chat"'+(opened.has("night-chat") ? " open" : "")+
+    '><summary aria-label="Üzenetelőzmények"><span id="latest-sender" class="night-sender">Üzenetek</span><span id="latest-message" aria-live="polite">Még nincs üzenet.</span></summary>'+
+    '<div class="night-chat-history"><p class="chat-privacy">Az üzeneteket a párod és a tréner látja.</p><div class="messages" id="messages" aria-label="Párbeszéd"></div></div>'+
+    '</details>'+(finished ? "" : input)+'</div>';
 }
-
-function timedPlayer(s, {room,opened,turnPending}) {
+function timedControls(s, turnPending) {
+  if (s.race.startsAt === null) return '<p class="night-status" role="status">'+
+    (s.race.ready ? "A párod képernyőjére várunk…" : "Kapcsolódás a rajthoz…")+'</p>';
+  if (s.race.target) return '<p class="night-status" role="status">Kitérés rögzítve · '+s.race.target+' m</p>';
+  if (turnPending) return '<p class="night-status" role="status">Kitérés elküldve…</p>';
+  return '<div class="night-actions">'+action("turn",'Kitérek <span aria-hidden="true">↗</span>',"primary",true)+'</div>'+
+    '<p class="night-hint" data-race-hint>Kitérés a következő pontnál</p>';
+}
+function stepControls(s, pendingDecision, reveal) {
+  if (s.waiting) return '<p class="night-status" role="status">Döntésed rögzítve <small>A másik autóra vársz.</small></p>';
+  if (pendingDecision) return '<p class="night-status" role="status">A döntésed visszaigazolására várunk.</p>'+
+    action("retry-decision","Döntés ellenőrzése","secondary");
+  return '<div class="night-actions steps">'+action("go","Haladok","secondary",Boolean(reveal))+
+    action("yield",'Kitérek <span aria-hidden="true">↗</span>',"primary",Boolean(reveal))+'</div>';
+}
+function resultOverlay(s) {
+  const title = s.reason === "ready-timeout" ? "A rajt elmaradt" : outcomes[s.outcome];
+  const distance = s.history.at(-1)?.distance;
+  const detail = s.reason === "ready-timeout" ? "A rajthoz hiányzott egy kapcsolati jelzés."
+    : Number.isFinite(distance) ? distance+" m" : "";
+  return '<div class="night-result" role="status"><span>FUTAM VÉGE</span><strong>'+title+'</strong>'+
+    (detail ? '<small>'+detail+'</small>' : "")+'</div>';
+}
+function nightPlayer(s, {room,opened,turnPending,pendingDecision,reveal}) {
   const finished = Boolean(s.result);
-  const last = s.history.at(-1);
-  const controls = finished ? '<div class="feedback '+(s.result === "crash" ? "critical" : "good")+'" role="status"><strong>'+
-    (s.reason === "ready-timeout" ? "A rajt elmaradt" : outcomes[s.outcome])+'</strong><p>'+
-    (s.reason === "ready-timeout" ? "A rajthoz nem érkezett meg mindkét kapcsolati jelzés. Új játékot kérhetsz." : "A játék véget ért.")+
-    '</p></div><div class="stack rematch">'+rematch(s)+'</div>'
-    : s.race.startsAt === null ? '<div class="feedback warm" role="status"><strong>'+
-      (s.race.ready ? "A párod képernyőjére várunk…" : "Kapcsolódás a rajthoz…")+'</strong></div>'
-    : s.race.target ? '<div class="feedback good" role="status"><strong>Kitérés rögzítve · '+s.race.target+' m</strong></div>'
-    : turnPending ? '<div class="feedback warm" role="status"><strong>Kitérés elküldve…</strong></div>'
-    : '<div class="action-grid timed-action">'+action("turn","Kitérek","primary",true)+
-      '<p class="muted" data-race-cutoff hidden>Az utolsó kitérési pont elmúlt.</p></div>';
-  const stage = '<section class="card race-card timed-race"'+(finished ? "" : ' data-live-race')+'><div class="race-meta">'+
-    '<div><p class="eyebrow">TÁVOLSÁG KÖZTETEK</p><p class="distance"><b data-race-distance>'+s.distance+'</b> <span>m</span></p></div>'+
-    '<span class="badge light" data-race-time>'+ (finished ? "Vége" : s.race.startsAt === null ? "Rajt előtt" : "Rajt…")+'</span></div>'+
-    (finished ? "" : '<progress max="45000" value="0" aria-label="Eltelt játékidő"></progress>')+
-    '<div class="live-road">'+road(s.distance,finished && last?.own==="yield",finished && last?.other==="yield")+
-    '<span class="race-flash" data-race-mark aria-hidden="true" hidden></span></div>'+
-    '<div class="legend"><span>● Te</span><span>● A másik autó</span></div>'+controls+'</section>';
-  return '<div class="play'+(finished ? "" : " playing")+'">'+header("SZOBA "+room+" · "+s.number+". JÁTÉK",finished ? "Játék vége" : "Folyamatos futam",
-    finished ? "Itt találod a futamod eredményét." : "Az autó halad. A gombbal a következő pontnál térsz ki.")+
-    '<div class="play-grid">'+stage+(finished ? personalReport(s,opened) : conversation(false))+'</div>'+
-    (finished && s.messages.length ? '<details id="closed-chat" class="closed-chat"'+(opened.has("closed-chat") ? " open" : "")+
-      '><summary>Lezárt üzenetváltás</summary>'+conversation(true)+'</details>' : finished ? "" : personalReport(s,opened))+'</div>';
+  const timeLabel = finished ? "Vége" : s.race ? s.race.startsAt === null ? "Rajt előtt" : "Rajt…"
+    : (s.step+1)+" / "+(s.totalSteps ?? legacyPoints.length)+". pont";
+  const result = finished ? resultOverlay(s) : "";
+  return '<section class="night-game'+(finished ? " night-finished" : " night-playing")+
+    '" aria-label="Chicken Run · '+(s.race ? "Folyamatos futam" : "Döntési pontonként")+
+    '"'+(reveal ? ' data-night-reveal' : '')+(s.result === "crash" ? ' data-night-crash' : '')+'>'+
+    '<div class="night-id"><span>FUTAM / '+String(s.number).padStart(2,"0")+'</span><span>'+room+'</span></div>'+
+    nightRoad(s.distance,timeLabel,s.race || finished ? "" : s.distance+" M",result)+
+    '<div class="night-console">'+(!finished || s.messages.length ? conversation(opened,finished) : "")+
+    (finished ? '<div class="stack rematch">'+rematch(s)+'</div>' :
+      s.race ? timedControls(s,turnPending) : stepControls(s,pendingDecision,reveal))+'</div>'+
+    (finished ? personalReport(s,opened) : "")+'</section>';
 }
 export function player(s, context) {
-  const { room, opened, pendingDecision, reveal } = context;
+  const { room } = context;
   if (s.phase === "lobby") return '<div class="player-shell"><div class="banner">'+road(920)+'</div>'+
     waitingPage(room,"A rajtra vársz", "Sikeresen csatlakoztál. A tréner indítja a párosítást.",
       '<p class="lobby-counter"><strong>'+s.count+'</strong> résztvevő a váróban</p>')+'</div>';
   if (s.spectator) return waitingPage(room,"Új játék","A párosítás a jelentkezők között történik.",rematch(s));
-  if (s.race) return timedPlayer(s,context);
-  const last = s.history.at(-1);
-  const finished = Boolean(s.result);
-  const choice = pendingDecision?.choice;
-  const revealing = Boolean(reveal);
-  const controls = finished ? '<div class="feedback '+(s.result === "crash" ? "critical" : "good")+'" role="status"><strong>'+
-    outcomes[s.outcome]+'</strong><p>A játék véget ért.</p></div><div class="stack rematch">'+rematch(s)+'</div>'
-    : s.waiting ? '<div class="feedback good" role="status"><strong>Döntésed rögzítve</strong>'+
-      '<p>A másik autó döntésére vársz.</p></div>'
-    : choice ? '<div class="feedback warm" role="status"><strong>A döntésed visszaigazolására várunk</strong>'+
-      '<p>A választásod: '+moves[choice]+'.</p></div>'+action("retry-decision","Döntés ellenőrzése","secondary")
-    : '<div class="action-grid">'+action("go","Haladok","primary",revealing)+action("yield","Kitérek","primary",revealing)+'</div>';
-
-  const stage = '<section class="card race-card"><div class="race-meta"><div><p class="eyebrow">TÁVOLSÁG KÖZTETEK</p>'+
-    '<p class="distance">'+s.distance+' <span>m</span></p></div>'+badge((s.step+1)+'. pont / '+(s.totalSteps ?? legacyPoints.length),"light")+'</div>'+
-    road(s.distance,finished && last?.own==="yield",finished && last?.other==="yield",reveal)+
-    '<div class="legend"><span>● Te</span><span>● A másik autó</span></div>'+
-    (last ? '<p class="decision-reveal" role="status"><strong>'+
-      (s.result && s.result !== "stopped" ? "Az utolsó döntés" : "Mindketten továbbmentetek")+'</strong>'+
-      '<span>'+last.distance+' m · Te: '+moves[last.own]+' · A másik autó: '+moves[last.other]+'</span></p>' : "")+
-    controls+'</section>';
-  const chat = conversation(finished);
-  return '<div class="play'+(finished ? "" : " playing")+'">'+header("SZOBA "+room+" · "+s.number+". JÁTÉK",finished ? "Játék vége" : "Szemben az úton",
-    finished ? (s.phase === "closed" ? "Itt találod a döntéseidet." : "Nézd meg a döntéseidet, vagy kérj új partnert.") : "Haladsz tovább vagy kitérsz?")+
-    '<div class="play-grid">'+stage+(finished ? personalReport(s,opened) : chat)+'</div>'+
-    (finished && s.messages.length ? '<details id="closed-chat" class="closed-chat"'+(opened.has("closed-chat") ? " open" : "")+
-      '><summary>Lezárt üzenetváltás</summary>'+chat+'</details>' : finished ? "" : personalReport(s,opened))+'</div>';
+  return nightPlayer(s,context);
 }

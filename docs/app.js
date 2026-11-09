@@ -1,7 +1,7 @@
-import { animateRace } from "./live-race.js?v=12";
+import { animateRace } from "./live-race.js?v=13";
 import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration } from "./story.js?v=12";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=12";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=13";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -110,7 +110,13 @@ function update(next, started = performance.now()) {
     messageRequest = undefined;
   }
   if (!isTrainer) {
-    const transition = next.race ? null : nextReveal(previous,next);
+    const raceFinished = next.race && next.history?.length && next.result &&
+      previous?.number === next.number && !previous.result;
+    const shown = Number(screen.querySelector("[data-night-road]")?.dataset.position);
+    const transition = raceFinished ? {
+      distance: Number.isFinite(shown) ? shown : next.distance,
+      started: performance.now(),
+    } : next.race ? null : nextReveal(previous,next);
     if (transition) {
       reveal = transition;
       clearTimeout(revealTimer);
@@ -516,6 +522,13 @@ function paintChat() {
   if (!log) return;
   const bottom = log.scrollHeight - log.clientHeight - log.scrollTop < 36;
   const scrollTop = log.scrollTop;
+  const latest = state.messages.at(-1);
+  const sender = document.querySelector("#latest-sender");
+  const preview = document.querySelector("#latest-message");
+  const label = latest ? latest.own ? "Te" : "A másik autó" : "Üzenetek";
+  const message = latest?.text ?? "Még nincs üzenet.";
+  if (sender.textContent !== label) sender.textContent = label;
+  if (preview.textContent !== message) preview.textContent = message;
   log.replaceChildren();
   if (!state.messages.length) log.innerHTML = '<p class="muted">Még nincs üzenet.</p>';
   for (const item of state.messages) {
@@ -540,6 +553,7 @@ function render() {
   }
   const active = document.activeElement;
   const focusId = screen.contains(active) ? active.id : "";
+  const keepChatFocus = active.matches("#night-chat > summary");
   const caret = focusId === "message-input" ? [active.selectionStart,active.selectionEnd] : null;
   stopAnimation?.();
   const log = document.querySelector("#messages");
@@ -570,10 +584,10 @@ function render() {
     paintChat();
     const nextLog = document.querySelector("#messages");
     if (nextLog) nextLog.scrollTop = stickToBottom ? nextLog.scrollHeight : oldScroll;
-    if (state.race && !state.result) stopAnimation = animateRace(screen,state.race,() => performance.now()+raceOffset,() => busy);
+    stopAnimation = animateRace(screen,state,() => performance.now()+raceOffset,() => busy,reveal);
   }
   paintQr(document.querySelector("#inline-qr"));
-  const restore = focusId && document.getElementById(focusId);
+  const restore = keepChatFocus ? screen.querySelector("#night-chat > summary") : focusId && document.getElementById(focusId);
   if (restore) {
     restore.focus({preventScroll:true});
     if (caret) restore.setSelectionRange(...caret);
@@ -659,7 +673,10 @@ screen.addEventListener("click", event => {
   }
 });
 screen.addEventListener("toggle", event => {
-  if (event.target.matches("details[open]")) paintPairStories();
+  if (event.target.id === "night-chat" && event.target.open) {
+    const log = event.target.querySelector("#messages");
+    log.scrollTop = log.scrollHeight;
+  } else if (event.target.matches("details[open]")) paintPairStories();
 }, true);
 dialog.addEventListener("click", event => {
   const button = event.target.closest("button");
