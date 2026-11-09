@@ -410,7 +410,7 @@ function render() {
   }
   const active = document.activeElement;
   const focusId = screen.contains(active) ? active.id : "";
-  const selection = focusId === "message-input" ? [active.selectionStart,active.selectionEnd] : null;
+  const caret = focusId === "message-input" ? [active.selectionStart,active.selectionEnd] : null;
   const log = document.querySelector("#messages");
   const oldScroll = log?.scrollTop ?? 0;
   const stickToBottom = !log || log.scrollHeight-log.clientHeight-oldScroll < 36;
@@ -444,7 +444,7 @@ function render() {
   const restore = focusId && document.getElementById(focusId);
   if (restore) {
     restore.focus({preventScroll:true});
-    if (selection) restore.setSelectionRange(...selection);
+    if (caret) restore.setSelectionRange(...caret);
   }
   if (busy) lockButtons(true);
 }
