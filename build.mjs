@@ -4,6 +4,7 @@ const files = {
   "/style.css": "text/css; charset=utf-8",
   "/app.js": "text/javascript; charset=utf-8",
   "/connection.js": "text/javascript; charset=utf-8",
+  "/story.js": "text/javascript; charset=utf-8",
   "/views.js": "text/javascript; charset=utf-8",
   "/icon.svg": "image/svg+xml",
   "/qr.js": "text/javascript; charset=utf-8",

@@ -1,5 +1,6 @@
-import { command, readState, saved, secret } from "./connection.js?v=4";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=4";
+import { changeSelection, nextReveal, pairStory, points, revealDuration } from "./story.js?v=5";
+import { command, readState, saved, secret } from "./connection.js?v=5";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=5";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -17,11 +18,14 @@ const roomKey = "cr:"+(isTrainer ? "host" : "player")+":"+room;
 const decisionKey = "cr:pending-decision:"+room;
 const joinKey = "cr:pending-join:"+room;
 const createKey = "cr:pending-create";
+const selectionKey = "cr:projection:"+room;
 
 let auth = saved.get(roomKey);
 let state, signature, loadFailure, errorRetry, pollTimer;
 let busy = false, polling = false, generation = 0, lastPulse = 0;
-let selectedTab = "overview", draft = "", messageRequest, confirmAction;
+let selectedTab = "overview", filter = "all", draft = "", messageRequest, confirmAction;
+let reveal, revealTimer;
+let selection = readSelection();
 let pendingDecision;
 try { pendingDecision = JSON.parse(saved.get(decisionKey)); } catch {}
 const transcriptCache = new Map();
@@ -33,6 +37,28 @@ function roomLink(code, view) {
   url.searchParams.set("room", code);
   if (view) url.searchParams.set("view", view);
   return url.href;
+}
+
+function readSelection() {
+  try {
+    const entries = JSON.parse(saved.get(selectionKey));
+    return Array.isArray(entries) ? entries.filter(entry =>
+      entry && Number.isInteger(entry.number) && entry.number > 0 && Array.isArray(entry.quotes)).slice(0,2) : [];
+  } catch { return []; }
+}
+
+function selectStory(number, quote) {
+  const current = state.pairs.find(pair => pair.number === number && pair.result);
+  if (!current) return;
+  const next = changeSelection(selection,number,quote);
+  if (next === selection) {
+    if (quote === undefined) showNotice("A kivetítőn két eset fér el. Előbb vegyél le egyet.");
+    return;
+  }
+  selection = next;
+  saved.set(selectionKey,JSON.stringify(selection));
+  showNotice();
+  render();
 }
 
 function endpoint(action) {
@@ -63,6 +89,17 @@ function update(next) {
   if (previous?.number !== next.number) {
     draft = "";
     messageRequest = undefined;
+  }
+  if (!isTrainer) {
+    const transition = nextReveal(previous,next);
+    if (transition) {
+      reveal = transition;
+      clearTimeout(revealTimer);
+      revealTimer = setTimeout(() => { reveal = null; render(); }, revealDuration + 20);
+    } else if (previous?.number !== next.number) {
+      clearTimeout(revealTimer);
+      reveal = null;
+    }
   }
   resolveDecision(next);
   const nextSignature = JSON.stringify(next);
@@ -272,24 +309,53 @@ async function downloadTrainerReport(button) {
   }
 }
 
-function paintTranscript(section, pair, messages) {
+function renderPairStory(section, pair, messages, projected, loading = false) {
+  const picked = selection.find(entry => entry.number === pair.number);
+  const names = projected ? ["Játékos A",pair.bot ? "Tesztjátékos" : "Játékos B"] : pair.names.map(escape);
+  const events = pairStory(pair,messages,projected ? picked?.quotes ?? [] : null);
+  let distance;
+  const rows = events.map(event => {
+    const showDistance = distance !== event.distance;
+    distance = event.distance;
+    const marker = showDistance ? '<h4>'+(distance === undefined ? "Korábbi üzenetek" : distance+" m")+'</h4>' : "";
+    let content;
+    if (event.kind === "message") {
+      const selected = picked?.quotes.includes(event.index) ?? false;
+      const quoteButton = !projected && picked
+        ? '<button id="quote-'+pair.number+'-'+event.index+'" type="button" class="text-link" data-do="project-quote" data-number="'+
+          pair.number+'" data-quote="'+event.index+'" aria-pressed="'+selected+'">'+
+          (selected ? "Idézet elrejtése" : "Idézet kivetítése")+'</button>' : "";
+      content = '<strong>'+names[event.seat]+'</strong><blockquote>'+escape(event.text)+'</blockquote>'+quoteButton;
+    } else if (event.kind === "choice") {
+      content = '<strong>'+names[event.seat]+'</strong> · '+moves[event.choice]+' <small>(beküldve)</small>';
+    } else {
+      const next = points[points.indexOf(event.distance)+1];
+      const bothGo = event.choices.every(choice => choice === "go");
+      const summary = bothGo ? next ? "Tovább "+next+" méterre" : "Ütközés"
+        : event.choices.every(choice => choice === "yield") ? "Mindketten kitértek" : names[event.choices.indexOf("yield")]+" tért ki";
+      content = '<strong>'+summary+'</strong><span class="story-choices">'+
+        names[0]+': '+moves[event.choices[0]]+' · '+names[1]+': '+moves[event.choices[1]]+'</span>';
+    }
+    return '<li class="story-event '+event.kind+'">'+marker+'<div class="story-body">'+
+      (!projected ? '<span class="story-time">'+time(event.at)+'</span>' : '')+'<div>'+content+'</div></div></li>';
+  }).join("");
   const target = section.querySelector("[data-transcript-body]");
-  target.innerHTML = messages.length
-    ? '<ol class="transcript-list">'+messages.map(message => '<li><header><strong>'+escape(pair.names[message.seat])+
-      '</strong><small>'+(message.distance ? message.distance+" m · " : "")+time(message.at)+
-      '</small></header><p>'+escape(message.text)+'</p></li>').join("")+'</ol>'
-    : '<p class="muted">Nem váltottak üzenetet.</p>';
+  target.innerHTML = (loading ? '<p class="muted">Üzenetek betöltése…</p>' : "")+
+    (rows ? '<ol class="story-events">'+rows+'</ol>' : loading ? "" : '<p class="muted">Ehhez a játékhoz még nincs megjeleníthető esemény.</p>')+
+    (pair.result === "stopped" ? '<p class="muted">A tréner lezárta a játékot.</p>' : "");
 }
 
-async function paintTranscripts() {
-  if (mode !== "host" || !state?.pairs) return;
-  for (const section of screen.querySelectorAll("details[open] [data-transcript]")) {
+function paintPairStories() {
+  if (!isTrainer || !state?.pairs) return;
+  const projected = mode === "projector";
+  const selector = projected ? "[data-transcript]" : "details[open] [data-transcript]";
+  for (const section of screen.querySelectorAll(selector)) {
     const number = Number(section.dataset.transcript);
     const pair = state.pairs.find(p => p.number === number);
     if (!pair) continue;
     const count = pair.messageCount ?? 0;
-    if (!count) {
-      paintTranscript(section,pair,[]);
+    if (!count || (projected && !selection.find(entry => entry.number === number)?.quotes.length)) {
+      renderPairStory(section,pair,[],projected);
       continue;
     }
     let entry = transcriptCache.get(number);
@@ -298,22 +364,25 @@ async function paintTranscripts() {
       transcriptCache.set(number,entry);
     }
     if (entry.messages) {
-      if (!section.dataset.loaded) paintTranscript(section,pair,entry.messages);
+      if (section.dataset.loaded !== String(count)) renderPairStory(section,pair,entry.messages,projected);
       section.dataset.loaded = String(count);
       continue;
     }
-    section.querySelector("[data-transcript-body]").innerHTML = '<p class="muted">Üzenetek betöltése…</p>';
+    if (section.dataset.loading === String(count)) continue;
+    section.dataset.loading = String(count);
+    renderPairStory(section,pair,[],projected,true);
     const current = entry;
     void current.request.then(result => {
       current.messages = result.pairs[0]?.messages ?? [];
       if (!section.isConnected || transcriptCache.get(number) !== current) return;
-      paintTranscript(section,pair,current.messages);
+      renderPairStory(section,pair,current.messages,projected);
       section.dataset.loaded = String(count);
     }, () => {
       if (transcriptCache.get(number) === current) transcriptCache.delete(number);
       if (!section.isConnected) return;
-      section.querySelector("[data-transcript-body]").innerHTML =
-        '<button type="button" class="button small secondary" data-do="retry-transcript">Üzenetek újratöltése</button>';
+      delete section.dataset.loading;
+      section.querySelector("[data-transcript-body]").insertAdjacentHTML("afterbegin",
+        '<button type="button" class="button small secondary" data-do="retry-transcript">Üzenetek újratöltése</button>');
     });
   }
 }
@@ -345,7 +414,7 @@ function render() {
   const log = document.querySelector("#messages");
   const oldScroll = log?.scrollTop ?? 0;
   const stickToBottom = !log || log.scrollHeight-log.clientHeight-oldScroll < 36;
-  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision };
+  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reveal };
   if (!room) {
     const previous = saved.get("cr:last-host");
     screen.innerHTML = mode === "player" ? enterCode() : home(codeValid.test(previous ?? "") ? previous : null, roomLink);
@@ -360,10 +429,11 @@ function render() {
   } else if (!state) {
     screen.innerHTML = waitingPage(room,"Kapcsolódás…","A futam állását töltjük be.");
   } else if (mode === "projector") {
-    screen.innerHTML = projector(state,room);
+    screen.innerHTML = projector(state,room,selection);
+    paintPairStories();
   } else if (isTrainer) {
     screen.innerHTML = trainer(state,context);
-    void paintTranscripts();
+    paintPairStories();
   } else {
     screen.innerHTML = player(state,context);
     paintChat();
@@ -441,10 +511,15 @@ screen.addEventListener("click", event => {
   else if (action === "copy") void copyLink(button);
   else if (action === "download-host") void downloadTrainerReport(button);
   else if (action === "download-player") downloadPersonalReport();
-  else if (action === "retry-transcript") void paintTranscripts();
+  else if (action === "retry-transcript") paintPairStories();
+  else if (action === "filter") {
+    filter = button.dataset.filter;
+    render();
+  } else if (action === "project-pair") selectStory(Number(button.dataset.number));
+  else if (action === "project-quote") selectStory(Number(button.dataset.number),Number(button.dataset.quote));
 });
 screen.addEventListener("toggle", event => {
-  if (event.target.matches("details[open]")) void paintTranscripts();
+  if (event.target.matches("details[open]")) paintPairStories();
 }, true);
 dialog.addEventListener("click", event => {
   const button = event.target.closest("button");
@@ -456,6 +531,12 @@ dialog.addEventListener("click", event => {
     confirmAction = undefined;
   }
   if ("copy" in button.dataset) void copyLink(button);
+});
+window.addEventListener("storage", event => {
+  if (event.key === selectionKey && isTrainer) {
+    selection = readSelection();
+    if (state) render();
+  }
 });
 window.addEventListener("online", () => nextPoll());
 window.addEventListener("offline", () => setConnection("slow","Nincs internetkapcsolat"));
