@@ -1,23 +1,24 @@
 # Chicken Run
 
-Önálló, magyar nyelvű, többjátékos tréningjáték. A tréner futamot indít, a játékosok pedig a QR-kóddal vagy a szobakóddal, fiók és név nélkül csatlakoznak. Indításkor véletlen párokat kapnak. Egy szobában legfeljebb 40 fő játszhat. Páratlan létszámnál a rendszer egy megfigyelőt sorsol.
+Önálló, magyar nyelvű, többjátékos tréningjáték. A tréner futamot indít, a játékosok a QR-kóddal vagy a szobakóddal, fiók nélkül csatlakoznak. Az opcionális nevet vagy becenevet csak a tréner látja. Egy szobában legfeljebb 40 résztvevő játszhat.
 
 ## Játékmenet
 
-A távolság a két autó között értendő. Ha mindketten haladnak, normál lépésben mindkét autó 100 métert tesz meg. A döntési pontok: 1000, 800, 600, 400, 200, 50 és 10 méter. A két autó a finálé rövidebb szakaszain is egyenlő távolságot tesz meg.
+- Az első párosítás véletlen. Páratlan létszámnál a pár nélkül maradt résztvevő egy automatikus tesztjátékost kap.
+- Az autók 1000 méterre indulnak egymástól. A következő döntési pontok 800, 600, 400, 200, 50 és 10 méternél vannak.
+- A választás akkor válik láthatóvá, amikor mindkét fél beküldte. Kitérésnél véget ér a játék. Ha 10 méternél is mindketten haladnak, ütköznek. A párok játék közben üzenhetnek egymásnak.
+- Az **Új játékot indítok** gombbal a résztvevő várólistára kerül. A rendszer olyan másik résztvevőt keres, aki ugyanezt választotta, és akivel az előző játékban egyikük sem volt párban.
+- A **Saját döntési riport** az összes befejezett játékot és az egyes döntések távolságát, időpontját és kimenetelét mutatja. A tréner látja a név szerinti párokat, az aktuális állást és a közösen lezárt döntéseket. A futam lezárása után a riportok a szoba lejártáig elérhetők.
 
-Mindkét játékos titokban küld be egy döntést. Egy döntés után a felület várakozást jelez, és a másik választását csak a két beküldés után mutatja. Kitérésnél véget ér a pár futama. Ha mindketten haladnak 10 méternél is, ütköznek. A párok a játék közben szabad szövegben üzenhetnek egymásnak. A tréneri nézet a párok állását és összesített kimeneteleiket mutatja.
+## Közzététel
 
-## Helyi futtatás és ellenőrzés
+A játékos- és a tréneri felület címe: https://matebudai-hue.github.io/chickenrun/. A GitHub Pages a main ág docs mappáját szolgálja ki. A valós idejű játékállapotot a Chicken Run saját háttérszolgáltatása kezeli. A szobák nyolc óra után lejárnak. A tréneri hozzáférés a futamot indító böngészőben érhető el.
+
+## Helyi futtatás
 
 Node.js 22.13 vagy újabb szükséges. Nincs telepítendő csomag.
 
-```sh
-npm test
-npm start
-```
+    npm test
+    npm start
 
-A helyi cím: http://localhost:8080. A helyi játékállapotot a folyamat memóriája tárolja. A távoli résztvevők az internetes kiadást használják, ahol a szobákat a játék saját adatbázisa tartja meg a futam idejére. A szobák nyolc óra után lejárnak.
-
-A `npm run build` elkészíti a Worker-csomagot. A hosztolt változat a `DB` adatbáziskötést és a `drizzle/` migrációt használja. A QR-kódot a vendég böngészője állítja elő. A beépített QR-kód-könyvtár licence a `public/QR-LICENSE.txt` fájlban van.
-
+Helyben a http://localhost:8080 címen fut, és a játékállapotot a folyamat memóriája tárolja. Az npm run build elkészíti a Worker-csomagot. A hosztolt háttérszolgáltatás a DB adatbáziskötést és a drizzle/ migrációt használja. A QR-kódot a vendég böngészője állítja elő. A QR-kód-könyvtár licence a docs/QR-LICENSE.txt fájlban van.

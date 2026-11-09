@@ -7,13 +7,28 @@ const headers = {
   "Referrer-Policy": "no-referrer",
 };
 
+const pagesOrigin = "https://matebudai-hue.github.io";
+
+async function handleApi(request, env) {
+  const cors = new Headers({ Vary: "Origin" });
+  if (request.headers.get("Origin") === pagesOrigin) {
+    cors.set("Access-Control-Allow-Origin", pagesOrigin);
+    cors.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    cors.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    cors.set("Access-Control-Max-Age", "600");
+  }
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  const response = env.DB
+    ? await api(request, d1Store(env.DB))
+    : Response.json({ error: "Az adatbázis nem elérhető." }, { status: 503 });
+  for (const [key, value] of cors) response.headers.set(key, value);
+  return response;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/api/")) {
-      if (!env.DB) return Response.json({ error: "Az adatbázis nem elérhető." }, { status: 503 });
-      return api(request, d1Store(env.DB));
-    }
+    if (url.pathname.startsWith("/api/")) return handleApi(request, env);
     if (request.method !== "GET" && request.method !== "HEAD") {
       return new Response("Érvénytelen kérés.", { status: 405, headers });
     }

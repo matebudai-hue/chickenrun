@@ -18,10 +18,13 @@ async function create(n = 2) {
   const { body: host } = await call("/api/rooms", null, {});
   const room = (action, who, body) => call("/api/rooms/"+host.room+"/"+action, who, body);
   const players = Array.from({length:n},secret);
-  for (const who of players) assert.equal((await room("join",who,{})).status, 200);
+  const labels = players.map((_, index) => "Tesztelő " + (index + 1));
+  for (const [index, who] of players.entries()) {
+    assert.equal((await room("join",who,{label:labels[index]})).status, 200);
+  }
   assert.equal((await room("start",players[0],{})).status, 403);
   assert.equal((await room("start",host.token,{})).status, 200);
-  return { room, host, players };
+  return { room, host, players, labels };
 }
 
 test("decision stays private and both advance through all seven distances", async () => {
@@ -49,17 +52,25 @@ test("concurrent decisions commit once and reveal both choices at 50 m", async (
   for(let step=0;step<5;step++) await Promise.all([a,b].map(p=>room("decision",p,{step,choice:"go"})));
   assert.equal((await room("state",a)).body.distance,50);
   await Promise.all([room("decision",a,{step:5,choice:"yield"}),room("decision",b,{step:5,choice:"go"})]);
-  assert.equal((await room("state",a)).body.yielded,true);
-  assert.equal((await room("state",b)).body.yielded,false);
+  assert.equal((await room("state",a)).body.outcome,"own");
+  assert.equal((await room("state",b)).body.outcome,"other");
   assert.equal((await room("state",a)).body.history.length,6);
 });
 
-test("messages are pair-only, duplicate messages do not repeat, odd player observes",async()=>{
+test("messages are pair-only, duplicate messages do not repeat, odd player gets a bot",async()=>{
   const {room,host,players}=await create(5);
   const statuses=await Promise.all(players.map(p=>room("state",p)));
-  assert.equal(statuses.filter(x=>x.body.spectator).length,1);
-  const sender=players[statuses.findIndex(x=>!x.body.spectator)];
-  const message={step:0,id:secret(),text:"<b>Haladok!</b>"};
+  assert.equal(statuses.filter(x=>x.body.number > 0).length,5);
+  const pairs = (await room("state",host.token)).body.pairs;
+  const botPair = pairs.find(p => p.names.includes("Tesztjátékos"));
+  assert.equal(pairs.filter(p => p.names.includes("Tesztjátékos")).length, 1);
+  const botOpponent = players[statuses.findIndex(x => x.body.number === botPair.number)];
+  const senderIndex = statuses.findIndex(x => x.body.number !== botPair.number);
+  const sender = players[senderIndex];
+  const finished = await room("decision",botOpponent,{number:botPair.number,step:0,choice:"yield"});
+  assert.equal(finished.body.report[0].bot,true);
+  assert.deepEqual(finished.body.history.map(h => [h.own,h.other]),[["yield","go"]]);
+  const message={number:statuses[senderIndex].body.number,step:0,id:secret(),text:"<b>Haladok!</b>"};
   await room("message",sender,message);
   await room("message",sender,message);
   const views=await Promise.all(players.map(p=>room("state",p)));
@@ -71,3 +82,43 @@ test("messages are pair-only, duplicate messages do not repeat, odd player obser
   assert.equal((await room("stop",host.token,{})).body.results.stopped,2);
 });
 
+
+test("finished players requeue once and are paired with different willing humans", async () => {
+  const {room,host,players,labels} = await create(4);
+  const first = await Promise.all(players.map(player => room("state",player).then(r => r.body)));
+  await Promise.all(players.map((p,i) => room("decision",p,{number:first[i].number,step:0,choice:"yield"})));
+  const oldPartner = first.findIndex((s,i) => i !== 0 && s.number === first[0].number);
+  const join = i => room("requeue",players[i],{number:first[i].number});
+  assert.equal((await join(0)).body.queued,true);
+  assert.equal((await join(oldPartner)).body.queued,true);
+  assert.equal((await room("state",host.token)).body.pairs.length,2);
+
+  await Promise.all(players.map((_,i) => join(i)));
+  const second = await Promise.all(players.map(player => room("state",player).then(r => r.body)));
+  assert.equal(new Set(second.map(s => s.number)).size,2);
+  assert.notEqual(second[0].number,second[oldPartner].number);
+  assert.ok(second.every(s => !s.queued && s.number > 2 && s.report.length === 1));
+  assert.ok(second.every(s => labels.every(label => !JSON.stringify(s).includes(label))));
+  assert.equal((await room("decision",players[0],{number:first[0].number,step:0,choice:"go"})).body.waiting,false);
+  await Promise.all(players.map((p,i) => room("decision",p,{number:second[i].number,step:0,choice:"yield"})));
+
+  const report = (await room("state",players[0])).body.report;
+  assert.equal(report.length,2);
+  assert.ok(report.every(r => r.outcome === "both" && r.history[0].own === "yield" && r.history[0].at > 0));
+  const admin = (await room("state",host.token)).body;
+  assert.equal(admin.pairs.length,4);
+  assert.ok(admin.pairs.every(p => p.names.length === 2 && p.history[0].choices.every(c => c === "yield")));
+  await room("stop",host.token,{});
+  assert.equal((await room("requeue",players[0],{number:second[0].number})).status,409);
+  assert.equal((await room("state",players[0])).body.report.length,2);
+});
+
+test("a lone player can play the bot, cancel waiting, and keep the report", async () => {
+  const {room,players:[player]} = await create(1);
+  const played = await room("decision",player,{number:1,step:0,choice:"yield"});
+  assert.equal(played.body.outcome,"own");
+  assert.equal((await room("requeue",player,{number:1})).body.queued,true);
+  const cancelled = await room("cancel",player,{number:1});
+  assert.equal(cancelled.body.queued,false);
+  assert.equal(cancelled.body.report.length,1);
+});

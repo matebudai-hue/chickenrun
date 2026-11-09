@@ -55,8 +55,24 @@ function shuffle(items) {
   }
   return copy;
 }
+function playerName(room, id) {
+  if (id === null) return "Tesztjátékos";
+  const index = room.players.findIndex(player => player.id === id);
+  return room.players[index].label || "Játékos " + (index + 1);
+}
 function activePair(room, id) {
-  return room.pairs.find(p => p.players.includes(id));
+  const index = room.pairs.findLastIndex(pair => pair.players.includes(id));
+  return { pair: room.pairs[index], number: index + 1 };
+}
+function playerHistory(pair, seat) {
+  return pair.history.map(row => ({
+    distance: row.distance, at: row.submitted?.[seat] ?? row.at, own: row.choices[seat], other: row.choices[1 - seat],
+  }));
+}
+function outcome(pair, seat) {
+  return pair.result === "a" || pair.result === "b"
+    ? pair.result === (seat === 0 ? "a" : "b") ? "own" : "other"
+    : pair.result;
 }
 function view(room, auth) {
   const base = { phase: room.phase };
@@ -66,38 +82,74 @@ function view(room, auth) {
       if (pair.result) results[pair.result]++;
       return {
         number: i + 1, distance: pair.result === "crash" ? 0 : DISTANCES[pair.step],
-        ready: pair.choices.filter(Boolean).length, result: pair.result,
-        history: pair.history,
+        ready: pair.result ? 0 : pair.choices.filter(Boolean).length, result: pair.result,
+        names: pair.players.map(id => playerName(room, id)), history: pair.history,
       };
     });
-    return { ...base, role: "host", count: room.players.length, pairs, results, max: MAX_PLAYERS };
+    return {
+      ...base, role: "host", count: room.players.length, pairs, results,
+      queue: (room.queue ?? []).map(id => playerName(room, id)), max: MAX_PLAYERS,
+    };
   }
   const player = room.players.find(p => p.key === auth);
   if (!player) reject(403, "Ehhez a szobához nincs hozzáférésed.");
   if (room.phase === "lobby") return { ...base, role: "player", count: room.players.length };
-  const pair = activePair(room, player.id);
-  if (!pair) return { ...base, role: "player", spectator: true };
+  const { pair, number } = activePair(room, player.id);
+  const report = room.pairs.flatMap((match, index) => {
+    const seat = match.players.indexOf(player.id);
+    return seat < 0 || !match.result ? [] : [{
+      number: index + 1, outcome: outcome(match, seat), bot: match.players.includes(null),
+      history: playerHistory(match, seat),
+    }];
+  });
+  const details = { ...base, role: "player", queued: room.queue?.includes(player.id) ?? false, report };
+  if (!pair) return { ...details, spectator: true };
   const seat = pair.players.indexOf(player.id);
   return {
-    ...base, role: "player", step: pair.step,
-    distance: pair.result === "crash" ? 0 : DISTANCES[pair.step],
-    waiting: Boolean(pair.choices[seat]), result: pair.result,
+    ...details, number, step: pair.step, distance: pair.result === "crash" ? 0 : DISTANCES[pair.step],
+    waiting: Boolean(pair.choices[seat]), result: pair.result, outcome: outcome(pair, seat),
     messages: pair.messages.map(m => ({ id: m.id, own: m.seat === seat, text: m.text })),
-    history: pair.history.map(row => ({ distance: row.distance, own: row.choices[seat], other: row.choices[1-seat] })),
-    ...(pair.result === "a" || pair.result === "b" ? { yielded: pair.result === (seat === 0 ? "a" : "b") } : {}),
+    history: playerHistory(pair, seat),
   };
+}
+function addPair(room, a, b) {
+  // Keep earlier decisions for the reports. Chat only belongs to the latest pair.
+  const previous = [activePair(room, a).pair, b === null ? undefined : activePair(room, b).pair];
+  for (const pair of previous) {
+    if (pair && pair.players.every(id => id === null || id === a || id === b || activePair(room, id).pair !== pair)) {
+      pair.messages = [];
+    }
+  }
+  room.pairs.push({
+    players: [a, b], step: 0, choices: [null, null], result: null, history: [],
+    messages: [], sent: [0, 0],
+    ...(b === null ? { botYieldAt: 2 + Math.floor(Math.random() * 5) } : {}),
+  });
+  room.phase = "running";
 }
 function start(room) {
   if (room.phase !== "lobby") reject(409, "A futam már elindult.");
-  if (room.players.length < 2) reject(409, "Legalább két játékos szükséges.");
+  if (!room.players.length) reject(409, "Legalább egy játékos szükséges.");
   const players = shuffle(room.players.map(player => player.id));
-  for (let i = 0; i + 1 < players.length; i += 2) {
-    room.pairs.push({
-      players: players.slice(i, i + 2), step: 0, choices: [null, null],
-      result: null, history: [], messages: [], sent: [0, 0],
-    });
+  for (let i = 0; i < players.length; i += 2) addPair(room, players[i], players[i + 1] ?? null);
+}
+function requeue(room, player, action, number) {
+  if (room.phase === "lobby" || room.phase === "closed") reject(409, "A futam nem fogad új párokat.");
+  const latest = activePair(room, player);
+  if (latest.number !== number || (latest.pair && !latest.pair.result)) return false;
+  const queue = room.queue ??= [];
+  const index = queue.indexOf(player);
+  if (action === "cancel") {
+    if (index < 0) return false;
+    queue.splice(index, 1);
+    return true;
   }
-  room.phase = "running";
+  if (index >= 0) return false;
+  const previousPartner = id => activePair(room, id).pair?.players.find(other => other !== id);
+  const partnerIndex = queue.findIndex(id => id !== previousPartner(player) && player !== previousPartner(id));
+  if (partnerIndex < 0) queue.push(player);
+  else addPair(room, queue.splice(partnerIndex, 1)[0], player);
+  return true;
 }
 function finishIfDone(room) {
   if (room.pairs.every(pair => pair.result)) room.phase = "finished";
@@ -108,10 +160,17 @@ function decide(room, pair, seat, input) {
   }
   if (input.step !== pair.step || pair.result) return false;
   if (pair.choices[seat]) return false;
+  const now = Date.now();
+  const submitted = pair.submitted ??= [null, null];
   pair.choices[seat] = input.choice;
+  submitted[seat] = now;
+  if (pair.players[1] === null) {
+    pair.choices[1] = pair.step >= pair.botYieldAt ? "yield" : "go";
+    submitted[1] = now;
+  }
   if (!pair.choices.every(Boolean)) return true;
   const [a, b] = pair.choices;
-  pair.history.push({ distance: DISTANCES[pair.step], choices: [...pair.choices] });
+  pair.history.push({ distance: DISTANCES[pair.step], choices: [...pair.choices], at: now, submitted: [...submitted] });
   if (a === "yield" && b === "yield") pair.result = "both";
   else if (a === "yield") pair.result = "a";
   else if (b === "yield") pair.result = "b";
@@ -119,6 +178,7 @@ function decide(room, pair, seat, input) {
   else {
     pair.step++;
     pair.choices = [null, null];
+    pair.submitted = [null, null];
     pair.sent = [0, 0];
   }
   finishIfDone(room);
@@ -172,7 +232,7 @@ export async function api(request, store) {
     if (request.method === "POST" && url.pathname === "/api/rooms") {
       await readBody(request);
       const hostToken = token(), host = await digest(hostToken);
-      const initial = JSON.stringify({ host, phase: "lobby", players: [], pairs: [] });
+      const initial = JSON.stringify({ host, phase: "lobby", players: [], pairs: [], queue: [] });
       await store.prune();
       for (let attempt = 0; attempt < 4; attempt++) {
         const room = code();
@@ -180,7 +240,7 @@ export async function api(request, store) {
       }
       reject(503, "A szoba létrehozása nem sikerült. Próbáld újra.");
     }
-    const match = url.pathname.match(/^\/api\/rooms\/([23456789A-HJ-NP-Z]{8})\/(join|state|start|stop|decision|message)$/);
+    const match = url.pathname.match(/^\/api\/rooms\/([23456789A-HJ-NP-Z]{8})\/(join|state|start|stop|decision|message|requeue|cancel)$/);
     if (!match) reject(404, "Ismeretlen kérés.");
     const [, roomCode, action] = match;
     if (request.method !== (action === "state" ? "GET" : "POST")) reject(405, "Érvénytelen kérés.");
@@ -188,29 +248,34 @@ export async function api(request, store) {
     if (!credential) reject(403, "Hiányzó szobakulcs.");
     const auth = await digest(credential);
     if (action === "state") return json(view((await getRoom(store, roomCode)).room, auth));
-    const input = action === "decision" || action === "message" ? await readBody(request) : {};
+    const input = await readBody(request);
     const room = await change(store, roomCode, state => {
       if (action === "join") {
         if (state.players.some(p => p.key === auth)) return false;
         if (state.phase !== "lobby") reject(409, "Ez a futam már elindult.");
         if (state.players.length >= MAX_PLAYERS) reject(409, "A szoba megtelt.");
-        state.players.push({ id: token(), key: auth });
+        const label = typeof input.label === "string" ? input.label.trim() : "";
+        if (label.length > 40) reject(400, "A név legfeljebb 40 karakter lehet.");
+        state.players.push({ id: token(), key: auth, label });
         return true;
       }
       if (action === "start" || action === "stop") {
         if (state.host !== auth) reject(403, "Ez a tréner művelete.");
         if (action === "start") start(state);
         else {
-          if (state.phase !== "running") return false;
+          if (state.phase === "lobby" || state.phase === "closed") return false;
           state.pairs.forEach(pair => { if (!pair.result) pair.result = "stopped"; });
-          state.phase = "finished";
+          state.phase = "closed";
+          state.queue = [];
         }
         return true;
       }
       const player = state.players.find(p => p.key === auth);
       if (!player) reject(403, "Ehhez a szobához nincs hozzáférésed.");
-      const pair = activePair(state, player.id);
+      if (action === "requeue" || action === "cancel") return requeue(state, player.id, action, input.number);
+      const { pair, number } = activePair(state, player.id);
       if (!pair) reject(409, "Nincs aktív párod.");
+      if ((input.number ?? 1) !== number) return false;
       const seat = pair.players.indexOf(player.id);
       return action === "decision" ? decide(state, pair, seat, input) : send(pair, seat, input);
     });

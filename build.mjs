@@ -8,7 +8,7 @@ const files = {
   "/QR-LICENSE.txt": "text/plain; charset=utf-8",
 };
 const assets = Object.fromEntries(await Promise.all(Object.entries(files).map(async ([path,type]) => [
-  path, { type, base64: (await readFile("public"+path)).toString("base64") },
+  path, { type, base64: (await readFile("docs"+path)).toString("base64") },
 ])));
 await mkdir("dist/server", { recursive: true });
 await mkdir("dist/.openai", { recursive: true });
