@@ -3,18 +3,28 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Két autó, egy út. Döntési játék névtelen párokban.">
+  <meta name="theme-color" content="#152b34">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="Két autó, egy út. Élő döntési játék párokban.">
   <title>Chicken Run</title>
-  <link rel="stylesheet" href="./style.css">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css?v=3">
   <script src="./qr.js" defer></script>
-  <script src="./app.js" defer></script>
+  <script src="./app.js?v=3" type="module"></script>
 </head>
 <body>
   <main id="app">
-    <header class="mast"><a href="./" class="wordmark">Chicken Run</a><span id="connection"></span></header>
-    <section id="screen" aria-live="off"></section>
-    <p id="error" role="alert" hidden></p>
+    <header class="mast">
+      <a href="./" class="brand"><img src="./icon.svg" width="34" height="34" alt="">Chicken Run</a>
+      <div id="connection" class="badge connection" role="status" data-state="idle"></div>
+    </header>
+    <div id="notice" class="notice" hidden>
+      <p id="notice-text" role="alert"></p>
+      <button type="button" id="retry" class="button small secondary" hidden>Újrapróbálom</button>
+    </div>
+    <section id="screen"></section>
   </main>
+  <dialog id="dialog" aria-labelledby="dialog-title"></dialog>
+  <noscript>A játékhoz engedélyezd a JavaScriptet a böngészőben.</noscript>
 </body>
 </html>
-

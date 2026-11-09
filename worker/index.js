@@ -9,7 +9,7 @@ const headers = {
 
 const pagesOrigin = "https://matebudai-hue.github.io";
 
-async function handleApi(request, env) {
+async function handleApi(request, env, ctx) {
   const cors = new Headers({ Vary: "Origin" });
   if (request.headers.get("Origin") === pagesOrigin) {
     cors.set("Access-Control-Allow-Origin", pagesOrigin);
@@ -19,16 +19,16 @@ async function handleApi(request, env) {
   }
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   const response = env.DB
-    ? await api(request, d1Store(env.DB))
+    ? await api(request, d1Store(env.DB), promise => ctx.waitUntil(promise))
     : Response.json({ error: "Az adatbázis nem elérhető." }, { status: 503 });
   for (const [key, value] of cors) response.headers.set(key, value);
   return response;
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/api/")) return handleApi(request, env);
+    if (url.pathname.startsWith("/api/")) return handleApi(request, env, ctx);
     if (request.method !== "GET" && request.method !== "HEAD") {
       return new Response("Érvénytelen kérés.", { status: 405, headers });
     }

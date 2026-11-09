@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 export function memoryStore() {
   const rooms = new Map();
+  const presence = new Map();
   return {
     get: code => rooms.get(code),
     create(code, expires, state) {
@@ -18,8 +19,19 @@ export function memoryStore() {
       rooms.set(code, { ...row, revision: revision + 1, state });
       return true;
     },
+    async pulse(code, id) {
+      if (!presence.has(code)) presence.set(code, new Map());
+      presence.get(code).set(id, Date.now());
+    },
+    online(code) {
+      return new Set([...(presence.get(code) ?? [])].filter(([, at]) => at > Date.now() - 45_000).map(([id]) => id));
+    },
     prune() {
-      for (const [code,row] of rooms) if (row.expires_at < Date.now()) rooms.delete(code);
+      for (const [code,row] of rooms) {
+        if (row.expires_at >= Date.now()) continue;
+        rooms.delete(code);
+        presence.delete(code);
+      }
     },
   };
 }

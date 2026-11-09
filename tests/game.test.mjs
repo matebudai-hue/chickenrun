@@ -122,3 +122,42 @@ test("a lone player can play the bot, cancel waiting, and keep the report", asyn
   assert.equal(cancelled.body.queued,false);
   assert.equal(cancelled.body.report.length,1);
 });
+test("retrying a room creation after a lost reply opens the same room", async () => {
+  const store = memoryStore();
+  const key = secret();
+  const createRoom = () => api(new Request(base+"/api/rooms",{
+    method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({key}),
+  }),store);
+  const replies = await Promise.all([createRoom(),createRoom(),createRoom()]);
+  assert.deepEqual(replies.map(r=>r.status).sort(),[200,200,201]);
+  const rooms = await Promise.all(replies.map(r=>r.json()));
+  assert.ok(rooms.every(room=>room.room === rooms[0].room && room.token === key));
+});
+
+test("trainer sees readiness and can recover an unfinished pair without revealing pending choices", async () => {
+  const {room,host,players,labels} = await create(2);
+  await room("decision",players[0],{number:1,step:0,choice:"go"});
+  const before = (await room("state",host.token)).body;
+  assert.ok(before.roster.every(p=>p.online));
+  assert.equal(before.roster.find(p=>p.name===labels[0]).status,"ready");
+  assert.equal(before.roster.find(p=>p.name===labels[1]).status,"pending");
+  assert.equal(before.pairs[0].history.length,0);
+  assert.equal((await room("stop-pair",players[0],{number:1})).status,403);
+  assert.equal((await room("stop-pair",host.token,{number:1})).body.pairs[0].result,"stopped");
+  assert.equal((await room("state",players[0])).body.report[0].history.length,0);
+  await room("requeue",players[0],{number:1});
+  const bot = await room("test-pair",host.token,{player:1,number:1});
+  assert.equal(bot.body.pairs.length,2);
+  assert.equal(bot.body.pairs[1].bot,true);
+  assert.equal((await room("test-pair",host.token,{player:1,number:1})).body.pairs.length,2);
+});
+
+test("forty participants can join and submit concurrently without lost decisions", async () => {
+  const {room,host,players} = await create(40);
+  const states = await Promise.all(players.map(p=>room("state",p).then(r=>r.body)));
+  const decisions = await Promise.all(players.map((p,i)=>room("decision",p,{number:states[i].number,step:0,choice:"yield"})));
+  assert.ok(decisions.every(d=>d.status===200));
+  const admin = (await room("state",host.token)).body;
+  assert.equal(admin.results.both,20);
+  assert.ok(admin.pairs.every(p=>p.history.length===1));
+});

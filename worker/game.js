@@ -2,6 +2,7 @@ export const DISTANCES = [1000, 800, 600, 400, 200, 50, 10];
 const LIFE = 8 * 60 * 60 * 1000;
 const MAX_PLAYERS = 40;
 const MAX_MESSAGES = 10;
+const ONLINE_WINDOW = 45_000;
 const CODE_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const encoder = new TextEncoder();
 
@@ -13,7 +14,8 @@ class GameError extends Error {
 }
 const reject = (status, message) => { throw new GameError(status, message); };
 const token = () => crypto.randomUUID().replaceAll("-", "");
-const code = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), n => CODE_CHARS[n % 32]).join("");
+const validToken = /^[a-f0-9]{32}$/;
+const code = hash => hash.slice(0, 16).match(/../g).map(hex => CODE_CHARS[parseInt(hex, 16) % 32]).join("");
 const digest = async (value) => {
   const hash = await crypto.subtle.digest("SHA-256", encoder.encode(value));
   return Array.from(new Uint8Array(hash), n => n.toString(16).padStart(2, "0")).join("");
@@ -58,7 +60,7 @@ function shuffle(items) {
 function playerName(room, id) {
   if (id === null) return "Tesztjátékos";
   const index = room.players.findIndex(player => player.id === id);
-  return room.players[index].label || "Játékos " + (index + 1);
+  return room.players[index]?.label || "Játékos " + (index + 1);
 }
 function activePair(room, id) {
   const index = room.pairs.findLastIndex(pair => pair.players.includes(id));
@@ -74,7 +76,7 @@ function outcome(pair, seat) {
     ? pair.result === (seat === 0 ? "a" : "b") ? "own" : "other"
     : pair.result;
 }
-function view(room, auth) {
+function view(room, auth, online) {
   const base = { phase: room.phase };
   if (auth === room.host) {
     const results = { a: 0, b: 0, both: 0, crash: 0, stopped: 0 };
@@ -83,12 +85,23 @@ function view(room, auth) {
       return {
         number: i + 1, distance: pair.result === "crash" ? 0 : DISTANCES[pair.step],
         ready: pair.result ? 0 : pair.choices.filter(Boolean).length, result: pair.result,
-        names: pair.players.map(id => playerName(room, id)), history: pair.history,
+        names: pair.players.map(id => playerName(room, id)), history: pair.history, bot: pair.players.includes(null),
       };
     });
     return {
       ...base, role: "host", count: room.players.length, pairs, results,
       queue: (room.queue ?? []).map(id => playerName(room, id)), max: MAX_PLAYERS,
+      roster: room.players.map((player, index) => {
+        const { pair, number } = activePair(room, player.id);
+        const seat = pair?.players.indexOf(player.id);
+        const queued = room.queue?.includes(player.id);
+        const status = queued ? "queued" : !pair ? "lobby" : pair.result ? "finished" : pair.choices[seat] ? "ready" : "pending";
+        return {
+          number: index + 1, name: playerName(room, player.id), match: number || null, status,
+          partner: pair ? playerName(room, pair.players[1 - seat]) : null,
+          ...(online ? { online: online.has(player.id) } : {}),
+        };
+      }),
     };
   }
   const player = room.players.find(p => p.key === auth);
@@ -185,11 +198,11 @@ function decide(room, pair, seat, input) {
   return true;
 }
 function send(pair, seat, input) {
-  if (pair.result || input.step !== pair.step) reject(409, "Ez a döntési pont már lezárult.");
   const text = typeof input.text === "string" ? input.text.trim() : "";
   if (!text || text.length > 240) reject(400, "Az üzenet 1–240 karakter lehet.");
   if (typeof input.id !== "string" || !/^[a-f0-9]{32}$/.test(input.id)) reject(400, "Érvénytelen üzenet.");
   if (pair.messages.some(m => m.seat === seat && m.id === input.id)) return false;
+  if (pair.result || input.step !== pair.step) reject(409, "Ez a döntési pont már lezárult.");
   if (pair.sent[seat] >= MAX_MESSAGES) reject(429, "Ebben a lépésben már elküldted a tíz üzenetedet.");
   pair.messages.push({ seat, id: input.id, text });
   if (pair.messages.length > 48) pair.messages.shift();
@@ -222,32 +235,67 @@ export function d1Store(db) {
       const r = await db.prepare("UPDATE rooms SET state = ?, revision = revision + 1 WHERE code = ? AND revision = ?").bind(state, code, revision).run();
       return r.meta.changes === 1;
     },
+    async pulse(code, id) {
+      const now = Date.now();
+      await db.prepare("INSERT INTO presence (code, player, seen_at) VALUES (?, ?, ?) ON CONFLICT(code, player) DO UPDATE SET seen_at = excluded.seen_at WHERE presence.seen_at < excluded.seen_at")
+        .bind(code, id, now).run();
+    },
+    async online(code) {
+      const { results } = await db.prepare("SELECT player FROM presence WHERE code = ? AND seen_at > ?")
+        .bind(code, Date.now() - ONLINE_WINDOW).all();
+      return new Set(results.map(row => row.player));
+    },
     prune: () => db.prepare("DELETE FROM rooms WHERE expires_at < ?").bind(Date.now()).run(),
   };
 }
 
-export async function api(request, store) {
+async function stateView(store, roomCode, room, auth, pulse = false, defer) {
+  if (auth === room.host && store.online) return view(room, auth, await store.online(roomCode));
+  const projection = view(room, auth);
+  if (pulse && store.pulse) {
+    const player = room.players.find(p => p.key === auth);
+    const write = store.pulse(roomCode, player.id).catch(() => {});
+    if (defer) defer(write);
+    else await write;
+  }
+  return projection;
+}
+
+export async function api(request, store, defer) {
   try {
     const url = new URL(request.url);
     if (request.method === "POST" && url.pathname === "/api/rooms") {
-      await readBody(request);
-      const hostToken = token(), host = await digest(hostToken);
+      const input = await readBody(request);
+      if (input.key !== undefined && (typeof input.key !== "string" || !validToken.test(input.key))) reject(400, "Érvénytelen futamkulcs.");
+      const hostToken = input.key ?? token();
+      const host = await digest(hostToken);
       const initial = JSON.stringify({ host, phase: "lobby", players: [], pairs: [], queue: [] });
-      await store.prune();
       for (let attempt = 0; attempt < 4; attempt++) {
-        const room = code();
-        if (await store.create(room, Date.now() + LIFE, initial)) return json({ room, token: hostToken }, 201);
+        const room = code(await digest(host + ":" + attempt));
+        if (await store.create(room, Date.now() + LIFE, initial)) {
+          const pruning = Promise.resolve(store.prune()).catch(() => {});
+          if (defer) defer(pruning);
+          else await pruning;
+          return json({ room, token: hostToken }, 201);
+        }
+        const row = await store.get(room);
+        if (row && row.expires_at >= Date.now() && JSON.parse(row.state).host === host) {
+          return json({ room, token: hostToken });
+        }
       }
       reject(503, "A szoba létrehozása nem sikerült. Próbáld újra.");
     }
-    const match = url.pathname.match(/^\/api\/rooms\/([23456789A-HJ-NP-Z]{8})\/(join|state|start|stop|decision|message|requeue|cancel)$/);
+    const match = url.pathname.match(/^\/api\/rooms\/([23456789A-HJ-NP-Z]{8})\/(join|state|start|stop|decision|message|requeue|cancel|stop-pair|test-pair)$/);
     if (!match) reject(404, "Ismeretlen kérés.");
     const [, roomCode, action] = match;
     if (request.method !== (action === "state" ? "GET" : "POST")) reject(405, "Érvénytelen kérés.");
     const credential = request.headers.get("authorization")?.match(/^Bearer ([a-f0-9]{32})$/)?.[1];
     if (!credential) reject(403, "Hiányzó szobakulcs.");
     const auth = await digest(credential);
-    if (action === "state") return json(view((await getRoom(store, roomCode)).room, auth));
+    if (action === "state") {
+      const { room } = await getRoom(store, roomCode);
+      return json(await stateView(store, roomCode, room, auth, url.searchParams.has("pulse"), defer));
+    }
     const input = await readBody(request);
     const room = await change(store, roomCode, state => {
       if (action === "join") {
@@ -259,9 +307,30 @@ export async function api(request, store) {
         state.players.push({ id: token(), key: auth, label });
         return true;
       }
-      if (action === "start" || action === "stop") {
+      if (["start", "stop", "stop-pair", "test-pair"].includes(action)) {
         if (state.host !== auth) reject(403, "Ez a tréner művelete.");
-        if (action === "start") start(state);
+        if (action === "test-pair") {
+          const player = state.players[input.player - 1];
+          const index = player ? state.queue?.indexOf(player.id) ?? -1 : -1;
+          if (index < 0 || activePair(state, player.id).number !== input.number) return false;
+          state.queue.splice(index, 1);
+          addPair(state, player.id, null);
+          return true;
+        }
+        if (action === "stop-pair") {
+          const pair = state.pairs[input.number - 1];
+          if (!pair || pair.result) return false;
+          pair.result = "stopped";
+          finishIfDone(state);
+          return true;
+        }
+        if (action === "start") {
+          if (state.phase !== "lobby") return false;
+          if (Number.isInteger(input.count) && state.players.length !== input.count) {
+            reject(409, "Közben változott a létszám. Ellenőrizd a várót, és indítsd újra a párosítást.");
+          }
+          start(state);
+        }
         else {
           if (state.phase === "lobby" || state.phase === "closed") return false;
           state.pairs.forEach(pair => { if (!pair.result) pair.result = "stopped"; });
@@ -279,7 +348,7 @@ export async function api(request, store) {
       const seat = pair.players.indexOf(player.id);
       return action === "decision" ? decide(state, pair, seat, input) : send(pair, seat, input);
     });
-    return json(view(room, auth));
+    return json(await stateView(store, roomCode, room, auth, action === "join", defer));
   } catch (error) {
     if (error instanceof GameError) return json({ error: error.message }, error.status);
     console.error("Chicken Run: request failed", error?.name);

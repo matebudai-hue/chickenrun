@@ -8,6 +8,13 @@
       "when": 1794211200000,
       "tag": "0000_rooms",
       "breakpoints": true
+    },
+    {
+      "when": 1794211200001,
+      "idx": 1,
+      "version": "6",
+      "tag": "0001_presence",
+      "breakpoints": true
     }
   ]
 }
