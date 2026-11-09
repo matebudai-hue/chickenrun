@@ -1,7 +1,7 @@
 import { animateRace } from "./live-race.js?v=13";
 import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration } from "./story.js?v=12";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=13";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=14";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");

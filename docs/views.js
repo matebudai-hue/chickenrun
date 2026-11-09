@@ -50,28 +50,11 @@ function road(distance) {
     '<path d="M18 25h24m-12-12v24m688 148h24m-12-12v24" stroke="#8e987c" opacity=".65"/>'+    vehicle(false,a)+vehicle(true,b)+'</svg>';
 }
 
-function coverArt() {
-  return '<svg class="cover-art" viewBox="0 0 800 500" aria-hidden="true">'+
-    '<defs><linearGradient id="beam"><stop stop-color="#fff0c6" stop-opacity=".76"/><stop offset="1" stop-color="#fff0c6" stop-opacity="0"/></linearGradient>'+
-    '<pattern id="cover-grid" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0H0v30" fill="none" stroke="#53604d" opacity=".6"/></pattern>'+
-    '<pattern id="cover-hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><path d="M0 0v9" stroke="#a5ae90" opacity=".38"/></pattern></defs>'+
-    '<rect width="800" height="500" fill="#292f27"/><rect width="800" height="500" fill="url(#cover-grid)"/>'+
-    '<path d="M32 100h166v86H32zM600 317h166v110H600z" fill="url(#cover-hatch)"/>'+
-    '<path d="M44 39h35m-17-17v34m662 398h34m-17-17v34M400 16v468m-384-234h768" stroke="#a5ae90" stroke-width="1" opacity=".55"/>'+
-    '<g transform="rotate(-22 400 250)"><rect x="-140" y="167" width="1080" height="166" fill="#171b17"/>'+
-    '<path d="M-140 169h1080M-140 331h1080" stroke="#e1d6ad" stroke-width="3"/>'+
-    '<path d="M-140 180h1080M-140 320h1080" stroke="#bcb296" stroke-width="1" opacity=".52"/>'+
-    '<path d="M-140 250h1080" stroke="#bcb296" stroke-dasharray="28 22" stroke-width="2" opacity=".65"/>'+
-    '<path d="M394 181v138m12-138v138" stroke="#bcb296" stroke-dasharray="3 8" opacity=".45"/>'+
-    vehicle(false,[158,250])+vehicle(true,[642,250])+'</g>'+
-    '<path d="M56 370h114m-114 12h81M630 124h114m-81 12h81" stroke="#f2c85f" stroke-width="2" opacity=".8"/>'+
-    '<path d="M33 442h32m-32-1v-32m734-351h-32m32 1v32" fill="none" stroke="#f2c85f" stroke-width="2"/></svg>';
-}
 export function home(previous, roomLink) {
-  return '<div class="landing"><section class="card trainer-entry"><p class="eyebrow">TRÉNERI VEZÉRLŐPULT</p>'+
-    '<h1 class="cover-title">Chicken<br>Run</h1><div class="row cover-actions">'+action("create","Új futam és QR-kód","primary")+
-    (previous ? '<a class="button secondary" href="'+roomLink(previous,"host")+'">Vissza az előző futamhoz</a>' : '')+
-    '</div></section><div class="entry-art">'+coverArt()+'</div></div>';
+  return '<div class="cockpit"><section class="control"><h1>Tréneri pult</h1><div class="control-actions">'+
+    action("create","Új futam és QR-kód","primary")+
+    (previous ? '<a class="button secondary" href="'+roomLink(previous,"host")+'">Előző futam</a>' : '')+
+    '</div></section></div>';
 }
 
 export function enterCode() {
@@ -173,26 +156,27 @@ export function trainer(s, context) {
   const stage = lobby ? "Váró" : closed ? "Lezárva" : active.length ? "Játék folyamatban" : "Minden pár végzett";
   const cta = lobby ? action("start", "Játék indítása", "primary", !s.count)
     : closed ? action("create", "Új tréningfutam", "primary") : action("stop", "Futam lezárása", "secondary danger");
-  const toolbar = '<section class="control"><div><p class="eyebrow">TRÉNERI VEZÉRLŐPULT</p><div class="control-title"><h1>Chicken Run</h1>'+
-    badge(stage, lobby ? "warm" : "good")+(s.mode === "timed" ? badge("45 mp","warm") : "")+'</div></div><div class="control-actions">'+cta+
+  const toolbar = '<section class="control"><div class="control-title"><h1>Tréneri pult</h1>'+
+    '<span class="control-code" aria-label="Szobakód: '+room+'">'+room+'</span>'+
+    badge(stage, lobby ? "warm" : "good")+(!lobby ? badge(s.mode === "timed" ? "45 mp" : "Lépésenként","warm") : "")+
+    '</div><div class="control-actions">'+cta+
     action("share", "QR és belépés", "secondary")+
     '<a class="button secondary" href="'+roomLink(room,"projector")+'" target="_blank" rel="noopener">Kivetítő</a></div></section>';
-  const metrics = '<div class="metrics">'+metric("Résztvevők", s.count, hasPresence ? online+" online" : "Csatlakozott játékosok", "good")+
-    metric(lobby ? "Induló párok" : "Aktív párok", lobby ? Math.ceil(s.count/2) : active.length,
-      lobby && s.count%2 ? "Egy tesztjátékossal" : lobby ? "Véletlen párosítás" : s.pairs.length+" játék összesen")+
-    metric(lobby ? "Szobakód" : s.mode === "timed" ? "Rajtra váró párok" : "Leadott döntések",
-      lobby ? room : s.mode === "timed" ? active.filter(pair => pair.awaitingReady).length : active.reduce((n,p) => n+p.ready,0)+" / "+active.length*2,
-      lobby ? "Fiók nélküli belépés" : s.mode === "timed" ? "A képernyők visszajelzésére várnak" : "Az aktuális döntési pontokon", "warm")+
-    metric(lobby ? "Tesztjátékos" : "Új partnerre vár", lobby ? s.count%2 : s.queue.length,
-      lobby ? "Páratlan létszámnál automatikus" : "30 mp után tesztjátékos érkezik")+'</div>';
+  const stats = [["Résztvevő",s.count,hasPresence ? online+" online" : ""],
+    [lobby ? "Induló pár" : "Aktív pár",lobby ? Math.ceil(s.count/2) : active.length,
+      !lobby ? s.pairs.length+" játék összesen" : ""],
+    lobby ? ["Tesztjátékos",s.count%2,""] : ["Új partnerre vár",s.queue.length,""]];
+  if (!lobby) stats.push(s.mode === "timed" ? ["Rajtra váró pár",active.filter(pair => pair.awaitingReady).length,""]
+    : ["Leadott döntés",active.reduce((n,p) => n+p.ready,0)+" / "+active.length*2,""]);
+  const metrics = '<dl class="control-stats">'+stats.map(([label,value,detail]) =>
+    '<div><dt>'+label+'</dt><dd>'+value+(detail ? ' <small>· '+detail+'</small>' : "")+'</dd></div>').join("")+'</dl>';
   const nav = '<nav class="section-nav" aria-label="Tréneri nézetek">'+
     [["overview","Áttekintés"],["players","Játékosok"],["report","Riport"]].map(([id,label]) =>
       '<button class="section-tab" data-do="tab" data-tab="'+id+'" aria-pressed="'+(tab===id)+'">'+label+'</button>').join("")+'</nav>';
-  const chooser = lobby ? '<fieldset class="race-modes"><legend>Játékmód</legend>'+
-    [["steps","Döntési pontonként","Két gomb · minden pontnál választanak"],
-     ["timed","Folyamatos futam","45 mp · 1500 m · egyetlen Kitérek gomb"]].map(([id,title,description]) =>
-      '<label><input type="radio" name="game-mode" value="'+id+'"'+(selectedGameMode === id ? " checked" : "")+
-      '><span><strong>'+title+'</strong><small>'+description+'</small></span></label>').join("")+'</fieldset>' : "";
+  const chooser = lobby ? '<div class="race-modes" role="group" aria-label="Játékmód"><span>Játékmód</span>'+
+    [["steps","Döntési pontonként"],["timed","Folyamatos · 45 mp"]].map(([id,title]) =>
+      '<label><input id="mode-'+id+'" type="radio" name="game-mode" value="'+id+'"'+(selectedGameMode === id ? " checked" : "")+
+      '>'+title+'</label>').join("")+'</div>' : "";
   let body;
   if (tab === "report") {
     const groups = pairGroups(s.pairs);
@@ -219,7 +203,7 @@ export function trainer(s, context) {
     body = queueOverview(s)+card("Párok és döntések", '<p class="muted">'+done+' befejezett játék · az aktív párok felül jelennek meg.</p>'+
       pairList([...active,...s.pairs.filter(p=>p.result).slice().reverse()],opened,selection,true));
   }
-  return '<div class="cockpit">'+toolbar+chooser+metrics+nav+body+'</div>';
+  return '<div class="cockpit">'+toolbar+'<div class="control-overview">'+metrics+chooser+'</div>'+nav+body+'</div>';
 }
 
 function namedPairings(pairs) {
