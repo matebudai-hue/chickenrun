@@ -161,3 +161,43 @@ test("forty participants can join and submit concurrently without lost decisions
   assert.equal(admin.results.both,20);
   assert.ok(admin.pairs.every(p=>p.history.length===1));
 });
+test("all chat survives the player chat window and rematches, with access restricted to the trainer", async () => {
+  const {room,host,players} = await create(4);
+  const states = await Promise.all(players.map(p => room("state",p).then(r => r.body)));
+  const number = states[0].number;
+  const partner = states.findIndex((s,index) => index !== 0 && s.number === number);
+  const outsider = states.findIndex(s => s.number !== number);
+  const [a,b] = [players[0],players[partner]];
+  for (const [step,distance] of DISTANCES.slice(0,3).entries()) {
+    for (let index=0;index<10;index++) {
+      const data = p => ({number,step,id:secret(),text:distance+" / "+p+" / "+index});
+      const writes = [data("A"),data("B")];
+      const responses = await Promise.all([room("message",a,writes[0]),room("message",b,writes[1])]);
+      assert.ok(responses.every(response => response.status === 200));
+      assert.equal((await room("message",a,writes[0])).status,200);
+    }
+    for (const player of [a,b]) {
+      await room("decision",player,{number,step,choice:step===2 ? "yield" : "go"});
+    }
+  }
+  assert.equal((await room("state",a)).body.messages.length,48);
+  const query = "transcript?pair="+number;
+  assert.equal((await room(query,a)).status,403);
+  assert.equal((await room(query,players[outsider])).status,403);
+  const first = (await room(query,host.token)).body.pairs[0].messages;
+  assert.equal(first.length,60);
+  assert.deepEqual(new Set(first.map(m => m.distance)),new Set([1000,800,600]));
+  assert.equal(new Set(first.map(m => m.text)).size,60);
+  assert.ok(first.every(m => m.at > 0 && (m.seat === 0 || m.seat === 1)));
+  assert.equal((await room("state",host.token)).body.pairs[number-1].messageCount,60);
+  await Promise.all(players.filter(p=>p!==a && p!==b).map(p=>room("decision",p,{number:states[outsider].number,step:0,choice:"yield"})));
+  for (const index of [0,partner,outsider,states.findIndex((s,i)=>i!==outsider&&s.number!==number)]) {
+    await room("requeue",players[index],{number:states[index].number});
+  }
+  const newState = (await room("state",a)).body;
+  assert.notEqual(newState.number,number);
+  assert.deepEqual(newState.messages,[]);
+  await room("stop",host.token,{});
+  assert.deepEqual((await room(query,host.token)).body.pairs[0].messages,first);
+  assert.equal((await room("transcript",host.token)).body.pairs.find(p=>p.number===number).messages.length,60);
+});

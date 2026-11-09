@@ -1,0 +1,10 @@
+CREATE TABLE chat (
+  code TEXT NOT NULL REFERENCES rooms(code) ON DELETE CASCADE,
+  pair INTEGER NOT NULL,
+  seat INTEGER NOT NULL,
+  id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  distance INTEGER NOT NULL,
+  PRIMARY KEY (code, pair, seat, id)
+);

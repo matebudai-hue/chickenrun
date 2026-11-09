@@ -1,6 +1,6 @@
 # Chicken Run
 
-Önálló, magyar nyelvű, többjátékos tréningjáték. A tréner futamot indít, a játékosok a QR-kóddal vagy a szobakóddal, fiók nélkül csatlakoznak. Az opcionális nevet vagy becenevet csak a tréner látja. Egy szobában legfeljebb 40 résztvevő játszhat.
+Önálló, magyar nyelvű, többjátékos tréningjáték. A főoldal a tréneri vezérlőpult. Az Új futam és QR-kód gomb megnyitja a várót, a Játék indítása gomb sorsolja a párokat az addig csatlakozott játékosokból. A játékosok a QR-kóddal vagy a szobakóddal, fiók nélkül csatlakoznak. Az opcionális nevet vagy becenevet csak a tréner látja. Egy szobában legfeljebb 40 résztvevő játszhat.
 
 ## Játékmenet
 
@@ -8,7 +8,7 @@
 - Az autók 1000 méterre indulnak egymástól. A következő döntési pontok 800, 600, 400, 200, 50 és 10 méternél vannak.
 - A választás akkor válik láthatóvá, amikor mindkét fél beküldte. Kitérésnél véget ér a játék. Ha 10 méternél is mindketten haladnak, ütköznek. A párok játék közben üzenhetnek egymásnak.
 - Az **Új játékot indítok** gombbal a résztvevő várólistára kerül. A rendszer olyan másik résztvevőt keres, aki ugyanezt választotta, és akivel az előző játékban egyikük sem volt párban.
-- A **Saját döntési riport** az összes befejezett játékot és az egyes döntések távolságát, időpontját és kimenetelét mutatja. A tréner látja a név szerinti párokat, az aktuális állást és a közösen lezárt döntéseket. A futam lezárása után a riportok a szoba lejártáig elérhetők.
+- A **Saját döntési riport** az összes befejezett játékot és az egyes döntések távolságát, időpontját és kimenetelét mutatja. A tréner látja a név szerinti párokat, az aktuális állást és a közösen lezárt döntéseket, valamint a párok teljes üzenetváltását. A tréneri CSV mindkettőt tartalmazza. A futam lezárása után a riportok a szoba lejártáig elérhetők.
 
 ## Közzététel
 

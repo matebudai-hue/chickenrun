@@ -58,17 +58,9 @@ label{display:block;font-size:.92rem;font-weight:730}
 .heading>p:last-child{color:var(--muted)}
 .landing{width:min(100%,1040px);margin:auto}
 .hero{position:relative;overflow:hidden;background:#19333c;color:#fff;border-radius:22px;box-shadow:0 16px 40px #25454d26}
-.hero-copy{padding:clamp(1.35rem,5vw,3.15rem);padding-bottom:1.35rem}
-.hero .eyebrow{color:var(--gold)}
-.hero h1{font-size:clamp(3.2rem,8vw,6.25rem);margin:.34rem 0 .8rem}
-.hero p:last-child{max-width:37ch;color:#dce9e6}
 .road{display:block;width:100%;height:auto;background:#20363b;border-radius:12px}
 .hero .road,.banner .road{border-radius:0}
 .hero .road{max-height:260px;object-fit:cover;aspect-ratio:760/210}
-.entry-grid,.trainer-grid,.play-grid{display:grid;gap:1rem;margin-top:1rem;align-items:start}
-.entry-grid{grid-template-columns:1fr 1fr}
-.entry-grid .button{margin-top:.65rem}
-.entry-grid .text-link{display:block;margin-top:.45rem}
 .centered{width:min(100%,500px);margin:0 auto;text-align:left}
 .centered h1{font-size:clamp(1.8rem,7vw,2.45rem);margin:.3rem 0 .7rem}
 .centered>p:not(.eyebrow){color:var(--muted);margin-bottom:.8rem}
@@ -140,13 +132,9 @@ details[open] summary::before{content:"▾"}
 .race-meta{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.6rem}
 .distance{font-variant-numeric:tabular-nums;font-size:clamp(2.85rem,8vw,5rem);font-weight:850;line-height:1.03;letter-spacing:-.06em}
 .distance span{font-size:.37em;color:#bfd4d5;letter-spacing:0}
-.legend,.trail{display:flex;justify-content:space-between;align-items:center;gap:.25rem;font-size:.75rem;margin-top:.38rem}
+.legend{display:flex;justify-content:space-between;align-items:center;gap:.25rem;font-size:.75rem;margin-top:.38rem}
 .legend span:first-child{color:#f3c881}
 .legend span:last-child{color:#9adbd2}
-.trail{margin:.65rem 0 .95rem;font-variant-numeric:tabular-nums}
-.trail span{flex:1;text-align:center;padding:.2rem .08rem;border-bottom:2px solid #45616a;color:#afc6c8}
-.trail .current{color:#ffe8ba;border-color:#ffc982;font-weight:810}
-.trail .passed{border-color:#84a9a7}
 .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.7rem}
 .race-card .button{min-height:51px}
 .race-card .button.primary{background:var(--gold);color:#242d2b}
@@ -179,8 +167,6 @@ dialog::backdrop{background:#12262fcc}
 @media(max-width:460px){
   #app{width:calc(100% - 24px)}
   .mast{height:59px}
-  .entry-grid{grid-template-columns:1fr}
-  .hero h1{font-size:3.1rem}
   .card,.control{padding:.8rem}
   .control-actions{gap:.4rem}
   .control-actions .button{font-size:.82rem;min-height:42px;padding:.45rem .58rem}
@@ -190,3 +176,15 @@ dialog::backdrop{background:#12262fcc}
   .decision-table{table-layout:fixed}
   .notice{align-items:flex-start;flex-direction:column}
 }
+.trainer-entry{margin-bottom:1rem}
+.trainer-entry h1{margin:.3rem 0 1rem}
+.entry-art .road{max-height:none}
+.race-card .action-grid,.race-card .feedback{margin-top:.85rem}
+.trainer-transcript{margin:.8rem 0 .25rem;padding-top:.65rem;border-top:1px solid var(--line)}
+.trainer-transcript h3{margin:0 0 .4rem;font-size:.98rem}
+.transcript-list{list-style:none;padding:0;margin:0;display:grid;gap:.35rem;max-height:25rem;overflow:auto}
+.transcript-list li{padding:.5rem .65rem;border-radius:8px;background:#edf3f4}
+.transcript-list li:nth-child(even){background:#e9f3ee}
+.transcript-list header{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem .55rem;overflow-wrap:anywhere}
+.transcript-list p{white-space:pre-wrap;overflow-wrap:anywhere}
+.transcript-list small{color:var(--muted)}

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 export function memoryStore() {
   const rooms = new Map();
   const presence = new Map();
+  const chat = new Map();
   return {
     get: code => rooms.get(code),
     create(code, expires, state) {
@@ -13,11 +14,19 @@ export function memoryStore() {
       rooms.set(code, { revision: 0, expires_at: expires, state });
       return true;
     },
-    put(code, revision, state) {
+    put(code, revision, state, message) {
       const row = rooms.get(code);
       if (!row || row.revision !== revision) return false;
       rooms.set(code, { ...row, revision: revision + 1, state });
+      if (message) {
+        if (!chat.has(code)) chat.set(code, new Map());
+        const key = [message.number,message.seat,message.id].join(":");
+        if (!chat.get(code).has(key)) chat.get(code).set(key,message);
+      }
       return true;
+    },
+    transcript(code, number) {
+      return [...(chat.get(code)?.values() ?? [])].filter(message => !number || message.number === number);
     },
     async pulse(code, id) {
       if (!presence.has(code)) presence.set(code, new Map());
@@ -31,6 +40,7 @@ export function memoryStore() {
         if (row.expires_at >= Date.now()) continue;
         rooms.delete(code);
         presence.delete(code);
+        chat.delete(code);
       }
     },
   };

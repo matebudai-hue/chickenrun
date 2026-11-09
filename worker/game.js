@@ -86,6 +86,7 @@ function view(room, auth, online) {
         number: i + 1, distance: pair.result === "crash" ? 0 : DISTANCES[pair.step],
         ready: pair.result ? 0 : pair.choices.filter(Boolean).length, result: pair.result,
         names: pair.players.map(id => playerName(room, id)), history: pair.history, bot: pair.players.includes(null),
+        messageCount: pair.messageCount ?? pair.messages.length,
       };
     });
     return {
@@ -126,10 +127,12 @@ function view(room, auth, online) {
   };
 }
 function addPair(room, a, b) {
-  // Keep earlier decisions for the reports. Chat only belongs to the latest pair.
+  // The archive holds new messages. Keep any older messages that predate it.
   const previous = [activePair(room, a).pair, b === null ? undefined : activePair(room, b).pair];
   for (const pair of previous) {
     if (pair && pair.players.every(id => id === null || id === a || id === b || activePair(room, id).pair !== pair)) {
+      pair.legacyMessages ??= pair.messages.filter(message => message.at === undefined);
+      pair.messageCount ??= pair.messages.length;
       pair.messages = [];
     }
   }
@@ -197,17 +200,20 @@ function decide(room, pair, seat, input) {
   finishIfDone(room);
   return true;
 }
-function send(pair, seat, input) {
+function send(pair, number, seat, input) {
   const text = typeof input.text === "string" ? input.text.trim() : "";
   if (!text || text.length > 240) reject(400, "Az üzenet 1–240 karakter lehet.");
   if (typeof input.id !== "string" || !/^[a-f0-9]{32}$/.test(input.id)) reject(400, "Érvénytelen üzenet.");
   if (pair.messages.some(m => m.seat === seat && m.id === input.id)) return false;
   if (pair.result || input.step !== pair.step) reject(409, "Ez a döntési pont már lezárult.");
   if (pair.sent[seat] >= MAX_MESSAGES) reject(429, "Ebben a lépésben már elküldted a tíz üzenetedet.");
-  pair.messages.push({ seat, id: input.id, text });
+  pair.legacyMessages ??= pair.messages.filter(message => message.at === undefined);
+  const message = { seat, id: input.id, text, at: Date.now(), distance: DISTANCES[pair.step] };
+  pair.messageCount = (pair.messageCount ?? pair.messages.length) + 1;
+  pair.messages.push(message);
   if (pair.messages.length > 48) pair.messages.shift();
   pair.sent[seat]++;
-  return true;
+  return { number, ...message };
 }
 async function getRoom(store, roomCode) {
   const row = await store.get(roomCode);
@@ -218,7 +224,7 @@ async function change(store, roomCode, mutator) {
   for (let attempt = 0; attempt < 40; attempt++) {
     const { row, room } = await getRoom(store, roomCode);
     const changed = mutator(room);
-    if (changed === false || await store.put(roomCode, row.revision, JSON.stringify(room))) return room;
+    if (changed === false || await store.put(roomCode, row.revision, JSON.stringify(room), typeof changed === "object" ? changed : undefined)) return room;
     await new Promise(resolve => setTimeout(resolve, 6 + Math.random() * Math.min(attempt * 5, 100)));
   }
   reject(503, "A szoba foglalt. Próbáld újra.");
@@ -231,9 +237,22 @@ export function d1Store(db) {
       const r = await db.prepare("INSERT OR IGNORE INTO rooms (code, expires_at, state) VALUES (?, ?, ?)").bind(code, expires, state).run();
       return r.meta.changes === 1;
     },
-    async put(code, revision, state) {
-      const r = await db.prepare("UPDATE rooms SET state = ?, revision = revision + 1 WHERE code = ? AND revision = ?").bind(state, code, revision).run();
-      return r.meta.changes === 1;
+    async put(code, revision, state, message) {
+      const update = db.prepare("UPDATE rooms SET state = ?, revision = revision + 1 WHERE code = ? AND revision = ?")
+        .bind(state, code, revision);
+      if (!message) return (await update.run()).meta.changes === 1;
+      // Both writes use the same revision in one transaction.
+      const insert = db.prepare("INSERT OR IGNORE INTO chat (code, pair, seat, id, text, at, distance) SELECT code, ?, ?, ?, ?, ?, ? FROM rooms WHERE code = ? AND revision = ?")
+        .bind(message.number, message.seat, message.id, message.text, message.at, message.distance, code, revision);
+      const [, result] = await db.batch([insert, update]);
+      return result.meta.changes === 1;
+    },
+    async transcript(code, number) {
+      const columns = "SELECT pair AS number, seat, id, text, at, distance FROM chat WHERE code = ?";
+      const statement = number
+        ? db.prepare(columns + " AND pair = ? ORDER BY rowid").bind(code, number)
+        : db.prepare(columns + " ORDER BY pair, rowid").bind(code);
+      return (await statement.all()).results;
     },
     async pulse(code, id) {
       const now = Date.now();
@@ -261,6 +280,20 @@ async function stateView(store, roomCode, room, auth, pulse = false, defer) {
   return projection;
 }
 
+async function transcript(store, roomCode, room, number) {
+  const archived = await store.transcript(roomCode, number);
+  const selected = number ? [[number, room.pairs[number - 1]]] : room.pairs.map((pair, index) => [index + 1, pair]);
+  const byPair = new Map(selected.map(([index, pair]) => [
+    index, (pair.legacyMessages ?? pair.messages.filter(message => message.at === undefined)).slice(),
+  ]));
+  for (const { number: index, ...message } of archived) {
+    byPair.get(index)?.push(message);
+  }
+  return [...byPair].map(([index, messages]) => ({
+    number: index, messages: messages.map(({ seat, text, at, distance }) => ({ seat, text, at, distance })),
+  }));
+}
+
 export async function api(request, store, defer) {
   try {
     const url = new URL(request.url);
@@ -285,13 +318,23 @@ export async function api(request, store, defer) {
       }
       reject(503, "A szoba létrehozása nem sikerült. Próbáld újra.");
     }
-    const match = url.pathname.match(/^\/api\/rooms\/([23456789A-HJ-NP-Z]{8})\/(join|state|start|stop|decision|message|requeue|cancel|stop-pair|test-pair)$/);
+    const match = url.pathname.match(/^\/api\/rooms\/([23456789A-HJ-NP-Z]{8})\/(join|state|start|stop|decision|message|requeue|cancel|stop-pair|test-pair|transcript)$/);
     if (!match) reject(404, "Ismeretlen kérés.");
     const [, roomCode, action] = match;
-    if (request.method !== (action === "state" ? "GET" : "POST")) reject(405, "Érvénytelen kérés.");
+    if (request.method !== (["state", "transcript"].includes(action) ? "GET" : "POST")) reject(405, "Érvénytelen kérés.");
     const credential = request.headers.get("authorization")?.match(/^Bearer ([a-f0-9]{32})$/)?.[1];
     if (!credential) reject(403, "Hiányzó szobakulcs.");
     const auth = await digest(credential);
+    if (action === "transcript") {
+      const { room } = await getRoom(store, roomCode);
+      if (room.host !== auth) reject(403, "Az üzenetváltást csak a tréner tekintheti meg.");
+      const requested = url.searchParams.get("pair");
+      const number = requested === null ? null : Number(requested);
+      if (number !== null && (!Number.isInteger(number) || number < 1 || number > room.pairs.length)) {
+        reject(404, "Ez a pár nem található.");
+      }
+      return json({ pairs: await transcript(store, roomCode, room, number) });
+    }
     if (action === "state") {
       const { room } = await getRoom(store, roomCode);
       return json(await stateView(store, roomCode, room, auth, url.searchParams.has("pulse"), defer));
@@ -346,7 +389,7 @@ export async function api(request, store, defer) {
       if (!pair) reject(409, "Nincs aktív párod.");
       if ((input.number ?? 1) !== number) return false;
       const seat = pair.players.indexOf(player.id);
-      return action === "decision" ? decide(state, pair, seat, input) : send(pair, seat, input);
+      return action === "decision" ? decide(state, pair, seat, input) : send(pair, number, seat, input);
     });
     return json(await stateView(store, roomCode, room, auth, action === "join", defer));
   } catch (error) {

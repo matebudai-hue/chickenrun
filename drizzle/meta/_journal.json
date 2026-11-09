@@ -15,6 +15,13 @@
       "version": "6",
       "tag": "0001_presence",
       "breakpoints": true
+    },
+    {
+      "when": 1794211200002,
+      "breakpoints": true,
+      "tag": "0002_chat",
+      "idx": 2,
+      "version": "6"
     }
   ]
 }

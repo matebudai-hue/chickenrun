@@ -1,5 +1,5 @@
-import { command, readState, saved, secret } from "./connection.js?v=3";
-import { escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=3";
+import { command, readState, saved, secret } from "./connection.js?v=4";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=4";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -24,6 +24,7 @@ let busy = false, polling = false, generation = 0, lastPulse = 0;
 let selectedTab = "overview", draft = "", messageRequest, confirmAction;
 let pendingDecision;
 try { pendingDecision = JSON.parse(saved.get(decisionKey)); } catch {}
+const transcriptCache = new Map();
 const opened = new Set();
 opened.seen = new Set();
 
@@ -219,19 +220,7 @@ async function copyLink(button) {
   }
 }
 
-function downloadReport(personal) {
-  const headings = ["Játék","Kimenetel","Távolság (m)","Időpont","Játékos 1","Döntés 1","Játékos 2","Döntés 2"];
-  const result = pair => pair.result === "a" ? pair.names[0]+" tért ki"
-    : pair.result === "b" ? pair.names[1]+" tért ki" : outcomes[pair.result];
-  const matches = personal ? state.report : state.pairs.filter(p=>p.result);
-  const rows = matches.flatMap(pair => {
-    const [a,b] = personal ? ["Te", pair.bot ? "Tesztjátékos" : "A másik autó"] : pair.names;
-    const outcome = personal ? outcomes[pair.outcome] : result(pair);
-    return (pair.history.length ? pair.history : [{}]).map(row => {
-      const [first,second] = personal ? [row.own,row.other] : row.choices ?? [];
-      return [pair.number,outcome,row.distance,time(row.at),a,moves[first],b,moves[second]];
-    });
-  });
+function downloadCsv(headings, rows, label) {
   const safe = value => {
     const raw = String(value ?? "");
     const text = /^[\s]*[=+\-@]/.test(raw) ? "'"+raw : raw;
@@ -241,11 +230,93 @@ function downloadReport(personal) {
   const url = URL.createObjectURL(new Blob(["\ufeff",csv],{type:"text/csv;charset=utf-8"}));
   const link = document.createElement("a");
   link.href = url;
-  link.download = "chicken-run-"+room+(personal ? "-sajat" : "-treneri")+".csv";
+  link.download = "chicken-run-"+room+"-"+label+".csv";
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function downloadPersonalReport() {
+  const headings = ["Játék","Kimenetel","Távolság (m)","Időpont","Saját döntés","Partner","Partner döntése"];
+  const rows = state.report.flatMap(pair => (pair.history.length ? pair.history : [{}]).map(row => [
+    pair.number,outcomes[pair.outcome],row.distance,time(row.at),moves[row.own],
+    pair.bot ? "Tesztjátékos" : "A másik autó",moves[row.other],
+  ]));
+  downloadCsv(headings,rows,"sajat");
+}
+
+async function downloadTrainerReport(button) {
+  button.disabled = true;
+  try {
+    const { pairs } = await readState(endpoint("transcript"),auth);
+    const messages = new Map(pairs.map(pair => [pair.number,pair.messages]));
+    const headings = ["Játék","Típus","Távolság (m)","Időpont","Játékos 1","Döntés 1","Játékos 2","Döntés 2","Feladó","Üzenet","Kimenetel"];
+    const rows = state.pairs.filter(pair => pair.result).flatMap(pair => {
+      const [a,b] = pair.names;
+      const outcome = pair.result === "a" ? a+" tért ki" : pair.result === "b" ? b+" tért ki" : outcomes[pair.result];
+      const decisions = pair.history.map(row => ({
+        at:row.at ?? 0, cells:[pair.number,"Döntés",row.distance,time(row.at),a,moves[row.choices[0]],b,moves[row.choices[1]],"","",outcome],
+      }));
+      const chat = (messages.get(pair.number) ?? []).map(row => ({
+        at:row.at ?? 0, cells:[pair.number,"Üzenet",row.distance,time(row.at),a,"",b,"",pair.names[row.seat],row.text,outcome],
+      }));
+      return decisions.length || chat.length
+        ? [...chat,...decisions].sort((first,second) => first.at-second.at).map(row => row.cells)
+        : [[pair.number,"Kimenetel","","",a,"",b,"","","",outcome]];
+    });
+    downloadCsv(headings,rows,"treneri");
+    showNotice();
+  } catch (error) {
+    showNotice("A riport letöltése nem sikerült. Próbáld újra.", () => void downloadTrainerReport(button));
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function paintTranscript(section, pair, messages) {
+  const target = section.querySelector("[data-transcript-body]");
+  target.innerHTML = messages.length
+    ? '<ol class="transcript-list">'+messages.map(message => '<li><header><strong>'+escape(pair.names[message.seat])+
+      '</strong><small>'+(message.distance ? message.distance+" m · " : "")+time(message.at)+
+      '</small></header><p>'+escape(message.text)+'</p></li>').join("")+'</ol>'
+    : '<p class="muted">Nem váltottak üzenetet.</p>';
+}
+
+async function paintTranscripts() {
+  if (mode !== "host" || !state?.pairs) return;
+  for (const section of screen.querySelectorAll("details[open] [data-transcript]")) {
+    const number = Number(section.dataset.transcript);
+    const pair = state.pairs.find(p => p.number === number);
+    if (!pair) continue;
+    const count = pair.messageCount ?? 0;
+    if (!count) {
+      paintTranscript(section,pair,[]);
+      continue;
+    }
+    let entry = transcriptCache.get(number);
+    if (entry?.count !== count) {
+      entry = { count, request:readState(endpoint("transcript")+"?pair="+number,auth) };
+      transcriptCache.set(number,entry);
+    }
+    if (entry.messages) {
+      if (!section.dataset.loaded) paintTranscript(section,pair,entry.messages);
+      section.dataset.loaded = String(count);
+      continue;
+    }
+    section.querySelector("[data-transcript-body]").innerHTML = '<p class="muted">Üzenetek betöltése…</p>';
+    const current = entry;
+    void current.request.then(result => {
+      current.messages = result.pairs[0]?.messages ?? [];
+      if (!section.isConnected || transcriptCache.get(number) !== current) return;
+      paintTranscript(section,pair,current.messages);
+      section.dataset.loaded = String(count);
+    }, () => {
+      if (transcriptCache.get(number) === current) transcriptCache.delete(number);
+      if (!section.isConnected) return;
+      section.querySelector("[data-transcript-body]").innerHTML =
+        '<button type="button" class="button small secondary" data-do="retry-transcript">Üzenetek újratöltése</button>';
+    });
+  }
+}
 function paintChat() {
   const log = document.querySelector("#messages");
   if (!log) return;
@@ -277,7 +348,7 @@ function render() {
   const context = { room, roomLink, opened, tab:selectedTab, pendingDecision };
   if (!room) {
     const previous = saved.get("cr:last-host");
-    screen.innerHTML = home(codeValid.test(previous ?? "") ? previous : null, roomLink);
+    screen.innerHTML = mode === "player" ? enterCode() : home(codeValid.test(previous ?? "") ? previous : null, roomLink);
   } else if (!codeValid.test(room) || loadFailure === 404) {
     screen.innerHTML = waitingPage("", "A futam nem érhető el", "Ellenőrizd a szobakódot, vagy olvasd be újra a tréner QR-kódját.",
       '<a class="button secondary" href="./">Vissza a főoldalra</a>');
@@ -292,6 +363,7 @@ function render() {
     screen.innerHTML = projector(state,room);
   } else if (isTrainer) {
     screen.innerHTML = trainer(state,context);
+    void paintTranscripts();
   } else {
     screen.innerHTML = player(state,context);
     paintChat();
@@ -367,8 +439,13 @@ screen.addEventListener("click", event => {
     screen.querySelector('[data-tab="'+selectedTab+'"]').focus();
   } else if (action === "share") share();
   else if (action === "copy") void copyLink(button);
-  else if (action === "download-host" || action === "download-player") downloadReport(action === "download-player");
+  else if (action === "download-host") void downloadTrainerReport(button);
+  else if (action === "download-player") downloadPersonalReport();
+  else if (action === "retry-transcript") void paintTranscripts();
 });
+screen.addEventListener("toggle", event => {
+  if (event.target.matches("details[open]")) void paintTranscripts();
+}, true);
 dialog.addEventListener("click", event => {
   const button = event.target.closest("button");
   if (!button) return;
