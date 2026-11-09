@@ -1,4 +1,4 @@
-import { carPositions, pairGroups, points, revealDuration } from "./story.js?v=5";
+import { carPositions, pairGroups, legacyPoints, revealDuration } from "./story.js?v=10";
 
 export const moves = { go: "Halad", yield: "Kitér" };
 export const outcomes = {
@@ -264,7 +264,7 @@ export function player(s, context) {
     : '<div class="action-grid">'+action("go","Haladok","primary",revealing)+action("yield","Kitérek","primary",revealing)+'</div>';
 
   const stage = '<section class="card race-card"><div class="race-meta"><div><p class="eyebrow">TÁVOLSÁG KÖZTETEK</p>'+
-    '<p class="distance">'+s.distance+' <span>m</span></p></div>'+badge((s.step+1)+'. pont / '+points.length,"light")+'</div>'+
+    '<p class="distance">'+s.distance+' <span>m</span></p></div>'+badge((s.step+1)+'. pont / '+(s.totalSteps ?? legacyPoints.length),"light")+'</div>'+
     road(s.distance,finished && last?.own==="yield",finished && last?.other==="yield",reveal)+
     '<div class="legend"><span>● Te</span><span>● A másik autó</span></div>'+
     (last ? '<p class="decision-reveal" role="status"><strong>'+

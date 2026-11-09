@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { projector, time } from "../docs/views.js";
-import { carPositions, changeSelection, nextReveal, pairGroups, pairStory, points } from "../docs/story.js";
+import { carPositions, changeSelection, nextReveal, pairGroups, pairStory } from "../docs/story.js";
 
 test("both cars move inward at each distance, meet at impact and leave the lane when yielding", () => {
-  const distances = [...points,0];
+  const distances = [1000,800,600,400,200,100,50,10,0];
   const gaps = distances.map(distance => {
     const [a,b] = carPositions(distance);
     return b[0]-a[0];

@@ -5,8 +5,7 @@ import { memoryStore } from "../local.mjs";
 
 const base = "https://example.test";
 const secret = () => crypto.randomUUID().replaceAll("-", "");
-async function create(n = 2) {
-  const store = memoryStore();
+async function create(n = 2, store = memoryStore()) {
   const call = async (path, token, body) => {
     const res = await api(new Request(base+path, {
       method: body === undefined ? "GET" : "POST",
@@ -27,12 +26,13 @@ async function create(n = 2) {
   return { room, host, players, labels };
 }
 
-test("decision stays private and both advance through all seven distances", async () => {
+test("decision stays private and both advance through all eight distances", async () => {
   const { room, host, players: [a,b] } = await create();
-  assert.deepEqual(DISTANCES, [1000,800,600,400,200,50,10]);
+  assert.deepEqual(DISTANCES, [1000,800,600,400,200,100,50,10]);
   for (const [step, distance] of DISTANCES.entries()) {
     const before = (await room("state",b)).body;
     assert.equal(before.distance, distance);
+    assert.equal(before.totalSteps,8);
     const first = await room("decision",a,{step,choice:"go"});
     assert.equal(first.body.waiting,true);
     assert.deepEqual((await room("state",b)).body,before);
@@ -49,12 +49,12 @@ test("decision stays private and both advance through all seven distances", asyn
 
 test("concurrent decisions commit once and reveal both choices at 50 m", async () => {
   const {room, players:[a,b]}=await create();
-  for(let step=0;step<5;step++) await Promise.all([a,b].map(p=>room("decision",p,{step,choice:"go"})));
+  for(let step=0;step<6;step++) await Promise.all([a,b].map(p=>room("decision",p,{step,choice:"go"})));
   assert.equal((await room("state",a)).body.distance,50);
-  await Promise.all([room("decision",a,{step:5,choice:"yield"}),room("decision",b,{step:5,choice:"go"})]);
+  await Promise.all([room("decision",a,{step:6,choice:"yield"}),room("decision",b,{step:6,choice:"go"})]);
   assert.equal((await room("state",a)).body.outcome,"own");
   assert.equal((await room("state",b)).body.outcome,"other");
-  assert.equal((await room("state",a)).body.history.length,6);
+  assert.equal((await room("state",a)).body.history.length,7);
 });
 
 test("messages are pair-only, duplicate messages do not repeat, odd player gets a bot",async t=>{
@@ -212,20 +212,20 @@ test("all chat survives the player chat window and rematches, with access restri
   assert.equal((await room("transcript",host.token)).body.pairs.find(p=>p.number===number).messages.length,60);
 });
 
-test("bot plans split evenly between late yields and going all the way", async t => {
+test("the bot draws one of five equally likely plans", async t => {
   t.mock.timers.enable({apis:["Date"],now:1_800_000_000_000});
   let random = 0;
   t.mock.method(Math,"random",() => random);
-  for (let draw=0;draw<6;draw++) {
-    random = (draw+.5)/6;
+  for (let draw=0;draw<5;draw++) {
+    random = (draw+.5)/5;
     const {room,players:[player]} = await create(1);
-    const lastStep = draw < 3 ? 4 + draw : 6;
+    const lastStep = draw < 4 ? 4 + draw : 7;
     for (let step=0;step<=lastStep;step++) {
       await room("decision",player,{number:1,step,choice:"go"});
       t.mock.timers.tick(15_000);
       const {body} = await room("state",player);
-      assert.equal(body.history.at(-1).other,step===lastStep && draw<3 ? "yield" : "go");
-      assert.equal(body.result,step===lastStep ? draw<3 ? "b" : "crash" : null);
+      assert.equal(body.history.at(-1).other,step===lastStep && draw<4 ? "yield" : "go");
+      assert.equal(body.result,step===lastStep ? draw<4 ? "b" : "crash" : null);
     }
   }
 });
@@ -256,4 +256,20 @@ test("the bot deadline is durable, stays hidden, and is settled just once", asyn
   assert.equal((await room("state",player)).body.history.length,1);
   t.mock.timers.tick(1);
   assert.equal((await room("state",player)).body.history.length,2);
+});
+
+test("a pair created before the 100 m decision keeps its original distances", async () => {
+  const store = memoryStore();
+  const {room,host,players} = await create(2,store);
+  const row = store.get(host.room);
+  const saved = JSON.parse(row.state);
+  delete saved.pairs[0].distanceVersion;
+  assert.ok(store.put(host.room,row.revision,JSON.stringify(saved)));
+  const state = (await room("state",players[0])).body;
+  assert.equal(state.totalSteps,7);
+  for (let step=0;step<5;step++) {
+    await Promise.all(players.map(player=>room("decision",player,{number:1,step,choice:"go"})));
+  }
+  assert.equal((await room("state",players[0])).body.distance,50);
+  assert.deepEqual((await room("state",host.token)).body.pairs[0].distances,[1000,800,600,400,200,50,10]);
 });

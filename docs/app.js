@@ -1,6 +1,6 @@
-import { changeSelection, nextReveal, pairStory, points, revealDuration } from "./story.js?v=5";
+import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration } from "./story.js?v=10";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=9";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=10";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -332,6 +332,7 @@ function renderPairStory(section, pair, messages, projected, loading = false) {
     } else if (event.kind === "choice") {
       content = '<strong>'+names[event.seat]+'</strong> · '+moves[event.choice]+' <small>(beküldve)</small>';
     } else {
+      const points = pair.distances ?? legacyPoints;
       const next = points[points.indexOf(event.distance)+1];
       const bothGo = event.choices.every(choice => choice === "go");
       const summary = bothGo ? next ? "Tovább "+next+" méterre" : "Ütközés"

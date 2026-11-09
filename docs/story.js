@@ -1,4 +1,4 @@
-export const points = [1000, 800, 600, 400, 200, 50, 10];
+export const legacyPoints = [1000, 800, 600, 400, 200, 50, 10];
 export const revealDuration = 560;
 
 export function carPositions(distance, firstYields = false, secondYields = false) {

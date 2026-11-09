@@ -1,4 +1,6 @@
-export const DISTANCES = [1000, 800, 600, 400, 200, 50, 10];
+export const DISTANCES = [1000, 800, 600, 400, 200, 100, 50, 10];
+const LEGACY_DISTANCES = [1000, 800, 600, 400, 200, 50, 10];
+const distancesFor = pair => pair.distanceVersion === 2 ? DISTANCES : LEGACY_DISTANCES;
 const LIFE = 8 * 60 * 60 * 1000;
 const MAX_PLAYERS = 40;
 const MAX_MESSAGES = 10;
@@ -85,7 +87,8 @@ function view(room, auth, online) {
     const pairs = room.pairs.map((pair, i) => {
       if (pair.result) results[pair.result]++;
       return {
-        number: i + 1, distance: pair.result === "crash" ? 0 : DISTANCES[pair.step],
+        number: i + 1, distance: pair.result === "crash" ? 0 : distancesFor(pair)[pair.step],
+        distances: distancesFor(pair),
         ready: pair.result ? 0 : pair.choices.filter(Boolean).length, result: pair.result,
         names: pair.players.map(id => playerName(room, id)), history: pair.history, bot: pair.players.includes(null),
         messageCount: pair.messageCount ?? pair.messages.length,
@@ -123,14 +126,15 @@ function view(room, auth, online) {
   if (!pair) return { ...details, spectator: true };
   const seat = pair.players.indexOf(player.id);
   return {
-    ...details, number, step: pair.step, distance: pair.result === "crash" ? 0 : DISTANCES[pair.step],
+    ...details, number, step: pair.step, distance: pair.result === "crash" ? 0 : distancesFor(pair)[pair.step],
+    totalSteps: distancesFor(pair).length,
     waiting: Boolean(pair.choices[seat]), result: pair.result, outcome: outcome(pair, seat),
     messages: pair.messages.map(m => ({ id: m.id, own: m.seat === seat, text: m.text })),
     history: playerHistory(pair, seat),
   };
 }
 function botPlan() {
-  const draw = Math.floor(Math.random() * (BOT_YIELD_STEPS * 2));
+  const draw = Math.floor(Math.random() * (BOT_YIELD_STEPS + 1));
   return draw < BOT_YIELD_STEPS ? BOT_FIRST_YIELD_STEP + draw : null;
 }
 function addPair(room, a, b) {
@@ -144,7 +148,7 @@ function addPair(room, a, b) {
     }
   }
   room.pairs.push({
-    players: [a, b], startedAt: Date.now(), step: 0, choices: [null, null], result: null, history: [],
+    players: [a, b], startedAt: Date.now(), distanceVersion: 2, step: 0, choices: [null, null], result: null, history: [],
     messages: [], sent: [0, 0],
     ...(b === null ? { botYieldAt: botPlan() } : {}),
   });
@@ -197,11 +201,12 @@ function decide(room, pair, seat, input) {
 function resolveStep(room, pair, now) {
   const submitted = pair.submitted;
   const [a, b] = pair.choices;
-  pair.history.push({ distance: DISTANCES[pair.step], choices: [...pair.choices], at: now, submitted: [...submitted] });
+  const distances = distancesFor(pair);
+  pair.history.push({ distance: distances[pair.step], choices: [...pair.choices], at: now, submitted: [...submitted] });
   if (a === "yield" && b === "yield") pair.result = "both";
   else if (a === "yield") pair.result = "a";
   else if (b === "yield") pair.result = "b";
-  else if (pair.step === DISTANCES.length - 1) pair.result = "crash";
+  else if (pair.step === distances.length - 1) pair.result = "crash";
   else {
     pair.step++;
     pair.choices = [null, null];
@@ -233,7 +238,7 @@ function send(pair, number, seat, input) {
   if (pair.result || input.step !== pair.step || botIsDue(pair, Date.now())) reject(409, "Ez a döntési pont már lezárult.");
   if (pair.sent[seat] >= MAX_MESSAGES) reject(429, "Ebben a lépésben már elküldted a tíz üzenetedet.");
   pair.legacyMessages ??= pair.messages.filter(message => message.at === undefined);
-  const message = { seat, id: input.id, text, at: Date.now(), distance: DISTANCES[pair.step] };
+  const message = { seat, id: input.id, text, at: Date.now(), distance: distancesFor(pair)[pair.step] };
   pair.messageCount = (pair.messageCount ?? pair.messages.length) + 1;
   pair.messages.push(message);
   if (pair.messages.length > 48) pair.messages.shift();
