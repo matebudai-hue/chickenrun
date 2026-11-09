@@ -273,3 +273,31 @@ dialog::backdrop{background:#161b14cc}
 .live-road{position:relative}
 .race-flash{position:absolute;inset:50% auto auto 50%;transform:translate(-50%,-50%);padding:.26rem .52rem;background:#191e18;border:1px solid var(--gold);font:700 .9rem var(--mono);color:var(--gold);pointer-events:none}
 @media(max-width:540px){.race-modes{grid-template-columns:1fr}}
+
+.queue-list{display:flex;flex-wrap:wrap;gap:.5rem 1.25rem;padding-left:1.2rem;margin:.35rem 0}
+[data-queue-until]{font-variant-numeric:tabular-nums}
+.chat-privacy{font-size:.79rem;margin:.25rem 0 0}
+#chat-status{font-size:.82rem;margin:.25rem 0}
+.timed-action [data-race-cutoff]{margin:0;font-size:.82rem}
+@media(max-width:800px){
+  .playing .chat-card{padding:.55rem .72rem}
+  .playing .chat-card h2{font-size:1rem;margin-bottom:.25rem}
+  .playing .chat-card .messages{height:62px}
+  .playing .chat-form{margin-top:0}
+  .playing .chat-form input{min-width:0;font-size:16px}
+}
+@media(max-width:540px){
+  body[data-surface="player"]:has(.playing) .mast{min-height:38px;margin-bottom:.35rem}
+  .playing .heading{margin-bottom:.4rem}
+  .playing .heading h1{font-size:1.6rem}
+  .playing .play-grid{gap:.45rem}
+  .playing .road{max-height:132px}
+  .playing .race-meta{padding:.35rem .65rem}
+  .playing .legend{padding-block:.22rem}
+  .playing .race-card .button{min-height:44px}
+  .playing .decision-reveal{padding-block:.24rem}
+}
+body[data-keyboard="true"] .playing .timed-action{
+  position:fixed;z-index:5;inset-inline:12px;bottom:calc(var(--keyboard-inset, 0px) + 6px);
+  margin:0;padding:.32rem;background:#20261e;border-radius:6px;
+}

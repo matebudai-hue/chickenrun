@@ -1,4 +1,4 @@
-import { finishRace, newRace, nextExit, raceDistance, raceEnd, raceReady, RACE_MARKS, stopRace } from "./race.js";
+import { finishRace, newRace, nextExit, markReady, raceElapsed, raceDistance, raceEnd, raceReady, RACE_MARKS, stopRace } from "./race.js";
 
 export const DISTANCES = [1000, 800, 600, 400, 200, 100, 50, 10];
 const LEGACY_DISTANCES = [1000, 800, 600, 400, 200, 50, 10];
@@ -9,6 +9,8 @@ const MAX_MESSAGES = 10;
 const BOT_FIRST_YIELD_STEP = DISTANCES.indexOf(200);
 const BOT_YIELD_STEPS = DISTANCES.length - BOT_FIRST_YIELD_STEP;
 const ONLINE_WINDOW = 45_000;
+const CONNECTION_GAP = 6_000;
+const REMATCH_WAIT = 30_000;
 const CODE_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const encoder = new TextEncoder();
 
@@ -84,7 +86,7 @@ function outcome(pair, seat) {
 }
 function distanceFor(pair) {
   if (!pair.race) return pair.result === "crash" ? 0 : distancesFor(pair)[pair.step];
-  return pair.history.at(-1)?.distance ?? raceDistance((pair.race.stoppedAt ?? Date.now()) - pair.race.startsAt);
+  return pair.history.at(-1)?.distance ?? raceDistance(raceElapsed(pair.race, pair.race.stoppedAt ?? Date.now()));
 }
 function view(room, auth, online) {
   const base = { phase: room.phase, mode: room.mode ?? "steps" };
@@ -98,10 +100,13 @@ function view(room, auth, online) {
         ready: pair.result ? 0 : pair.race ? pair.race.turns.filter((turn,seat) => turn && pair.players[seat] !== null).length : pair.choices.filter(Boolean).length,
         result: pair.result,
         ...(pair.race ? {
-          timed: true,
+          timed: true, awaitingReady: pair.race.startsAt === null && !pair.result,
+          readyPlayers: pair.race.ready?.filter((ready, seat) => ready && pair.players[seat] !== null).length,
+          connectionGap: pair.race.connectionGap,
           turns: pair.result ? pair.race.turns.map(turn => turn && turn.at < (pair.race.stoppedAt ?? raceEnd(pair.race)[1]) ? turn : null) : undefined,
         } : {}),
         names: pair.players.map(id => playerName(room, id)), history: pair.history, bot: pair.players.includes(null),
+        reason: pair.reason,
         messageCount: pair.messageCount ?? pair.messages.length,
         startedAt: pair.startedAt,
       };
@@ -113,9 +118,11 @@ function view(room, auth, online) {
         const { pair, number } = activePair(room, player.id);
         const seat = pair?.players.indexOf(player.id);
         const queued = room.queue?.includes(player.id);
-        const status = queued ? "queued" : !pair ? "lobby" : pair.result ? "finished" : (pair.race ? pair.race.turns[seat] : pair.choices[seat]) ? "ready" : "pending";
+        const status = queued ? "queued" : !pair ? "lobby" : pair.result ? "finished" :
+          pair.race ? pair.race.startsAt === null ? "starting" : "driving" : pair.choices[seat] ? "ready" : "pending";
         return {
           number: index + 1, name: playerName(room, player.id), match: number || null, status,
+          queueUntil: queued ? room.queueUntil?.[player.id] : undefined,
           partner: pair ? playerName(room, pair.players[1 - seat]) : null,
           ...(online ? { online: online.has(player.id) } : {}),
         };
@@ -131,20 +138,29 @@ function view(room, auth, online) {
     return seat < 0 || !match.result ? [] : [{
       number: index + 1, outcome: outcome(match, seat), bot: match.players.includes(null),
       history: playerHistory(match, seat),
-      ...(match.race ? { timed:true, target:match.race.turns[seat]?.target } : {}),
+      reason: match.reason,
+      ...(match.race ? {
+        timed: true, target: match.race.turns[seat]?.target,
+        connectionGap: match.race.connectionGap?.[seat],
+      } : {}),
     }];
   });
   const details = { ...base, role: "player", queued: room.queue?.includes(player.id) ?? false, report };
+  if (details.queued) {
+    details.queueUntil = room.queueUntil?.[player.id];
+    details.serverAt = Date.now();
+  }
   if (!pair) return { ...details, spectator: true };
   const seat = pair.players.indexOf(player.id);
   return {
     ...details, number, step: pair.step, distance: distanceFor(pair),
     totalSteps: distancesFor(pair).length,
     ...(pair.race ? {
-      race: { startsAt:pair.race.startsAt, marks:RACE_MARKS, target:pair.race.turns[seat]?.target ?? null },
+      race: { startsAt:pair.race.startsAt, marks:RACE_MARKS, target:pair.race.turns[seat]?.target ?? null,
+        ready:pair.race.ready?.[seat], readyUntil:pair.race.readyUntil },
       serverAt:Date.now(),
     } : {}),
-    waiting: Boolean(pair.choices[seat]), result: pair.result, outcome: outcome(pair, seat),
+    waiting: Boolean(pair.choices[seat]), result: pair.result, outcome: outcome(pair, seat), reason: pair.reason,
     messages: pair.messages.map(m => ({ id: m.id, own: m.seat === seat, text: m.text })),
     history: playerHistory(pair, seat),
   };
@@ -165,9 +181,9 @@ function addPair(room, a, b) {
   }
   const now = Date.now();
   const plan = b === null ? botPlan() : null;
-  const race = room.mode === "timed" ? newRace(now, DISTANCES[plan]) : null;
+  const race = room.mode === "timed" ? newRace(now, DISTANCES[plan], room.readyGate, b === null) : null;
   room.pairs.push({
-    players: [a, b], startedAt: race?.startsAt ?? now, distanceVersion: 2, step: 0, choices: [null, null], result: null, history: [],
+    players: [a, b], startedAt: race ? race.startsAt : now, distanceVersion: 2, step: 0, choices: [null, null], result: null, history: [],
     messages: [], sent: [0, 0],
     ...(race ? { race } : b === null ? { botYieldAt: plan } : {}),
   });
@@ -184,21 +200,44 @@ function requeue(room, player, action, number) {
   const latest = activePair(room, player);
   if (latest.number !== number || (latest.pair && !latest.pair.result)) return false;
   const queue = room.queue ??= [];
+  const deadlines = room.queueUntil ??= {};
   const index = queue.indexOf(player);
   if (action === "cancel") {
     if (index < 0) return false;
     queue.splice(index, 1);
+    delete deadlines[player];
     return true;
   }
   if (index >= 0) return false;
   const previousPartner = id => activePair(room, id).pair?.players.find(other => other !== id);
   const partnerIndex = queue.findIndex(id => id !== previousPartner(player) && player !== previousPartner(id));
-  if (partnerIndex < 0) queue.push(player);
-  else addPair(room, queue.splice(partnerIndex, 1)[0], player);
+  if (partnerIndex < 0) {
+    queue.push(player);
+    deadlines[player] = Date.now() + REMATCH_WAIT;
+  } else {
+    const [partner] = queue.splice(partnerIndex, 1);
+    delete deadlines[partner];
+    addPair(room, partner, player);
+  }
+  return true;
+}
+function queueIsDue(room, now) {
+  return room.queue?.some(id => !room.queueUntil?.[id] || room.queueUntil[id] <= now);
+}
+function settleQueue(room, now) {
+  if (room.phase === "closed" || !queueIsDue(room, now)) return false;
+  const deadlines = room.queueUntil ??= {};
+  room.queue = room.queue.filter(id => {
+    deadlines[id] ??= now + REMATCH_WAIT;
+    if (deadlines[id] > now) return true;
+    delete deadlines[id];
+    addPair(room, id, null);
+    return false;
+  });
   return true;
 }
 function finishIfDone(room) {
-  if (room.pairs.every(pair => pair.result)) room.phase = "finished";
+  if (room.phase !== "closed" && room.pairs.every(pair => pair.result)) room.phase = "finished";
 }
 function decide(room, pair, seat, input) {
   if (!Number.isInteger(input.step) || !["go", "yield"].includes(input.choice)) {
@@ -234,13 +273,30 @@ function resolveStep(room, pair, now) {
   }
   finishIfDone(room);
 }
-function scheduleTurn(pair, seat, receivedAt) {
-  if (!pair.race) reject(409, "Ebben a játékban döntési pontonként választasz.");
-  if (pair.result || pair.race.turns[seat]) return false;
-  const turn = nextExit(pair.race,receivedAt);
+async function recordTurn(store, code, auth, number, receivedAt) {
+  const { room } = await getRoom(store, code);
+  const player = room.players.find(p => p.key === auth);
+  if (!player) reject(403, "Ehhez a szobához nincs hozzáférésed.");
+  const pair = Number.isInteger(number) ? room.pairs[number - 1] : undefined;
+  const seat = pair?.players.indexOf(player.id) ?? -1;
+  if (seat < 0 || !pair.race) reject(409, "Ebben a futamban nem tudsz kitérni.");
+  const prior = pair.race.turns[seat];
+  const end = Math.min(pair.race.stoppedAt ?? Infinity, raceEnd(pair.race)[1]);
+  if (prior && prior.at <= receivedAt && prior.at < end) {
+    return { ...view(room, auth), turnAck: { number, target: prior.target } };
+  }
+  const turn = receivedAt < end && nextExit(pair.race, receivedAt);
   if (!turn) reject(409, "Ehhez a kitéréshez már nincs elérhető pont.");
-  pair.race.turns[seat] = turn;
-  return true;
+
+  // Persist the ingress time independently of the room's chat and settlement writes.
+  await store.saveTurn(code, number, seat, turn);
+  const { room: updated } = await getRoom(store, code);
+  const race = updated.pairs[number - 1].race;
+  const accepted = race.turns[seat];
+  if (!accepted || accepted.at >= Math.min(race.stoppedAt ?? Infinity, raceEnd(race)[1])) {
+    reject(409, "Ez a futam a kitérés beérkezése előtt véget ért.");
+  }
+  return { ...view(updated, auth), turnAck: { number, target: accepted.target } };
 }
 function stopPair(pair, now) {
   if (pair.result) return;
@@ -248,15 +304,30 @@ function stopPair(pair, now) {
   if (pair.race) stopRace(pair.race,now);
 }
 function timedRaceIsDue(pair, now) {
-  return !pair.result && pair.race && raceReady(pair.race,now);
+  return !pair.result && pair.race && (raceReady(pair.race,now) || readyExpired(pair, now));
+}
+function readyExpired(pair, now) {
+  return pair.race?.startsAt === null && pair.race.readyUntil <= now;
 }
 function botIsDue(pair, now) {
   return !pair.result && Number.isFinite(pair.botDueAt) && pair.botDueAt <= now;
 }
-function settleDuePairs(room, now) {
+function settleDuePairs(room, now, seen) {
   let changed = false;
   for (const pair of room.pairs) {
     if (timedRaceIsDue(pair,now)) {
+      if (readyExpired(pair, now)) {
+        pair.reason = "ready-timeout";
+        stopPair(pair, now);
+        finishIfDone(room);
+        changed = true;
+        continue;
+      }
+      if (pair.race.ready && seen) {
+        const [, end] = raceEnd(pair.race);
+        pair.race.connectionGap = pair.players.map(id => id !== null &&
+          end - Math.max(pair.race.startsAt, seen.get(id) ?? 0) >= CONNECTION_GAP);
+      }
       const { result, history } = finishRace(pair.race);
       pair.result = result;
       pair.history.push(history);
@@ -284,7 +355,7 @@ function send(pair, number, seat, input, receivedAt) {
   }
   if (pair.sent[seat] >= MAX_MESSAGES) reject(429, pair.race ? "Ebben a futamban már elküldted a tíz üzenetedet." : "Ebben a lépésben már elküldted a tíz üzenetedet.");
   pair.legacyMessages ??= pair.messages.filter(message => message.at === undefined);
-  const message = { seat, id: input.id, text, at: now, distance: pair.race ? raceDistance(now - pair.race.startsAt) : distanceFor(pair) };
+  const message = { seat, id: input.id, text, at: now, distance: pair.race ? raceDistance(raceElapsed(pair.race, now)) : distanceFor(pair) };
   pair.messageCount = (pair.messageCount ?? pair.messages.length) + 1;
   pair.messages.push(message);
   if (pair.messages.length > 48) pair.messages.shift();
@@ -294,7 +365,23 @@ function send(pair, number, seat, input, receivedAt) {
 async function getRoom(store, roomCode) {
   const row = await store.get(roomCode);
   if (!row || row.expires_at < Date.now()) reject(404, "Ez a szoba nem található vagy lejárt.");
-  return { row, room: JSON.parse(row.state) };
+  const room = JSON.parse(row.state);
+  const reconciled = new Set();
+  for (const { number, seat, ...turn } of JSON.parse(row.turns ?? "[]")) {
+    const pair = room.pairs[number - 1];
+    if (!pair?.race) continue;
+    const prior = pair.race.turns[seat];
+    if (prior && prior.at <= turn.at) continue;
+    pair.race.turns[seat] = turn;
+    if (pair.result && pair.result !== "stopped") reconciled.add(pair);
+  }
+  // A valid request delayed during storage can correct a provisionally settled race.
+  for (const pair of reconciled) {
+    const { result, history } = finishRace(pair.race);
+    pair.result = result;
+    pair.history[pair.history.length - 1] = history;
+  }
+  return { row, room };
 }
 async function change(store, roomCode, mutator) {
   for (let attempt = 0; attempt < 40; attempt++) {
@@ -308,7 +395,26 @@ async function change(store, roomCode, mutator) {
 
 export function d1Store(db) {
   return {
-    get: (code) => db.prepare("SELECT revision, expires_at, state FROM rooms WHERE code = ?").bind(code).first(),
+    get: code => db.prepare(`
+      SELECT revision, expires_at, state, (
+        SELECT json_group_array(json_object('number', pair, 'seat', seat,
+          'at', at, 'target', target, 'offset', offset, 'distance', distance))
+        FROM race_turns WHERE code = rooms.code
+      ) AS turns FROM rooms WHERE code = ?
+    `).bind(code).first(),
+    async saveTurn(code, number, seat, turn) {
+      const insert = db.prepare(`
+        INSERT INTO race_turns (code, pair, seat, at, target, offset, distance)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(code, pair, seat) DO UPDATE SET at=excluded.at, target=excluded.target,
+          offset=excluded.offset, distance=excluded.distance WHERE excluded.at < race_turns.at
+      `).bind(code, number, seat, turn.at, turn.target, turn.offset, turn.distance);
+      await db.batch([insert, db.prepare("UPDATE rooms SET revision = revision + 1 WHERE code = ?").bind(code)]);
+    },
+    async seen(code) {
+      const { results } = await db.prepare("SELECT player, seen_at FROM presence WHERE code = ?").bind(code).all();
+      return new Map(results.map(row => [row.player, row.seen_at]));
+    },
     async create(code, expires, state) {
       const r = await db.prepare("INSERT OR IGNORE INTO rooms (code, expires_at, state) VALUES (?, ?, ?)").bind(code, expires, state).run();
       return r.meta.changes === 1;
@@ -345,6 +451,11 @@ export function d1Store(db) {
 }
 
 async function stateView(store, roomCode, room, auth, pulse = false, defer) {
+  if (auth === room.host && store.seen && room.readyGate && room.phase === "running") {
+    const seen = await store.seen(roomCode);
+    const cutoff = Date.now() - CONNECTION_GAP;
+    return view(room, auth, new Set([...seen].filter(([, at]) => at > cutoff).map(([id]) => id)));
+  }
   if (auth === room.host && store.online) return view(room, auth, await store.online(roomCode));
   const projection = view(room, auth);
   if (pulse && store.pulse) {
@@ -419,12 +530,36 @@ export async function api(request, store, defer) {
       }
       // An authenticated poll settles durable deadlines, even after a reload.
       const now = Date.now();
-      if (room.pairs.some(pair => botIsDue(pair,now) || timedRaceIsDue(pair,now))) {
-        room = await change(store, roomCode, current => settleDuePairs(current, Date.now()));
+      const member = room.players.find(player => player.key === auth);
+      const requested = Number(url.searchParams.get("ready"));
+      const latest = member ? activePair(room, member.id) : {};
+      const needsReady = latest.number === requested && latest.pair?.race?.startsAt === null &&
+        !latest.pair.result && !latest.pair.race.ready[latest.pair.players.indexOf(member.id)];
+      const timedDue = room.pairs.some(pair => timedRaceIsDue(pair, now));
+      if (needsReady || timedDue || queueIsDue(room, now) || room.pairs.some(pair => botIsDue(pair, now))) {
+        const seen = timedDue && store.seen ? await store.seen(roomCode) : undefined;
+        room = await change(store, roomCode, current => {
+          const time = Date.now();
+          let changed = settleDuePairs(current, time, seen);
+          changed = settleQueue(current, time) || changed;
+          if (!needsReady) return changed;
+          const { pair, number } = activePair(current, member.id);
+          if (number !== requested || pair.result) return changed;
+          if (!markReady(pair.race, pair.players.indexOf(member.id), time)) return changed;
+          pair.startedAt = pair.race.startsAt;
+          return true;
+        });
       }
-      return json(await stateView(store, roomCode, room, auth, url.searchParams.has("pulse"), defer));
+      const projection = await stateView(store, roomCode, room, auth, url.searchParams.has("pulse"), defer);
+      if (projection.role === "host" && url.searchParams.has("clock")) projection.serverAt = Date.now();
+      return json(projection);
     }
     const input = await readBody(request);
+    if (action === "turn") {
+      const recording = recordTurn(store, roomCode, auth, input.number, receivedAt);
+      if (defer) defer(recording.catch(() => {}));
+      return json(await recording);
+    }
     const room = await change(store, roomCode, state => {
       if (action === "join") {
         if (state.players.some(p => p.key === auth)) return false;
@@ -442,6 +577,7 @@ export async function api(request, store, defer) {
           const index = player ? state.queue?.indexOf(player.id) ?? -1 : -1;
           if (index < 0 || activePair(state, player.id).number !== input.number) return false;
           state.queue.splice(index, 1);
+          delete (state.queueUntil ?? {})[player.id];
           addPair(state, player.id, null);
           return true;
         }
@@ -459,6 +595,7 @@ export async function api(request, store, defer) {
           }
           if (input.mode !== undefined && !["steps","timed"].includes(input.mode)) reject(400, "Érvénytelen játékmód.");
           state.mode = input.mode ?? "steps";
+          state.readyGate = state.mode === "timed" && input.readyGate === true;
           start(state);
         }
         else {
@@ -466,17 +603,20 @@ export async function api(request, store, defer) {
           state.pairs.forEach(pair => stopPair(pair,receivedAt));
           state.phase = "closed";
           state.queue = [];
+          state.queueUntil = {};
         }
         return true;
       }
       const player = state.players.find(p => p.key === auth);
       if (!player) reject(403, "Ehhez a szobához nincs hozzáférésed.");
-      if (action === "requeue" || action === "cancel") return requeue(state, player.id, action, input.number);
+      if (action === "requeue" || action === "cancel") {
+        const changed = settleQueue(state, Date.now());
+        return requeue(state, player.id, action, input.number) || changed;
+      }
       const { pair, number } = activePair(state, player.id);
       if (!pair) reject(409, "Nincs aktív párod.");
       if ((input.number ?? 1) !== number) return false;
       const seat = pair.players.indexOf(player.id);
-      if (action === "turn") return scheduleTurn(pair,seat,receivedAt);
       if (action === "decision") {
         if (pair.race) reject(409, "Ebben a futamban a Kitérés gombbal döntesz.");
         return decide(state,pair,seat,input);

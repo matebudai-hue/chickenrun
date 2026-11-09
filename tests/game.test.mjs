@@ -5,7 +5,7 @@ import { memoryStore } from "../local.mjs";
 
 const base = "https://example.test";
 const secret = () => crypto.randomUUID().replaceAll("-", "");
-async function create(n = 2, store = memoryStore(), mode = "steps") {
+async function create(n = 2, store = memoryStore(), mode = "steps", readyGate = false) {
   const call = async (path, token, body) => {
     const res = await api(new Request(base+path, {
       method: body === undefined ? "GET" : "POST",
@@ -22,7 +22,7 @@ async function create(n = 2, store = memoryStore(), mode = "steps") {
     assert.equal((await room("join",who,{label:labels[index]})).status, 200);
   }
   assert.equal((await room("start",players[0],{})).status, 403);
-  assert.equal((await room("start",host.token,{mode})).status, 200);
+  assert.equal((await room("start",host.token,{mode,readyGate})).status, 200);
   return { room, host, players, labels };
 }
 
@@ -294,7 +294,7 @@ test("continuous race hides the partner's request and resolves two turns at the 
   await room("turn",b,{number:1});
   t.mock.timers.tick(3_499);
   assert.equal((await room("state",a)).body.result,null);
-  t.mock.timers.tick(451);
+  t.mock.timers.tick(901);
   const [first,second] = await Promise.all([room("state",a),room("state",b)]);
   assert.equal(first.body.outcome,"both");
   assert.deepEqual(first.body.history.map(row=>row.distance),[50]);
@@ -310,7 +310,7 @@ test("continuous race ends at 45 seconds if nobody exits and the last exit is at
   t.mock.timers.tick(46_000);
   assert.equal((await room("turn",a,{number:1})).status,409);
   assert.equal((await room("state",a)).body.result,null);
-  t.mock.timers.tick(2450);
+  t.mock.timers.tick(2900);
   assert.equal((await room("state",a)).body.result,"crash");
   const pair = (await room("state",host.token)).body.pairs[0];
   assert.equal(pair.history[0].at - pair.startedAt,45_000);
@@ -323,8 +323,86 @@ test("the timed test driver yields at the drawn mark without waiting for the hum
   t.mock.method(Math,"random",() => 0);
   const {room,players:[player]} = await create(1,memoryStore(),"timed");
   assert.equal((await room("state",player)).body.race.target,null);
-  t.mock.timers.tick(33_450);
+  t.mock.timers.tick(33_900);
   const finished = (await room("state",player)).body;
   assert.equal(finished.outcome,"other");
   assert.equal(finished.distance,200);
+});
+test("a kitérés that arrives before the gate survives a competing settlement and delayed storage", async t => {
+  t.mock.timers.enable({apis:["Date"],now:1_800_000_000_000});
+  const store = memoryStore();
+  const save = store.saveTurn;
+  let entered, release;
+  const paused = new Promise(resolve => { entered = resolve; });
+  const resume = new Promise(resolve => { release = resolve; });
+  const {room,host,players:[a,b]} = await create(2,store,"timed");
+  t.mock.timers.tick(41_999);
+  const first = await room("turn",a,{number:1});
+  assert.deepEqual(first.body.turnAck,{number:1,target:50});
+  t.mock.method(store,"saveTurn",async (...args) => {
+    entered();
+    await resume;
+    return save(...args);
+  });
+  const pending = room("turn",b,{number:1});
+  await paused;
+  t.mock.timers.tick(901);
+  assert.equal((await room("state",a)).body.outcome,"own");
+  release();
+  assert.deepEqual((await pending).body.turnAck,{number:1,target:50});
+  const corrected = (await room("state",host.token)).body;
+  assert.equal(corrected.results.both,1);
+  assert.equal(corrected.pairs[0].history.length,1);
+  assert.ok(corrected.pairs[0].turns.every(turn => turn.target === 50));
+  assert.deepEqual((await room("turn",b,{number:1})).body.turnAck,{number:1,target:50});
+});
+
+test("timed rematch waits thirty seconds, shows the deadline and starts with a bot", async t => {
+  t.mock.timers.enable({apis:["Date"],now:1_800_000_000_000});
+  const {room,host,players:[a,b]} = await create(2,memoryStore(),"timed");
+  t.mock.timers.tick(49_000);
+  assert.equal((await room("state",a)).body.result,"crash");
+  const queued = (await room("requeue",a,{number:1})).body;
+  assert.equal(queued.queueUntil - queued.serverAt,30_000);
+  assert.equal((await room("state",host.token)).body.roster.find(p => p.status === "queued").queueUntil,queued.queueUntil);
+  t.mock.timers.tick(29_999);
+  assert.equal((await room("state",a)).body.queued,true);
+  t.mock.timers.tick(1);
+  await Promise.all([room("state",a),room("state",host.token),room("requeue",b,{number:1})]);
+  const trainer = (await room("state",host.token)).body;
+  assert.equal(trainer.pairs.length,2);
+  assert.equal(trainer.pairs[1].bot,true);
+  assert.equal((await room("state",a)).body.number,2);
+  assert.equal((await room("state",b)).body.queued,true);
+});
+
+test("the countdown waits for both visible boards and the report signals missing presence", async t => {
+  t.mock.timers.enable({apis:["Date"],now:1_800_000_000_000});
+  const {room,host,players:[a,b]} = await create(2,memoryStore(),"timed",true);
+  assert.equal((await room("state",a)).body.race.startsAt,null);
+  assert.equal((await room("state?ready=1&pulse=1",a)).body.race.startsAt,null);
+  t.mock.timers.tick(7000);
+  assert.equal((await room("state?ready=2",b)).body.race.startsAt,null);
+  const ready = (await room("state?ready=1&pulse=1",b)).body;
+  assert.equal(ready.race.startsAt - ready.serverAt,3000);
+  assert.equal((await room("state",a)).body.race.startsAt,ready.race.startsAt);
+  t.mock.timers.tick(46_000);
+  await room("state?pulse=1",a);
+  t.mock.timers.tick(2900);
+  assert.equal((await room("state",a)).body.report[0].connectionGap,false);
+  assert.equal((await room("state",b)).body.report[0].connectionGap,true);
+  assert.equal((await room("state",host.token)).body.pairs[0].connectionGap.filter(Boolean).length,1);
+});
+
+test("a player who never reports ready does not get an apparent crash", async t => {
+  t.mock.timers.enable({apis:["Date"],now:1_800_000_000_000});
+  const {room,host,players:[a,b]} = await create(2,memoryStore(),"timed",true);
+  await room("state?ready=1",a);
+  t.mock.timers.tick(15_000);
+  const missing = (await room("state?ready=1",b)).body;
+  assert.equal(missing.race.startsAt,null);
+  assert.equal(missing.result,"stopped");
+  assert.equal(missing.reason,"ready-timeout");
+  assert.equal((await room("state",host.token)).body.results.crash,0);
+  assert.equal((await room("requeue",a,{number:1})).body.queued,true);
 });

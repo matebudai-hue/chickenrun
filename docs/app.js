@@ -1,7 +1,7 @@
-import { animateRace } from "./live-race.js?v=11";
-import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration } from "./story.js?v=11";
+import { animateRace } from "./live-race.js?v=12";
+import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration } from "./story.js?v=12";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=11";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=12";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -29,7 +29,8 @@ let busy = false, polling = false, generation = 0, lastPulse = 0;
 let selectedTab = "overview", filter = "all", draft = "", messageRequest, confirmAction;
 let reveal, revealTimer;
 let selectedGameMode = "steps";
-let raceOffset = 0, stopAnimation, turnPending = false;
+let raceOffset = Date.now() - performance.now(), stopAnimation, turnPending = false;
+let chatPending, chatNotice = "", turnAck;
 let selection = readSelection();
 let showPairings = saved.get(projectionModeKey) === "pairings";
 let pendingDecision;
@@ -95,10 +96,16 @@ function update(next, started = performance.now()) {
     const received = performance.now();
     raceOffset = next.serverAt + Math.min((received - started) / 2, 200) - received;
     delete next.serverAt;
-    if (!next.result) next.distance = next.race.marks[0][0];
+    if (next.race && !next.result) next.distance = next.race.marks[0][0];
   }
   const previous = state;
+  if (turnAck && next.number === turnAck.number && next.race && !next.result) {
+    next.race.target ??= turnAck.target;
+  }
   if (previous?.number !== next.number) {
+    turnAck = undefined;
+    turnPending = false;
+    chatNotice = "";
     draft = "";
     messageRequest = undefined;
   }
@@ -114,9 +121,12 @@ function update(next, started = performance.now()) {
     }
   }
   resolveDecision(next);
-  const nextSignature = JSON.stringify(next);
+  const nextSignature = JSON.stringify(isTrainer ? next : { ...next, messages: undefined });
   state = next;
-  if (nextSignature === signature) return;
+  if (nextSignature === signature) {
+    if (!isTrainer && JSON.stringify(previous?.messages) !== JSON.stringify(next.messages)) paintChat();
+    return;
+  }
   signature = nextSignature;
   render();
 }
@@ -130,10 +140,17 @@ async function poll() {
   if (busy || polling || !auth || loadFailure) return;
   polling = true;
   const stamp = generation;
-  const pulse = !isTrainer && Date.now() - lastPulse > 12_000;
+  const query = new URLSearchParams();
+  if (isTrainer && state?.queue?.length) query.set("clock", "1");
+  const visible = !isTrainer && !document.hidden;
+  const pulse = visible && Date.now() - lastPulse > (state?.race && !state.result ? 2000 : 12_000);
+  if (pulse) query.set("pulse", "1");
+  if (visible && state?.race?.startsAt === null && !state.result && !state.race.ready) {
+    query.set("ready", state.number);
+  }
   try {
     const started = performance.now();
-    const next = await readState(endpoint("state")+(pulse ? "?pulse=1" : ""), auth);
+    const next = await readState(endpoint("state")+(query.size ? "?"+query : ""), auth);
     if (stamp !== generation) return;
     if (pulse) lastPulse = Date.now();
     setConnection("ok", "Kapcsolat rendben");
@@ -149,7 +166,7 @@ async function poll() {
     }
   } finally {
     polling = false;
-    if (!loadFailure) nextPoll(document.hidden ? 4500 : state?.phase === "closed" ? 3000 : state?.race && !state.result ? 400+Math.random()*100 : 1000+Math.random()*250);
+    if (!loadFailure) nextPoll(document.hidden ? 4500 : state?.phase === "closed" ? 3000 : state?.race && !state.result ? 400+Math.random()*100 : state?.queued ? 600 : 1000+Math.random()*250);
   }
 }
 
@@ -203,6 +220,71 @@ async function perform(path, body, success, retry, label = "Kérés küldése…
 function mutate(action, body = {}, onSuccess = update) {
   const labels = { turn: "Kitérés küldése…", decision: "Döntés küldése…", requeue: "Új partner keresése…", start: "Párosítás…" };
   return perform(endpoint(action), body, onSuccess, () => mutate(action, body, onSuccess), labels[action]);
+}
+
+function paintChatControls() {
+  const button = screen.querySelector("#chat-form button");
+  if (button) {
+    button.disabled = Boolean(chatPending);
+    button.textContent = chatPending ? "Küldés…" : "Küldés";
+  }
+  const status = screen.querySelector("#chat-status");
+  if (status) {
+    status.hidden = !chatNotice;
+    status.textContent = chatNotice;
+  }
+}
+
+async function sendChat(request) {
+  if (chatPending) return;
+  chatPending = request;
+  chatNotice = "";
+  paintChatControls();
+  try {
+    await command(endpoint("message"), auth, request);
+    if (messageRequest === request) {
+      messageRequest = undefined;
+      if (draft.trim() === request.text) {
+        draft = "";
+        const input = screen.querySelector("#message-input");
+        if (input) input.value = "";
+      }
+    }
+  } catch (error) {
+    if (state.number === request.number && !state.result) {
+      chatNotice = error.retryable ? "Az üzenet visszaigazolása elmaradt. Újraküldheted." : error.message;
+    }
+  } finally {
+    chatPending = undefined;
+    paintChatControls();
+    nextPoll();
+  }
+}
+
+async function sendTurn(number) {
+  if (turnPending) return;
+  turnPending = true;
+  showNotice();
+  const request = command(endpoint("turn"), auth, { number });
+  render();
+  try {
+    const next = await request;
+    if (next.turnAck?.number !== number) throw new Error("A szerver nem igazolta vissza a kitérést.");
+    if (state.number === number && !state.result) {
+      turnAck = next.turnAck;
+      state.race.target = turnAck.target;
+    }
+  } catch (error) {
+    if (state.number === number && !state.result && !state.race.target) {
+      showNotice(error.retryable ? "A kitérés visszaigazolása elmaradt. Ellenőrizzük az állást." : error.message);
+    }
+  } finally {
+    if (state.number === number) {
+      turnPending = false;
+      render();
+    }
+    nextPoll();
+  }
 }
 
 function createRoom() {
@@ -287,10 +369,11 @@ function downloadCsv(headings, rows, label) {
 }
 
 function downloadPersonalReport() {
-  const headings = ["Játék","Kimenetel","Távolság (m)","Időpont","Saját döntés","Partner","Partner döntése"];
+  const headings = ["Játék","Kimenetel","Távolság (m)","Időpont","Saját döntés","Partner","Partner döntése","Kapcsolati megjegyzés"];
   const rows = state.report.flatMap(pair => (pair.history.length ? pair.history : [{}]).map(row => [
     pair.number,outcomes[pair.outcome],row.distance,time(row.at),moves[row.own],
     pair.bot ? "Tesztjátékos" : "A másik autó",moves[row.other],
+    pair.reason === "ready-timeout" ? "Rajt elmaradt" : pair.connectionGap ? "A futam végén hiányzott a kapcsolati jel" : "",
   ]));
   downloadCsv(headings,rows,"sajat");
 }
@@ -300,9 +383,11 @@ async function downloadTrainerReport(button) {
   try {
     const { pairs } = await readState(endpoint("transcript"),auth);
     const messages = new Map(pairs.map(pair => [pair.number,pair.messages]));
-    const headings = ["Játék","Típus","Távolság (m)","Időpont","Játékos 1","Döntés 1","Játékos 2","Döntés 2","Feladó","Üzenet","Kimenetel"];
+    const headings = ["Játék","Típus","Távolság (m)","Időpont","Játékos 1","Döntés 1","Játékos 2","Döntés 2","Feladó","Üzenet","Kimenetel","Hiányzó kapcsolati jel"];
     const rows = state.pairs.filter(pair => pair.result).flatMap(pair => {
       const [a,b] = pair.names;
+      const connectionNotes = pair.reason === "ready-timeout" ? "Rajt elmaradt" :
+        pair.names.filter((_, seat) => pair.connectionGap?.[seat]).join(", ");
       const outcome = pair.result === "a" ? a+" tért ki" : pair.result === "b" ? b+" tért ki" : outcomes[pair.result];
       const decisions = pair.history.map(row => ({
         at:row.at ?? 0, cells:[pair.number,"Döntés",row.distance,time(row.at),a,moves[row.choices[0]],b,moves[row.choices[1]],"","",outcome],
@@ -314,9 +399,10 @@ async function downloadTrainerReport(button) {
       const chat = (messages.get(pair.number) ?? []).map(row => ({
         at:row.at ?? 0, cells:[pair.number,"Üzenet",row.distance,time(row.at),a,"",b,"",pair.names[row.seat],row.text,outcome],
       }));
-      return decisions.length || chat.length || turns.length
-        ? [...chat,...decisions,...turns].sort((first,second) => first.at-second.at).map(row => row.cells)
-        : [[pair.number,"Kimenetel","","",a,"",b,"","","",outcome]];
+      const events = [...chat,...decisions,...turns].sort((first,second) => first.at-second.at);
+      return events.length
+        ? events.map(row => [...row.cells,connectionNotes])
+        : [[pair.number,"Kimenetel","","",a,"",b,"","","",outcome,connectionNotes]];
     });
     downloadCsv(headings,rows,"treneri");
     showNotice();
@@ -363,7 +449,10 @@ function renderPairStory(section, pair, messages, projected, loading = false) {
   const target = section.querySelector("[data-transcript-body]");
   target.innerHTML = (loading ? '<p class="muted">Üzenetek betöltése…</p>' : "")+
     (rows ? '<ol class="story-events">'+rows+'</ol>' : loading ? "" : '<p class="muted">Ehhez a játékhoz még nincs megjeleníthető esemény.</p>')+
-    (pair.result === "stopped" ? '<p class="muted">A tréner lezárta a játékot.</p>' : "");
+    (pair.result === "stopped" ? '<p class="muted">'+(pair.reason === "ready-timeout"
+      ? "A rajthoz nem érkezett meg mindkét játékos kapcsolati jelzése." : "A tréner lezárta a játékot.")+'</p>' : "")+
+    (!projected && pair.connectionGap?.some(Boolean) ? '<p class="muted">A futam végén hiányzott a kapcsolati jel · '+
+      pair.names.filter((_, seat) => pair.connectionGap[seat]).map(escape).join(", ")+'</p>' : "");
 }
 
 function paintPairStories() {
@@ -407,9 +496,27 @@ function paintPairStories() {
     });
   }
 }
+function paintQueue() {
+  for (const timer of screen.querySelectorAll("[data-queue-until]")) {
+    const seconds = Math.max(0, Math.ceil((Number(timer.dataset.queueUntil) - performance.now() - raceOffset) / 1000));
+    const label = seconds ? seconds+" mp" : "Párosítás…";
+    if (timer.textContent !== label) timer.textContent = label;
+  }
+}
+
+function keyboardInset() {
+  const viewport = window.visualViewport;
+  const inset = viewport ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0;
+  document.body.dataset.keyboard = String(document.activeElement?.id === "message-input" && inset > 80);
+  document.body.style.setProperty("--keyboard-inset", inset+"px");
+}
+
 function paintChat() {
   const log = document.querySelector("#messages");
   if (!log) return;
+  const bottom = log.scrollHeight - log.clientHeight - log.scrollTop < 36;
+  const scrollTop = log.scrollTop;
+  log.replaceChildren();
   if (!state.messages.length) log.innerHTML = '<p class="muted">Még nincs üzenet.</p>';
   for (const item of state.messages) {
     const line = document.createElement("p");
@@ -420,7 +527,9 @@ function paintChat() {
     log.append(line);
   }
   const input = document.querySelector("#message-input");
-  if (input) input.value = draft;
+  if (input && input.value !== draft) input.value = draft;
+  log.scrollTop = bottom ? log.scrollHeight : scrollTop;
+  paintChatControls();
 }
 
 function render() {
@@ -470,6 +579,8 @@ function render() {
     if (caret) restore.setSelectionRange(...caret);
   }
   if (busy) lockButtons(true);
+  paintQueue();
+  keyboardInset();
 }
 
 function sendDecision(choice) {
@@ -507,11 +618,7 @@ screen.addEventListener("submit", event => {
     if (!messageRequest || messageRequest.text !== text || messageRequest.number !== number || messageRequest.step !== step) {
       messageRequest = { number, step, text, id:secret() };
     }
-    void mutate("message",messageRequest,(next,started) => {
-      if (draft.trim() === text) draft = "";
-      messageRequest = undefined;
-      update(next,started);
-    });
+    void sendChat(messageRequest);
   }
 });
 screen.addEventListener("click", event => {
@@ -519,15 +626,8 @@ screen.addEventListener("click", event => {
   if (!button || busy) return;
   const action = button.dataset.do;
   if (action === "create") createRoom();
-  else if (action === "start") void mutate("start",{count:state.count,mode:selectedGameMode});
-  else if (action === "turn" && !turnPending) {
-    turnPending = true;
-    render();
-    void mutate("turn",{number:state.number}).finally(() => {
-      turnPending = false;
-      render();
-    });
-  }
+  else if (action === "start") void mutate("start",{count:state.count,mode:selectedGameMode,readyGate:true});
+  else if (action === "turn") void sendTurn(state.number);
   else if (action === "go" || action === "yield") sendDecision(action);
   else if (action === "retry-decision") sendDecision(pendingDecision.choice);
   else if (action === "requeue" || action === "cancel") void mutate(action,{number:state.number ?? 0});
@@ -581,7 +681,17 @@ window.addEventListener("storage", event => {
 });
 window.addEventListener("online", () => nextPoll());
 window.addEventListener("offline", () => setConnection("slow","Nincs internetkapcsolat"));
-document.addEventListener("visibilitychange", () => { if (!document.hidden) nextPoll(); });
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    lastPulse = 0;
+    nextPoll();
+  }
+});
+window.visualViewport?.addEventListener("resize", keyboardInset);
+window.visualViewport?.addEventListener("scroll", keyboardInset);
+screen.addEventListener("focusin", keyboardInset);
+screen.addEventListener("focusout", () => setTimeout(keyboardInset, 0));
+setInterval(paintQueue, 250);
 
 render();
 if (auth && codeValid.test(room)) {

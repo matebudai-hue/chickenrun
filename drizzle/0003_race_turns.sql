@@ -1,0 +1,10 @@
+CREATE TABLE race_turns (
+  code TEXT NOT NULL REFERENCES rooms(code) ON DELETE CASCADE,
+  pair INTEGER NOT NULL,
+  seat INTEGER NOT NULL,
+  at INTEGER NOT NULL,
+  target INTEGER NOT NULL,
+  offset INTEGER NOT NULL,
+  distance INTEGER NOT NULL,
+  PRIMARY KEY (code, pair, seat)
+);

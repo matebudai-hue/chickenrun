@@ -1,14 +1,15 @@
-import { carPositions } from "./story.js?v=11";
+import { carPositions } from "./story.js?v=12";
 
 export function animateRace(screen, race, clock, busy) {
   const board = screen.querySelector("[data-live-race]");
-  if (!board) return () => {};
+  if (!board || race.startsAt === null) return () => {};
   const cars = [...board.querySelectorAll(".road > g")];
   const distance = board.querySelector("[data-race-distance]");
   const countdown = board.querySelector("[data-race-time]");
   const flash = board.querySelector("[data-race-mark]");
   const button = board.querySelector('[data-do="turn"]');
   const progress = board.querySelector("progress");
+  const cutoff = board.querySelector("[data-race-cutoff]");
   const marks = race.marks;
   const stop = race.target ? marks.find(([m]) => m === race.target)[1] : marks.at(-1)[1];
   const lastTurn = marks.at(-2)[1];
@@ -31,6 +32,7 @@ export function animateRace(screen, race, clock, busy) {
     if (highlighted) flash.textContent = from+" m";
     progress.value = elapsed;
     if (button) button.disabled = busy() || shown < 0 || shown >= lastTurn;
+    if (cutoff) cutoff.hidden = shown < lastTurn;
     if (shown < stop) frame = requestAnimationFrame(draw);
   }
   draw();

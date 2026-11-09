@@ -7,8 +7,22 @@ export function memoryStore() {
   const rooms = new Map();
   const presence = new Map();
   const chat = new Map();
+  const turns = new Map();
   return {
-    get: code => rooms.get(code),
+    get(code) {
+      const row = rooms.get(code);
+      return row && { ...row, turns: JSON.stringify([...(turns.get(code)?.values() ?? [])]) };
+    },
+    saveTurn(code, number, seat, turn) {
+      const row = rooms.get(code);
+      if (!turns.has(code)) turns.set(code, new Map());
+      const entries = turns.get(code);
+      const key = number + ":" + seat;
+      const prior = entries.get(key);
+      if (!prior || turn.at < prior.at) entries.set(key, { number, seat, ...turn });
+      rooms.set(code, { ...row, revision: row.revision + 1 });
+    },
+    seen: code => new Map(presence.get(code)),
     create(code, expires, state) {
       if (rooms.has(code)) return false;
       rooms.set(code, { revision: 0, expires_at: expires, state });
@@ -41,6 +55,7 @@ export function memoryStore() {
         rooms.delete(code);
         presence.delete(code);
         chat.delete(code);
+        turns.delete(code);
       }
     },
   };
