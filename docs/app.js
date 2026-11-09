@@ -1,7 +1,7 @@
-import { animateRace } from "./live-race.js?v=13";
-import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration } from "./story.js?v=12";
+import { animateRace } from "./live-race.js?v=15";
+import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=15";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=14";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=15";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -26,8 +26,9 @@ const projectionModeKey = "cr:projection-mode:"+room;
 let auth = saved.get(roomKey);
 let state, signature, loadFailure, errorRetry, pollTimer;
 let busy = false, polling = false, generation = 0, lastPulse = 0;
-let selectedTab = "overview", filter = "all", draft = "", messageRequest, confirmAction;
-let reveal, revealTimer;
+let selectedTab = "overview", filter = "all", reportPair, draft = "", messageRequest, confirmAction;
+let reveal, revealTimer, finishRoadHeight, screeningCase;
+const screenPositions = new Map();
 let selectedGameMode = "steps";
 let raceOffset = Date.now() - performance.now(), stopAnimation, turnPending = false;
 let chatPending, chatNotice = "", turnAck;
@@ -103,6 +104,8 @@ function update(next, started = performance.now()) {
     next.race.target ??= turnAck.target;
   }
   if (previous?.number !== next.number) {
+    finishRoadHeight = undefined;
+    opened.delete("night-report");
     turnAck = undefined;
     turnPending = false;
     chatNotice = "";
@@ -112,7 +115,11 @@ function update(next, started = performance.now()) {
   if (!isTrainer) {
     const raceFinished = next.race && next.history?.length && next.result &&
       previous?.number === next.number && !previous.result;
-    const shown = Number(screen.querySelector("[data-night-road]")?.dataset.position);
+    const road = screen.querySelector("[data-night-road]");
+    if (next.result && previous?.number === next.number && !previous.result) {
+      finishRoadHeight = document.body.dataset.keyboard === "true" ? undefined : road?.offsetHeight;
+    }
+    const shown = Number(road?.dataset.position);
     const transition = raceFinished ? {
       distance: Number.isFinite(shown) ? shown : next.distance,
       started: performance.now(),
@@ -120,7 +127,8 @@ function update(next, started = performance.now()) {
     if (transition) {
       reveal = transition;
       clearTimeout(revealTimer);
-      revealTimer = setTimeout(() => { reveal = null; render(); }, revealDuration + 20);
+      const hold = next.result && !matchMedia("(prefers-reduced-motion: reduce)").matches ? 330 : 20;
+      revealTimer = setTimeout(() => { reveal = null; render(); }, revealDuration + hold);
     } else if (previous?.number !== next.number) {
       clearTimeout(revealTimer);
       reveal = null;
@@ -419,10 +427,68 @@ async function downloadTrainerReport(button) {
   }
 }
 
+function revealTitle(pair, event, names) {
+  const points = pair.distances ?? legacyPoints;
+  const next = points[points.indexOf(event.distance)+1];
+  if (event.choices.every(choice => choice === "go")) return !pair.timed && next ? "Tovább "+next+" méterre" : "Ütközés";
+  if (event.choices.every(choice => choice === "yield")) return "Mindketten kitértek";
+  return names[event.choices.indexOf("yield")]+" tért ki";
+}
+
+function paintScreening(target, pair, frames, index, loading) {
+  const names = ["Játékos A",pair.bot ? "Tesztjátékos" : "Játékos B"];
+  const event = frames[index];
+  const closing = event.kind === "reveal" && index === frames.length-1 && pair.result !== "stopped";
+  const meters = closing && pair.result === "crash" ? 0 : event.distance;
+  let title = "Rajt";
+  let detail = "";
+  if (loading) title = "Eset betöltése…";
+  else if (event.kind === "message") {
+    title = names[event.seat]+" üzenete";
+    detail = '<blockquote>'+escape(event.text)+'</blockquote>';
+  } else if (event.kind === "turn") {
+    title = names[event.seat]+" kitérést kért";
+    detail = '<p>Kért pont · '+event.target+' m</p>';
+  } else if (event.kind === "reveal") {
+    title = revealTitle(pair,event,names);
+    detail = '<p>'+names.map((name,seat)=>name+' · '+moves[event.choices[seat]]).join(' <span aria-hidden="true">/</span> ')+'</p>';
+  } else if (event.kind === "stopped") title = pair.reason === "ready-timeout" ? "A rajt elmaradt" : "Félbemaradt futam";
+
+  if (!target.querySelector(".screening-road")) {
+    target.innerHTML = '<div class="screening-story" aria-live="polite"><span data-screen-distance></span><h2 data-screen-title></h2>'+
+      '<div data-screen-detail></div></div><div class="screening-road" aria-hidden="true">'+
+      '<i class="screening-car car-a"></i><i class="screening-car car-b"></i></div>'+
+      '<div class="screening-controls"><button type="button" id="screen-prev" class="button secondary" data-do="screen-step" data-by="-1">← Előző pillanat</button>'+
+      '<div class="screening-progress"><progress max="1" value="1" aria-label="A történet állása"></progress><span></span></div>'+
+      '<button type="button" id="screen-next" class="button primary" data-do="screen-step" data-by="1">Következő pillanat →</button></div>';
+  }
+  target.querySelector("[data-screen-distance]").textContent = Number.isFinite(meters) ? meters+" m" : "";
+  target.querySelector("[data-screen-title]").textContent = title;
+  target.querySelector("[data-screen-detail]").innerHTML = detail;
+  const road = target.querySelector(".screening-road");
+  road.style.setProperty("--gap", (29*Math.pow(Math.min(1500,Math.max(0,meters ?? 1000))/1500,.62))+"%");
+  road.toggleAttribute("data-impact", closing && pair.result === "crash");
+  road.querySelector(".car-a").classList.toggle("exits", event.choices?.[0] === "yield");
+  road.querySelector(".car-b").classList.toggle("exits", event.choices?.[1] === "yield");
+  target.querySelector("#screen-prev").disabled = loading || index === 0;
+  target.querySelector("#screen-next").disabled = loading || index >= frames.length-1;
+  const progress = target.querySelector("progress");
+  progress.max = frames.length;
+  progress.value = index+1;
+  target.querySelector(".screening-progress span").textContent = (index+1)+" / "+frames.length;
+}
+
 function renderPairStory(section, pair, messages, projected, loading = false) {
   const picked = selection.find(entry => entry.number === pair.number);
-  const names = projected ? ["Játékos A",pair.bot ? "Tesztjátékos" : "Játékos B"] : pair.names.map(escape);
-  const events = pairStory(pair,messages,projected ? picked?.quotes ?? [] : null);
+  if (projected) {
+    const frames = screeningFrames(pair,messages,picked?.quotes ?? []);
+    const index = Math.min(screenPositions.get(pair.number) ?? 0,frames.length-1);
+    section.screening = { pair, frames, index, loading };
+    paintScreening(section.querySelector("[data-transcript-body]"),pair,frames,index,loading);
+    return;
+  }
+  const names = pair.names.map(escape);
+  const events = pairStory(pair,messages);
   let distance;
   const rows = events.map(event => {
     const showDistance = distance !== event.distance;
@@ -431,7 +497,7 @@ function renderPairStory(section, pair, messages, projected, loading = false) {
     let content;
     if (event.kind === "message") {
       const selected = picked?.quotes.includes(event.index) ?? false;
-      const quoteButton = !projected && picked
+      const quoteButton = picked
         ? '<button id="quote-'+pair.number+'-'+event.index+'" type="button" class="text-link" data-do="project-quote" data-number="'+
           pair.number+'" data-quote="'+event.index+'" aria-pressed="'+selected+'">'+
           (selected ? "Idézet elrejtése" : "Idézet kivetítése")+'</button>' : "";
@@ -441,30 +507,37 @@ function renderPairStory(section, pair, messages, projected, loading = false) {
     } else if (event.kind === "choice") {
       content = '<strong>'+names[event.seat]+'</strong> · '+moves[event.choice]+' <small>(beküldve)</small>';
     } else {
-      const points = pair.distances ?? legacyPoints;
-      const next = points[points.indexOf(event.distance)+1];
-      const bothGo = event.choices.every(choice => choice === "go");
-      const summary = bothGo ? !pair.timed && next ? "Tovább "+next+" méterre" : "Ütközés"
-        : event.choices.every(choice => choice === "yield") ? "Mindketten kitértek" : names[event.choices.indexOf("yield")]+" tért ki";
+      const summary = revealTitle(pair,event,names);
       content = '<strong>'+summary+'</strong><span class="story-choices">'+
         names[0]+': '+moves[event.choices[0]]+' · '+names[1]+': '+moves[event.choices[1]]+'</span>';
     }
     return '<li class="story-event event-'+event.kind+'">'+marker+'<div class="story-body">'+
-      (!projected ? '<span class="story-time">'+time(event.at)+'</span>' : '')+'<div>'+content+'</div></div></li>';
+      '<span class="story-time">'+time(event.at)+'</span><div>'+content+'</div></div></li>';
   }).join("");
   const target = section.querySelector("[data-transcript-body]");
   target.innerHTML = (loading ? '<p class="muted">Üzenetek betöltése…</p>' : "")+
     (rows ? '<ol class="story-events">'+rows+'</ol>' : loading ? "" : '<p class="muted">Ehhez a játékhoz még nincs megjeleníthető esemény.</p>')+
     (pair.result === "stopped" ? '<p class="muted">'+(pair.reason === "ready-timeout"
       ? "A rajthoz nem érkezett meg mindkét játékos kapcsolati jelzése." : "A tréner lezárta a játékot.")+'</p>' : "")+
-    (!projected && pair.connectionGap?.some(Boolean) ? '<p class="muted">A futam végén hiányzott a kapcsolati jel · '+
+    (pair.connectionGap?.some(Boolean) ? '<p class="muted">A futam végén hiányzott a kapcsolati jel · '+
       pair.names.filter((_, seat) => pair.connectionGap[seat]).map(escape).join(", ")+'</p>' : "");
+}
+
+function stepScreening(by) {
+  const section = screen.querySelector(".screening");
+  if (!section?.screening || section.screening.loading) return;
+  const current = section.screening;
+  const index = Math.max(0,Math.min(current.frames.length-1,current.index+by));
+  if (index === current.index) return;
+  current.index = index;
+  screenPositions.set(current.pair.number,index);
+  paintScreening(section.querySelector("[data-transcript-body]"),current.pair,current.frames,index,false);
 }
 
 function paintPairStories() {
   if (!isTrainer || !state?.pairs) return;
   const projected = mode === "projector";
-  const selector = projected ? "[data-transcript]" : "details[open] [data-transcript]";
+  const selector = projected ? "[data-transcript]" : "details[open] [data-transcript], [data-report-story]";
   for (const section of screen.querySelectorAll(selector)) {
     const number = Number(section.dataset.transcript);
     const pair = state.pairs.find(p => p.number === number);
@@ -515,6 +588,7 @@ function keyboardInset() {
   const inset = viewport ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0;
   document.body.dataset.keyboard = String(document.activeElement?.id === "message-input" && inset > 80);
   document.body.style.setProperty("--keyboard-inset", inset+"px");
+  if (viewport) document.body.style.setProperty("--visual-height", viewport.height+"px");
 }
 
 function paintChat() {
@@ -559,7 +633,10 @@ function render() {
   const log = document.querySelector("#messages");
   const oldScroll = log?.scrollTop ?? 0;
   const stickToBottom = !log || log.scrollHeight-log.clientHeight-oldScroll < 36;
-  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reveal, showPairings, selectedGameMode, turnPending };
+  const caseScroll = screen.querySelector("#report-cases")?.scrollTop;
+  const storyScroll = screen.querySelector("#report-events")?.scrollTop;
+  const storyNumber = screen.querySelector("[data-report-story]")?.dataset.transcript;
+  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reportPair, reveal, showPairings, selectedGameMode, turnPending };
   if (!room) {
     const previous = saved.get("cr:last-host");
     screen.innerHTML = mode === "player" ? enterCode() : home(codeValid.test(previous ?? "") ? previous : null, roomLink);
@@ -574,13 +651,23 @@ function render() {
   } else if (!state) {
     screen.innerHTML = waitingPage(room,"Kapcsolódás…","A futam állását töltjük be.");
   } else if (mode === "projector") {
-    screen.innerHTML = projector(state,room,selection,showPairings);
+    screen.innerHTML = projector(state,room,selection,showPairings,screeningCase);
     paintPairStories();
   } else if (isTrainer) {
     screen.innerHTML = trainer(state,context);
     paintPairStories();
+    const cases = screen.querySelector("#report-cases");
+    const story = screen.querySelector("[data-report-story]");
+    if (story) reportPair = Number(story.dataset.transcript);
+    if (cases && caseScroll) cases.scrollTop = caseScroll;
+    if (story && story.dataset.transcript === storyNumber && storyScroll) {
+      story.querySelector("#report-events").scrollTop = storyScroll;
+    }
   } else {
     screen.innerHTML = player(state,context);
+    if (state.result && finishRoadHeight) {
+      screen.querySelector(".night-game")?.style.setProperty("--finish-road-height",finishRoadHeight+"px");
+    }
     paintChat();
     const nextLog = document.querySelector("#messages");
     if (nextLog) nextLog.scrollTop = stickToBottom ? nextLog.scrollHeight : oldScroll;
@@ -660,7 +747,15 @@ screen.addEventListener("click", event => {
   else if (action === "download-host") void downloadTrainerReport(button);
   else if (action === "download-player") downloadPersonalReport();
   else if (action === "retry-transcript") paintPairStories();
-  else if (action === "filter") {
+  else if (action === "screen-step") stepScreening(Number(button.dataset.by));
+  else if (action === "screen-case") {
+    screeningCase = Number(button.dataset.number);
+    render();
+  }
+  else if (action === "report-case") {
+    reportPair = Number(button.dataset.number);
+    render();
+  } else if (action === "filter") {
     filter = button.dataset.filter;
     render();
   } else if (action === "project-pair") selectStory(Number(button.dataset.number));
@@ -691,10 +786,19 @@ dialog.addEventListener("click", event => {
 });
 window.addEventListener("storage", event => {
   if (!isTrainer) return;
-  if (event.key === selectionKey) selection = readSelection();
+  if (event.key === selectionKey) {
+    selection = readSelection();
+    screenPositions.clear();
+  }
   else if (event.key === projectionModeKey) showPairings = saved.get(projectionModeKey) === "pairings";
   else return;
   if (state) render();
+});
+if (mode === "projector") window.addEventListener("keydown", event => {
+  if (!screen.querySelector(".screening") || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+  event.preventDefault();
+  stepScreening(event.key === "ArrowLeft" ? -1 : 1);
 });
 window.addEventListener("online", () => nextPoll());
 window.addEventListener("offline", () => setConnection("slow","Nincs internetkapcsolat"));

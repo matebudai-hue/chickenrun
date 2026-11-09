@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { projector, time } from "../docs/views.js";
-import { carPositions, changeSelection, nextReveal, pairGroups, pairStory } from "../docs/story.js";
+import { carPositions, changeSelection, nextReveal, pairGroups, pairStory, screeningFrames } from "../docs/story.js";
 
 test("both cars move inward at each distance, meet at impact and leave the lane when yielding", () => {
   const distances = [1000,800,600,400,200,100,50,10,0];
@@ -31,6 +31,15 @@ test("story places chat between the actual submissions and shows only chosen quo
   assert.deepEqual(publicStory.map(event=>event.kind),["message","reveal","reveal"]);
   assert.deepEqual(publicStory.filter(event=>event.text).map(event=>event.text),["selected"]);
   assert.ok(pairStory(pair,messages,[]).every(event=>event.kind==="reveal"));
+});
+
+test("screening starts before the outcome and only offers explicitly selected quotes", () => {
+  const pair = {timed:true,result:"both",turns:[null,null],history:[{distance:50,at:800,choices:["yield","yield"]}]};
+  const chat = [{distance:400,at:200,seat:0,text:"selected"},{distance:100,at:500,seat:1,text:"private"}];
+  const frames = screeningFrames(pair,chat,[0]);
+  assert.deepEqual(frames.map(frame=>frame.kind),["start","message","reveal"]);
+  assert.equal(frames[0].distance,1500);
+  assert.deepEqual(frames.filter(frame=>frame.text).map(frame=>frame.text),["selected"]);
 });
 
 test("trainer selects at most two cases and dropping a case drops its quotes", () => {

@@ -50,6 +50,15 @@ export function pairStory(pair, messages, visibleQuotes = null) {
     Number(a.kind === "reveal") - Number(b.kind === "reveal"));
 }
 
+export function screeningFrames(pair, messages, quotes) {
+  const opening = pair.timed ? 1500 : (pair.distances ?? legacyPoints)[0];
+  const events = pairStory(pair,messages,quotes);
+  const frames = [{ kind:"start", distance:opening }];
+  frames.push(...events);
+  if (pair.result === "stopped") frames.push({kind:"stopped", distance:pair.distance});
+  return frames;
+}
+
 export function changeSelection(selection, number, quote) {
   const current = selection.find(entry => entry.number === number);
   if (quote === undefined) {
