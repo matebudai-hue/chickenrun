@@ -1,6 +1,6 @@
 import { changeSelection, nextReveal, pairStory, points, revealDuration } from "./story.js?v=5";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=8";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=9";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -14,6 +14,7 @@ const room = (params.get("room") || "").trim().toUpperCase();
 const codeValid = /^[23456789A-HJ-NP-Z]{8}$/;
 const mode = params.get("view");
 const isTrainer = mode === "host" || mode === "projector";
+document.body.dataset.surface = mode === "projector" ? "projector" : !isTrainer && (room || mode === "player") ? "player" : "trainer";
 const roomKey = "cr:"+(isTrainer ? "host" : "player")+":"+room;
 const decisionKey = "cr:pending-decision:"+room;
 const joinKey = "cr:pending-join:"+room;
@@ -338,7 +339,7 @@ function renderPairStory(section, pair, messages, projected, loading = false) {
       content = '<strong>'+summary+'</strong><span class="story-choices">'+
         names[0]+': '+moves[event.choices[0]]+' · '+names[1]+': '+moves[event.choices[1]]+'</span>';
     }
-    return '<li class="story-event '+event.kind+'">'+marker+'<div class="story-body">'+
+    return '<li class="story-event event-'+event.kind+'">'+marker+'<div class="story-body">'+
       (!projected ? '<span class="story-time">'+time(event.at)+'</span>' : '')+'<div>'+content+'</div></div></li>';
   }).join("");
   const target = section.querySelector("[data-transcript-body]");

@@ -25,7 +25,7 @@ const field = (id, label, placeholder, attrs = "") =>
   '<label for="'+id+'">'+label+'</label><input id="'+id+'" name="'+id+'" placeholder="'+placeholder+'" '+attrs+'>';
 
 function vehicle(other, [x,y], from, elapsed) {
-  const color = other ? "#8bd5cc" : "#f3b764";
+  const color = other ? "#a6e4ec" : "#ffb34a";
   const animation = from ? ' class="car-motion" style="--dx:'+(from[0]-x)+'px;--dy:'+(from[1]-y)+'px;--delay:-'+elapsed+'ms"' : "";
   return '<g transform="translate('+x+' '+y+')"><g'+animation+'><g transform="'+(other?'rotate(180)':'rotate(0)')+'"><path d="M36-9 129-27v54L36 9Z" fill="url(#beam)"/>'+
     '<rect x="-36" y="-14" width="75" height="30" rx="10" fill="#0b1920" opacity=".8" transform="translate(0 4)"/>'+
@@ -41,21 +41,39 @@ function road(distance = 1000, first = false, second = false, reveal = null) {
   const elapsed = reveal ? performance.now() - reveal.started : 0;
   const [previousA,previousB] = reveal && elapsed < revealDuration ? carPositions(reveal.distance) : [];
   return '<svg class="road" viewBox="0 0 760 210" aria-hidden="true">'+
-    '<defs><linearGradient id="asphalt" x2="0" y2="1" gradientUnits="objectBoundingBox"><stop stop-color="#34474d"/><stop offset="1" stop-color="#192e36"/></linearGradient>'+
-    '<linearGradient id="beam"><stop stop-color="#fff0b0" stop-opacity=".48"/><stop offset="1" stop-color="#fff0b0" stop-opacity="0"/></linearGradient>'+
-    '<pattern id="scrub" width="27" height="22" patternUnits="userSpaceOnUse"><path d="M1 18 16 8m8 13 2-1" stroke="#536362" stroke-width="1" opacity=".44"/></pattern></defs>'+
-    '<rect width="760" height="210" fill="#23373c"/><rect width="760" height="210" fill="url(#scrub)"/>'+
-    '<rect y="43" width="760" height="124" fill="url(#asphalt)"/><path d="M0 48h760M0 162h760" stroke="#e1be7a" stroke-width="2" opacity=".7"/>'+
-    '<path d="M0 105h760" stroke="#dfebec" stroke-width="2" stroke-dasharray="22 16" opacity=".38"/>'+
-    '<path d="M380 66v78" stroke="#dae6dd" stroke-dasharray="2 5" opacity=".28"/>'+
-    vehicle(false,a,previousA,elapsed)+vehicle(true,b,previousB,elapsed)+'</svg>';
+    '<defs><linearGradient id="beam"><stop stop-color="#fff3ca" stop-opacity=".6"/><stop offset="1" stop-color="#fff3ca" stop-opacity="0"/></linearGradient>'+
+    '<pattern id="road-grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0v24" fill="none" stroke="#5d655a" opacity=".4"/></pattern></defs>'+
+    '<rect width="760" height="210" fill="#262c26"/><rect width="760" height="210" fill="url(#road-grid)"/>'+
+    '<rect y="44" width="760" height="122" fill="#141917"/>'+
+    '<path d="M0 48h760M0 162h760" stroke="#cbbe96" stroke-width="2"/>'+
+    '<path d="M0 58h760M0 152h760" stroke="#3b4038" stroke-width="1"/>'+
+    '<path d="M0 105h760" stroke="#aba78a" stroke-width="2" stroke-dasharray="20 15" opacity=".65"/>'+
+    '<path d="M380 57v97m-9-94h18m-18 90h18" stroke="#d9d2b6" stroke-dasharray="3 5" opacity=".52"/>'+
+    '<path d="M18 25h24m-12-12v24m688 148h24m-12-12v24" stroke="#8e987c" opacity=".65"/>'+    vehicle(false,a,previousA,elapsed)+vehicle(true,b,previousB,elapsed)+'</svg>';
 }
 
+function coverArt() {
+  return '<svg class="cover-art" viewBox="0 0 800 500" aria-hidden="true">'+
+    '<defs><linearGradient id="beam"><stop stop-color="#fff0c6" stop-opacity=".76"/><stop offset="1" stop-color="#fff0c6" stop-opacity="0"/></linearGradient>'+
+    '<pattern id="cover-grid" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0H0v30" fill="none" stroke="#53604d" opacity=".6"/></pattern>'+
+    '<pattern id="cover-hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><path d="M0 0v9" stroke="#a5ae90" opacity=".38"/></pattern></defs>'+
+    '<rect width="800" height="500" fill="#292f27"/><rect width="800" height="500" fill="url(#cover-grid)"/>'+
+    '<path d="M32 100h166v86H32zM600 317h166v110H600z" fill="url(#cover-hatch)"/>'+
+    '<path d="M44 39h35m-17-17v34m662 398h34m-17-17v34M400 16v468m-384-234h768" stroke="#a5ae90" stroke-width="1" opacity=".55"/>'+
+    '<g transform="rotate(-22 400 250)"><rect x="-140" y="167" width="1080" height="166" fill="#171b17"/>'+
+    '<path d="M-140 169h1080M-140 331h1080" stroke="#e1d6ad" stroke-width="3"/>'+
+    '<path d="M-140 180h1080M-140 320h1080" stroke="#bcb296" stroke-width="1" opacity=".52"/>'+
+    '<path d="M-140 250h1080" stroke="#bcb296" stroke-dasharray="28 22" stroke-width="2" opacity=".65"/>'+
+    '<path d="M394 181v138m12-138v138" stroke="#bcb296" stroke-dasharray="3 8" opacity=".45"/>'+
+    vehicle(false,[158,250])+vehicle(true,[642,250])+'</g>'+
+    '<path d="M56 370h114m-114 12h81M630 124h114m-81 12h81" stroke="#f2c85f" stroke-width="2" opacity=".8"/>'+
+    '<path d="M33 442h32m-32-1v-32m734-351h-32m32 1v32" fill="none" stroke="#f2c85f" stroke-width="2"/></svg>';
+}
 export function home(previous, roomLink) {
   return '<div class="landing"><section class="card trainer-entry"><p class="eyebrow">TRÉNERI VEZÉRLŐPULT</p>'+
-    '<h1>Chicken Run</h1><div class="row">'+action("create","Új futam és QR-kód","primary")+
+    '<h1 class="cover-title">Chicken<br>Run</h1><div class="row cover-actions">'+action("create","Új futam és QR-kód","primary")+
     (previous ? '<a class="button secondary" href="'+roomLink(previous,"host")+'">Vissza az előző futamhoz</a>' : '')+
-    '</div></section><div class="hero entry-art">'+road(740)+'</div></div>';
+    '</div></section><div class="entry-art">'+coverArt()+'</div></div>';
 }
 
 export function enterCode() {
