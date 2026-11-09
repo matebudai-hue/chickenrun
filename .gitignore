@@ -1,0 +1,4 @@
+dist/
+*.sqlite*
+*.tar.gz
+

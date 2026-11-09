@@ -20,3 +20,4 @@ npm start
 A helyi cím: http://localhost:8080. A helyi játékállapotot a folyamat memóriája tárolja. A távoli résztvevők az internetes kiadást használják, ahol a szobákat a játék saját adatbázisa tartja meg a futam idejére. A szobák nyolc óra után lejárnak.
 
 A `npm run build` elkészíti a Worker-csomagot. A hosztolt változat a `DB` adatbáziskötést és a `drizzle/` migrációt használja. A QR-kódot a vendég böngészője állítja elő. A beépített QR-kód-könyvtár licence a `public/QR-LICENSE.txt` fájlban van.
+
