@@ -9,6 +9,7 @@ const digest = async key => Array.from(new Uint8Array(await crypto.subtle.digest
 const clean = (s, max) => typeof s === "string" ? s.trim().slice(0,max) : "";
 const choice = x => x === "X" || x === "Y";
 const current = s => s.rounds[s.index];
+const canContinue = s => s.phase === "finished" && (!current(s).scores || s.index + 1 < s.rounds.length);
 const totals = s => Array.from({length:4}, (_,i) => s.rounds.reduce((sum,r) => sum + (r.scores?.[i] ?? 0),0));
 const names = s => s.teams.map((t,i) => t?.name || `${i+1}. csapat`);
 function resultReport(s) {
@@ -63,7 +64,8 @@ function view(s, auth) {
       text:s.rounds[s.screenRound]?.notes[s.screenSeat], round:s.screenRound,
       name:s.anonymous ? "" : names(s)[s.screenSeat]
     } : undefined,
-    focus:s.focus, reportShared:(host || seat>=0) ? !!s.sharedReport : undefined };
+    focus:s.focus, canContinue:host ? canContinue(s) : undefined,
+    reportShared:(host || seat>=0) ? !!s.sharedReport : undefined };
 }
 function action(s, auth, act, b, transfer) {
   const r = current(s);
@@ -148,12 +150,26 @@ function action(s, auth, act, b, transfer) {
   } else if (act === "finish") {
     if (s.phase === "finished" && b.index === s.index) return false;
     check(["ready","negotiation","open","result"].includes(s.phase) && b.index === s.index);
+    s.interrupted = {phase:s.phase};
     if (!r.scores) {
+      s.interrupted.moves = [...r.moves];
+      s.interrupted.manual = [...r.manual];
       r.moves.fill(null);
       r.manual.fill(false);
     }
     s.phase = "finished";
     s.mode = "live";
+  } else if (act === "continue") {
+    check(canContinue(s) && b.index === s.index,"Innen már nem folytatható a játék.");
+    s.phase = s.interrupted?.phase ?? (r.scores ? "result" : "ready");
+    if (s.interrupted?.moves) {
+      r.moves = s.interrupted.moves;
+      r.manual = s.interrupted.manual;
+    }
+    delete s.interrupted;
+    s.focus = null;
+    s.mode = "live";
+    s.sharedReport = null;
   } else if (act === "screen") {
     check(["live","matrix","blank","join","reflection","note"].includes(b.mode));
     if (b.mode === "reflection") check(s.phase === "finished" && !!s.teams[b.seat]?.reflection);

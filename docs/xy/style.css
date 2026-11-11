@@ -177,11 +177,11 @@ dialog{color:var(--ink);background:var(--paper);border:1px solid var(--line);bor
 .project-note h2{font-size:clamp(1.35rem,4vh,2.6rem)}
 .project-note .project-note-text{font-size:clamp(.95rem,min(2.25vw,3.65vh),2rem);line-height:1.22;overflow-wrap:anywhere}
 .trainer-links{display:flex;align-items:center;flex-wrap:wrap;gap:.65rem}
-dialog.trainer-guide{width:min(94vw,790px);max-height:90dvh;padding:0;overflow:hidden}
+.guide-window main{max-width:790px;margin:1rem auto;padding:0}
 .guide-head{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.75rem 1.1rem;border-bottom:1px solid var(--line)}
-.guide-head h2,.guide-head .kicker{margin:0}
-.trainer .guide-head h2{font-size:1.35rem}
-.guide-body{padding:.9rem 1.1rem;max-height:calc(90dvh - 5rem);overflow:auto;font-size:.9rem;line-height:1.5}
+.guide-head h1,.guide-head .kicker{margin:0}
+.guide-head h1{font-size:1.35rem}
+.guide-body{padding:.9rem 1.1rem;font-size:.9rem;line-height:1.5}
 .guide-nav{display:flex;flex-wrap:wrap;gap:.45rem;margin:.7rem 0 1rem}
 .guide-body section{padding:.65rem 0;border-top:1px solid var(--line);scroll-margin-top:.3rem}
 .guide-body h3{font-size:1.12rem}

@@ -1,7 +1,7 @@
 export const trainerGuide = `
   <header class="guide-head">
-    <div><p class="kicker">Nagy X/Y · Budai Máté</p><h2 id="trainer-guide-title">Tréneri játékleírás</h2></div>
-    <form method="dialog"><button autofocus>Bezárás</button></form>
+    <div><p class="kicker">Nagy X/Y · Budai Máté</p><h1>Tréneri játékleírás</h1></div>
+    <button type="button" data-guide-close>Bezárás</button>
   </header>
   <div class="guide-body">
     <p>Az útmutató a <cite>Fogolydilemma – Túl a szép szavakon</cite> levezetési és kivezetési fejezeteit követi. A menet közben használt gombokat a digitális játékhoz igazítottuk.</p>
@@ -69,6 +69,8 @@ export const trainerGuide = `
       <h4>A gyakorlat lezárása</h4>
       <p>Az utolsó lepontozott kör után kattints a <strong>Játék lezárása és reflexiók</strong> gombra. Ha korábban állítod le a gyakorlatot, válaszd a <strong>Játék lezárása</strong> gombot, és erősítsd meg. A már lezárt körök pontjai megmaradnak. Ha ekkor épp nyitva van egy kör, annak döntései kimaradnak a pontozásból. A lezárás után a csapatok elküldhetik a reflexiójukat.</p>
 
+      <p>Ha túl korán zártad le a játékot, a <strong>Tovább játszom</strong> gombbal folytathatod. Ha már lepontoztad a kört, a <strong>Következő kör</strong> gombbal lépsz tovább. Ha a kör még nyitva volt, ugyanaz a kör nyílik vissza a már leadott döntésekkel. A lezárt körök pontjai megmaradnak. Folytatáskor a korábban megosztott PDF letöltési lehetősége megszűnik. Az új végeredményt a következő lezárás után oszthatod meg.</p>
+
       <h4>Kivetítés és kommentek a kivezetésben</h4>
       <p>A <strong>Kivetítő megnyitása</strong> külön böngészőfület nyit. Ezt a fület tedd a vászonra. Ha később akarod megmutatni a végeredményt, a játék lezárása előtt állítsd le a vászon megosztását vagy zárd be a kivetítőfület. A lezárás ugyanis automatikusan a végeredményre vált. Ha közben más képet szeretnél mutatni, még a kivetítő visszakapcsolása előtt válaszd a <strong>Pontozási mátrix</strong> vagy az <strong>Üres vászon</strong> nézetet.</p>
       <ul>
@@ -87,3 +89,13 @@ export const trainerGuide = `
     </footer>
   </div>
 `;
+
+const guide = document.getElementById("trainer-guide");
+if (guide) {
+  guide.innerHTML = trainerGuide;
+  guide.addEventListener("click", event => {
+    const target = event.target.closest("[data-guide-target]");
+    if (target) document.getElementById(target.dataset.guideTarget)?.scrollIntoView({block:"start"});
+    if (event.target.closest("[data-guide-close]")) window.close();
+  });
+}

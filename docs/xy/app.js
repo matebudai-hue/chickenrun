@@ -1,6 +1,5 @@
 import { command, readState, saved, secret } from "../connection.js?v=5";
 import { createReportPdf } from "./report-pdf.js?v=2";
-import { trainerGuide } from "./trainer-guide.js?v=5";
 
 const $ = id => document.getElementById(id);
 const screen = $("screen"), dialog = $("dialog"), signal = $("signal");
@@ -101,9 +100,10 @@ function hostView() {
   if (["ready","negotiation","open"].includes(phase) || phase==="result" && state.index+1<state.rounds.length) action+=btn("Játék lezárása","finish");
   if (phase==="finished") {title="Feldolgozás";desc=`${state.reflections.filter(Boolean).length}/4 reflexió beérkezett${state.reportShared?" · PDF megosztva":""}`;action=btn("Végeredmény kivetítése","results","","primary")+btn("PDF letöltése","pdf")+btn(state.reportShared?"Megosztott PDF frissítése":"PDF megosztása a csapatokkal","share-pdf")+(state.reportShared?btn("Megosztás leállítása","unshare-pdf"):"");}
   const weight = ["lobby","ready","negotiation"].includes(phase) ? `<label class="quick-weight">Körszorzó<select id="quick-weight">${options.map(n=>`<option value="${n}" ${n===now.multiplier?"selected":""}>×${n}</option>`).join("")}</select></label>` : `<strong>×${now.multiplier}</strong>`;
+  if (state.canContinue) action=btn("Tovább játszom","continue","","primary")+action;
   return `<section class="hero board"><div><p class="kicker">Tréneri vezérlő · ${code}</p><h1>${title}</h1><p>${desc}</p></div><div class="weight"><span>${state.index+1} / ${state.rounds.length}. kör</span>${weight}</div><div class="actions">${action}</div></section>
   <div class="teams-panel ${phase==="lobby"?"with-qr":""}">${roster()}${phase==="lobby"?qrBlock():""}</div>
-  <section class="paper tools"><div class="trainer-links"><a href="${screenUrl()}" target="_blank" rel="noopener">Kivetítő megnyitása ↗</a>${btn("Tréneri játékleírás","trainer-guide","","quiet")}</div>
+  <section class="paper tools"><div class="trainer-links"><a href="${screenUrl()}" target="_blank" rel="noopener">Kivetítő megnyitása ↗</a><a href="./trainer-guide.html?v=1" target="_blank" rel="noopener" data-guide-window>Tréneri játékleírás ↗</a></div>
   <div class="actions">${[[phase==="finished"?"Élő nézet":"Játéknézet · mátrix","live"],...(phase==="finished"?[["Pontozási mátrix","matrix"]]:[]),["QR-kód","join"],["Üres vászon","blank"]].map(([label,mode])=>btn(label,"screen",`data-mode="${mode}" aria-pressed="${state.mode===mode || phase!=="finished" && mode==="live" && state.mode==="matrix"}"`)).join("")}</div></section>
   <section class="paper report"><h2>Döntések és pontok</h2>${timeline()}
   ${phase==="finished"?`<label class="focus">Kiemelt forduló a vásznon<select id="focus"><option value="">Teljes döntéssor</option>${state.rounds.map((round,i)=>round.scored?`<option value="${i}" ${state.focus===i?"selected":""}>${i+1}. kör</option>`:"").join("")}</select></label>`:""}</section>
@@ -231,26 +231,18 @@ async function downloadReport() {
   finally{busy=false;signal.textContent="Kapcsolódva";}
 }
 screen.addEventListener("click",e=>{
-  const b=e.target.closest("button[data-act]"); if(!b||busy)return;
-  const {act,seat,choice,mode,named}=b.dataset;
-  if(act==="trainer-guide" && state.host){
-    dialog.classList.add("trainer-guide");
-    dialog.setAttribute("aria-labelledby","trainer-guide-title");
-    dialog.innerHTML=trainerGuide;
-    const jump=e=>{
-      const target=e.target.closest("[data-guide-target]");
-      if(target) $(target.dataset.guideTarget)?.scrollIntoView({block:"start"});
-    };
-    dialog.addEventListener("click",jump);
-    dialog.addEventListener("close",()=>{
-      dialog.removeEventListener("click",jump);
-      dialog.classList.remove("trainer-guide");
-      dialog.removeAttribute("aria-labelledby");
-      render();
-    },{once:true});
-    dialog.showModal();
+  const guide=e.target.closest("[data-guide-window]");
+  if (guide && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+    const popup=window.open(guide.href,"xy-trainer-guide","popup,width=820,height=780");
+    if (popup) {
+      popup.opener=null;
+      popup.focus();
+      e.preventDefault();
+    }
     return;
   }
+  const b=e.target.closest("button[data-act]"); if(!b||busy)return;
+  const {act,seat,choice,mode,named}=b.dataset;
   if(act==="recover"){location.href="?room="+saved.get(last);return;}
   if(act==="pdf"){void downloadReport();return;}
   if(act==="share-pdf"){

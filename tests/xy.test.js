@@ -139,4 +139,29 @@ test("four teams, negotiations, concurrent moves, recovery, projection and refle
   assert.equal((await call("report",b)).reflections[0],"Később módosított szöveg.");
   await call("reportshare",host,{enabled:false});
   await call("report",b,undefined,403);
+  await call("reportshare",host,{enabled:true});
+  assert.equal(early.canContinue,true);
+  await call("continue",b,{index:2},403);
+  const continued=await call("continue",host,{index:2});
+  assert.equal(continued.phase,"open");
+  assert.deepEqual(continued.rounds[2].moves,["X",null,null,null]);
+  assert.deepEqual(continued.totals,early.totals);
+  assert.equal((await call("",b)).reportShared,false);
+  assert.equal((await call("",projector)).rounds[0].moves,undefined);
+  await call("report",b,undefined,409);
+  await Promise.all([b,c,d].map(key=>call("move",key,{index:2,choice:"Y"})));
+  const scored=await call("close",host,{index:2});
+  await call("finish",host,{index:2});
+  const afterResult=await call("continue",host,{index:2});
+  assert.equal(afterResult.phase,"result");
+  assert.deepEqual(afterResult.totals,scored.totals);
+  assert.equal((await call("next",host,{index:2})).index,3);
+  for(let index=3;index<10;index++){
+    await call("open",host,{index});
+    await Promise.all([replacement,b,c,d].map(key=>call("move",key,{index,choice:"Y"})));
+    await call("close",host,{index});
+    if(index<9) await call("next",host,{index});
+  }
+  assert.equal((await call("finish",host,{index:9})).canContinue,false);
+  await call("continue",host,{index:9},409);
 });
