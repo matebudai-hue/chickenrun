@@ -1,5 +1,5 @@
 import { command, readState, saved, secret } from "../connection.js?v=5";
-import { createReportPdf } from "./report-pdf.js?v=1";
+import { createReportPdf } from "./report-pdf.js?v=2";
 
 const $ = id => document.getElementById(id);
 const screen = $("screen"), dialog = $("dialog"), signal = $("signal");

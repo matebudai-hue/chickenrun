@@ -6,7 +6,7 @@ const sum=values=>values.reduce((a,b)=>a+b,0);
 
 function wrap(ctx,text,maxWidth) {
   const lines=[];
-  for (const paragraph of String(text).split(/\r?\n/)) {
+  for (const paragraph of String(text).split(/\r?\n/).filter(p=>p.trim())) {
     let line="";
     for (const word of paragraph.split(/\s+/).filter(Boolean)) {
       const joined=line?line+" "+word:word;
@@ -24,6 +24,25 @@ function wrap(ctx,text,maxWidth) {
   return lines;
 }
 
+// Preserve round order while distributing whole entries across the available columns.
+function balancedColumns(blocks,count) {
+  if(!blocks.length)return [];
+  const length=blocks.length;
+  const prefix=[0];
+  for(const block of blocks)prefix.push(prefix.at(-1)+block.height);
+  const costs=Array.from({length:count+1},()=>Array(length+1).fill(Infinity));
+  const splits=Array.from({length:count+1},()=>Array(length+1).fill(0));
+  costs[0][0]=0;
+  for(let c=1;c<=count;c++)for(let end=c;end<=length;end++)for(let start=c-1;start<end;start++){
+    const cost=Math.max(costs[c-1][start],prefix[end]-prefix[start]);
+    if(cost<costs[c][end]){costs[c][end]=cost;splits[c][end]=start;}
+  }
+  const columns=[];
+  let end=length;
+  for(let c=count;c>0;c--){const start=splits[c][end];columns.unshift(blocks.slice(start,end));end=start;}
+  return columns;
+}
+
 function reportLayout(ctx, data, width, height, size, paint=false) {
   const margin=25, span=width-2*margin, bottom=height-margin, rowHeight=size*1.62;
   const font=(n,bold=false)=>ctx.font=`${bold?"700":"400"} ${n}px Arial, sans-serif`;
@@ -38,7 +57,7 @@ function reportLayout(ctx, data, width, height, size, paint=false) {
   font(24,true);line("Végeredmény",margin,margin+25);
   font(9);line(`Szoba: ${data.code}   ·   ${new Intl.DateTimeFormat("hu",{dateStyle:"medium",timeStyle:"short"}).format(new Date(data.createdAt))}`,width-margin,margin+33,muted,"right");
   let y=margin+57;
-  const widths=[.18,.165,.165,.165,.165,.16].map(r=>r*span);
+  const widths=[.21,.1575,.1575,.1575,.1575,.16].map(r=>r*span);
   const columns=widths.map((_,i)=>margin+sum(widths.slice(0,i)));
   font(size,true);
   const headers=["Kör · szorzó",...data.names,"Kör összesen"].map((h,i)=>wrap(ctx,h,widths[i]-10));
@@ -48,16 +67,19 @@ function reportLayout(ctx, data, width, height, size, paint=false) {
   y+=headH;
   const played=data.rounds.filter(r=>r.scores);
   for(const [i,r] of played.entries()){
-    rect(margin,y,span,rowHeight,i%2?"#ffffff":pale);
+    font(size,true);
+    const roundLabel=wrap(ctx,`${r.number}. kör · ×${r.multiplier}${r.negotiations?" · Tárgyalás"+(r.negotiations>1?" ×"+r.negotiations:""):""}`,widths[0]-10);
+    const actualHeight=rowHeight+(roundLabel.length-1)*size*1.18;
+    rect(margin,y,span,actualHeight,i%2?"#ffffff":pale);
     if(r.negotiations) rect(margin,y,span,1.4,blue);
-    font(size,true);line(`${r.number}. kör · ×${r.multiplier}${r.negotiations?" · T"+(r.negotiations>1?r.negotiations:""):""}`,columns[0]+5,y+size*.32);
+    roundLabel.forEach((label,i)=>line(label,columns[0]+5,y+size*.32+i*size*1.18));
     r.moves.forEach((v,j)=>{
       const x=columns[j+1]+5;
       font(size,true);line(v,x,y+size*.32,v==="X"?ink:blue);
       font(size);line(score(r.scores[j]),x+size*1.8,y+size*.32);
     });
     font(size,true);line(score(sum(r.scores)),columns[5]+5,y+size*.32);
-    y+=rowHeight;
+    y+=actualHeight;
   }
   rect(margin,y,span,rowHeight,"#dbeaff");
   font(size,true);
@@ -67,30 +89,40 @@ function reportLayout(ctx, data, width, height, size, paint=false) {
   for(const r of data.rounds)r.notes.forEach((note,i)=>{
     if(note) comments.push({label:`${r.number}. kör · ${data.names[i]}${r.scores?"":" · pontozás nélkül"}`,text:note});
   });
-  data.reflections.forEach((note,i)=>{if(note)comments.push({label:`Reflexió · ${data.names[i]}`,text:note});});
-  font(Math.max(size+2,9),true);line("Körjegyzetek és reflexiók",margin,y);
-  y+=Math.max(size+2,9)*1.45;
-  const top=y, gap=12, count=width>=1600?4:3, colWidth=(span-gap*(count-1))/count, leading=size*1.19;
-  let col=0;
-  const advance=()=>{col++;y=top;};
-  const put=(s,bold)=>{
-    if(y+leading>bottom)advance();
-    if(col>=count)return false;
-    font(size,bold);line(s,margin+col*(colWidth+gap),y,bold?blue:ink);y+=leading;
+  const reflections=data.reflections.flatMap((text,i)=>text?[{label:data.names[i],text}]:[]);
+  const gap=14, leading=size*1.22, headingSize=Math.max(size+2,9);
+  function section(title,entries,count){
+    if(!entries.length)return true;
+    const colWidth=(span-gap*(count-1))/count;
+    const blocks=entries.map(({label,text})=>{
+      font(size,true);const heading=wrap(ctx,label,colWidth);
+      font(size);const body=wrap(ctx,text,colWidth);
+      return {heading,body,height:(heading.length+body.length)*leading+size*.55};
+    });
+    const groups=balancedColumns(blocks,count);
+    const bodyTop=y+headingSize*1.5;
+    const next=bodyTop+Math.max(...groups.map(group=>sum(group.map(block=>block.height))));
+    if(next>bottom)return false;
+    font(headingSize,true);line(title,margin,y);
+    groups.forEach((group,i)=>{
+      let yy=bodyTop;
+      const x=margin+i*(colWidth+gap);
+      for(const block of group){
+        font(size,true);for(const s of block.heading){line(s,x,yy,blue);yy+=leading;}
+        font(size);for(const s of block.body){line(s,x,yy);yy+=leading;}
+        yy+=size*.55;
+      }
+    });
+    y=next+8;
     return true;
-  };
-  if(y+leading>bottom)return false;
-  if(!comments.length)return put("Nem érkezett körjegyzet vagy reflexió.",false);
-  for(const comment of comments){
-    font(size,true);const label=wrap(ctx,comment.label,colWidth);
-    font(size);const body=wrap(ctx,comment.text,colWidth);
-    const blockHeight=(label.length+body.length)*leading;
-    if(y>top && y+blockHeight>bottom && (blockHeight<=bottom-top || y+(label.length+1)*leading>bottom))advance();
-    for(const s of label)if(!put(s,true))return false;
-    for(const s of body)if(!put(s,false))return false;
-    y+=size*.48;
   }
-  return true;
+  if(!comments.length && !reflections.length){
+    font(size);line("Nem érkezett körjegyzet vagy reflexió.",margin,y,muted);
+    return y+leading<=bottom;
+  }
+  const noteCols=Math.min(comments.length,comments.length<=8?2:Math.min(7,Math.max(3,Math.floor(span/235))));
+  return section("Körjegyzetek",comments,noteCols) &&
+    section("Csapatreflexiók",reflections,reflections.length);
 }
 
 function onePagePdf(jpeg,pixelsWide,pixelsHigh,width,height) {
@@ -112,9 +144,7 @@ function onePagePdf(jpeg,pixelsWide,pixelsHigh,width,height) {
   return new Blob(parts,{type:"application/pdf"});
 }
 
-export async function createReportPdf(data) {
-  const canvas=document.createElement("canvas"), ctx=canvas.getContext("2d");
-  if(!ctx)throw Error("A böngésző nem tudja előállítani a PDF-et.");
+export function chooseReportLayout(ctx,data) {
   let page, size;
   for(const candidate of sizes){
     for(let n=11;n>=7.5;n-=.5)if(reportLayout(ctx,data,...candidate,n)){
@@ -127,7 +157,14 @@ export async function createReportPdf(data) {
     for(size=7;size>=2;size-=.25)if(reportLayout(ctx,data,...page,size))break;
     if(size<2)throw Error("A teljes jelentés egy oldalra nem helyezhető el.");
   }
-  const [w,h]=page, scale=Math.min(4,4200/w);
+  return {page,size};
+}
+
+export async function createReportPdf(data) {
+  const canvas=document.createElement("canvas"), ctx=canvas.getContext("2d");
+  if(!ctx)throw Error("A böngésző nem tudja előállítani a PDF-et.");
+  const {page,size}=chooseReportLayout(ctx,data);
+  const [w,h]=page, scale=Math.min(4,4800/w);
   canvas.width=Math.round(w*scale);canvas.height=Math.round(h*scale);
   ctx.setTransform(canvas.width/w,0,0,canvas.height/h,0,0);
   if(!reportLayout(ctx,data,w,h,size,true))throw Error("Nem sikerült a teljes jelentést az oldalra illeszteni.");
