@@ -103,7 +103,7 @@ function hostView() {
   if (state.canContinue) action=btn("Tovább játszom","continue","","primary")+action;
   return `<section class="hero board"><div><p class="kicker">Tréneri vezérlő · ${code}</p><h1>${title}</h1><p>${desc}</p></div><div class="weight"><span>${state.index+1} / ${state.rounds.length}. kör</span>${weight}</div><div class="actions">${action}</div></section>
   <div class="teams-panel ${phase==="lobby"?"with-qr":""}">${roster()}${phase==="lobby"?qrBlock():""}</div>
-  <section class="paper tools"><div class="trainer-links"><a href="${screenUrl()}" target="_blank" rel="noopener">Kivetítő megnyitása ↗</a><a href="./trainer-guide.html?v=1" target="_blank" rel="noopener" data-guide-window>Tréneri játékleírás ↗</a></div>
+  <section class="paper tools"><div class="trainer-links"><a href="${screenUrl()}" target="_blank" rel="noopener">Kivetítő megnyitása ↗</a><a href="./trainer-guide.html?v=2" target="_blank" rel="noopener" data-guide-window>Tréneri játékleírás ↗</a></div>
   <div class="actions">${[[phase==="finished"?"Élő nézet":"Játéknézet · mátrix","live"],...(phase==="finished"?[["Pontozási mátrix","matrix"]]:[]),["QR-kód","join"],["Üres vászon","blank"]].map(([label,mode])=>btn(label,"screen",`data-mode="${mode}" aria-pressed="${state.mode===mode || phase!=="finished" && mode==="live" && state.mode==="matrix"}"`)).join("")}</div></section>
   <section class="paper report"><h2>Döntések és pontok</h2>${timeline()}
   ${phase==="finished"?`<label class="focus">Kiemelt forduló a vásznon<select id="focus"><option value="">Teljes döntéssor</option>${state.rounds.map((round,i)=>round.scored?`<option value="${i}" ${state.focus===i?"selected":""}>${i+1}. kör</option>`:"").join("")}</select></label>`:""}</section>

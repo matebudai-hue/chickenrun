@@ -44,6 +44,10 @@ export const trainerGuide = `
         <li><strong>Tanulságok.</strong> „Mit kezdenek ezzel a tudással holnap reggel?” Hagyd, hogy a résztvevők mondják ki, mit próbálnának ki. Kérdezz rá, ki tudja kezdeményezni a beszélgetést, és milyen feltételen lehetne változtatni ahhoz, hogy vállalható legyen az együttműködés.</li>
       </ol>
       <p><strong>A tréner feladata végig ugyanaz.</strong> Kérdezz rá arra, mit láttak, mitől tartottak, és miért tűnt az adott döntés ésszerűnek. A ponttábla segítségével az egymásra ható döntéseket vizsgáljátok.</p>
+      <div class="guide-signoff">
+        <p>Ez egy nagyszerű gyakorlat. Az általam ismert egyik legnehezebb, de nehéz helyzetek edzik a trénert. Ezt a felületet azért készítettem, hogy még jobb élményt adhassunk a résztvevőinknek. Élvezd Te is!</p>
+        <p>Szeretettel: Máté</p>
+      </div>
     </section>
     <section id="guide-controls">
       <h3>A felület használata</h3>
@@ -83,10 +87,6 @@ export const trainerGuide = `
       <p>A lezárás után a <strong>PDF letöltése</strong> elkészíti a riportot a döntéssorral, pontokkal, beérkezett körjegyzetekkel és csapatreflexiókkal. Ez a te eszközödre töltődik le. Ha a csapatoknak is oda akarod adni, válaszd a <strong>PDF megosztása a csapatokkal</strong> gombot, majd erősítsd meg. Ekkor a csapatok saját felületén megjelenik a <strong>Végeredmény letöltése PDF-ben</strong> gomb.</p>
       <p>A közös PDF a megosztás pillanatában beérkezett szövegeket tartalmazza, a csapatnevekkel együtt. Ha később újabb jegyzet vagy reflexió érkezik, a <strong>Megosztott PDF frissítése</strong> teszi elérhetővé a frissebb változatot. A <strong>Megosztás leállítása</strong> leveszi a letöltési gombot. A korábban letöltött példányok a csapatoknál maradnak.</p>
     </section>
-    <footer>
-      <p>Ez egy nagyszerű gyakorlat. Az általam ismert egyik legnehezebb, de nehéz helyzetek edzik a trénert. Élvezd!</p>
-      <p>Szeretettel: Máté</p>
-    </footer>
   </div>
 `;
 

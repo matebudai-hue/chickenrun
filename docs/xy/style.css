@@ -3,6 +3,9 @@
 :root{color-scheme:light;--ink:#10233f;--blue:#1a53a3;--ice:#dbeaff;--paper:#fffcf5;--ground:#f0ede5;--line:#d6dce5;--soft:#465b75;--navy:#10233f;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:16px;background:var(--ground);color:var(--ink)}
 *{box-sizing:border-box}
 body{margin:0;min-width:280px}
+.xy-page,.guide-window{min-height:100dvh;display:flex;flex-direction:column}
+.creator-credit{flex:none;margin-top:auto;padding:.3rem 0;font-size:6pt;line-height:1.25;text-align:center;color:#656565}
+.blackout .creator-credit{display:none}
 .mast{display:flex;align-items:center;justify-content:space-between;padding:1rem clamp(1rem,4vw,4rem);border-bottom:1px solid #d6d2c8;background:var(--paper)}
 .brand{text-decoration:none;font-size:1.25rem;letter-spacing:-.05em;font-weight:700}.brand b{font-weight:900}.brand span,.poster i,.projectXY span{color:#85b9ff}
 #signal{font-size:.8rem;color:var(--soft);font-weight:700}
@@ -187,3 +190,5 @@ dialog{color:var(--ink);background:var(--paper);border:1px solid var(--line);bor
 .guide-body h3{font-size:1.12rem}
 .guide-body li{margin-bottom:.55rem}
 .guide-body blockquote,.guide-body aside{margin:.6rem 0;padding:.45rem .7rem;background:#edf3fc;border-left:3px solid #1a53a3}
+.guide-signoff{margin:.8rem 0 .25rem;padding:.75rem .9rem;background:#f2efe8;border-radius:3px}
+.guide-signoff p:last-child{margin-bottom:0}
