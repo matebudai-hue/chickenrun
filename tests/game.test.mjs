@@ -72,7 +72,7 @@ test("messages are pair-only, duplicate messages do not repeat, odd player gets 
   assert.equal(submitted.body.waiting,true);
   t.mock.timers.tick(15_000);
   const finished = await room("state",botOpponent);
-  assert.equal(finished.body.report[0].bot,true);
+  assert.equal(Object.hasOwn(finished.body.report[0],"bot"),false);
   assert.deepEqual(finished.body.history.map(h => [h.own,h.other]),[["yield","go"]]);
   const message={number:statuses[senderIndex].body.number,step:0,id:secret(),text:"<b>Haladok!</b>"};
   await room("message",sender,message);
@@ -357,14 +357,16 @@ test("a kitérés that arrives before the gate survives a competing settlement a
   assert.deepEqual((await room("turn",b,{number:1})).body.turnAck,{number:1,target:50});
 });
 
-test("timed rematch waits thirty seconds, shows the deadline and starts with a bot", async t => {
+test("timed rematch exposes the fallback deadline only to the trainer", async t => {
   t.mock.timers.enable({apis:["Date"],now:1_800_000_000_000});
   const {room,host,players:[a,b]} = await create(2,memoryStore(),"timed");
   t.mock.timers.tick(49_000);
   assert.equal((await room("state",a)).body.result,"crash");
   const queued = (await room("requeue",a,{number:1})).body;
-  assert.equal(queued.queueUntil - queued.serverAt,30_000);
-  assert.equal((await room("state",host.token)).body.roster.find(p => p.status === "queued").queueUntil,queued.queueUntil);
+  assert.equal(queued.queued,true);
+  assert.equal(Object.hasOwn(queued,"queueUntil"),false);
+  const waiting = (await room("state",host.token)).body.roster.find(p => p.status === "queued");
+  assert.equal(waiting.queueUntil - Date.now(),30_000);
   t.mock.timers.tick(29_999);
   assert.equal((await room("state",a)).body.queued,true);
   t.mock.timers.tick(1);

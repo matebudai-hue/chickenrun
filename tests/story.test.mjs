@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { projector, time } from "../docs/views.js";
+import { personalReport, player, projector, time } from "../docs/views.js";
 import { carPositions, changeSelection, nextReveal, pairGroups, pairStory, screeningFrames } from "../docs/story.js";
 
 test("both cars move inward at each distance, meet at impact and leave the lane when yielding", () => {
@@ -86,4 +86,18 @@ test("continuous replay shows a message, the turn request and the actual exit in
   const messages = [{at:105,distance:96,seat:1,text:"Ide figyelj"}];
   assert.deepEqual(pairStory(pair,messages).map(event=>event.kind),["message","turn","reveal"]);
   assert.deepEqual(pairStory(pair,messages,[]).map(event=>event.kind),["turn","reveal"]);
+});
+test("participant-facing views keep the rematch and test opponent neutral", () => {
+  const report = [{number:1,outcome:"both",bot:true,history:[]}];
+  const pairs = [{number:1,result:"both",bot:true,names:["Dóra","Tesztjátékos"]}];
+  const room = "ABCDEFGH";
+  const waiting = player({phase:"finished",spectator:true,queued:true,queueUntil:100}, {room});
+  assert.match(waiting,/A következő futam előkészítése/);
+  assert.match(waiting,/Mégsem/);
+  assert.doesNotMatch(waiting,/partner|tesztjátékos|data-queue-until|játékosra vársz/i);
+  assert.doesNotMatch(personalReport({report},new Set()),/tesztjátékos/i);
+  const summary = projector({phase:"finished",pairs},room,[]);
+  assert.match(summary,/1 befejezett játék/);
+  assert.doesNotMatch(summary,/tesztjátékos|partnerre/i);
+  assert.doesNotMatch(projector({phase:"finished",pairs},room,[],true),/tesztjátékos/i);
 });

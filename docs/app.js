@@ -1,7 +1,7 @@
 import { animateRace } from "./live-race.js?v=15";
 import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=15";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=15";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=16";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -232,7 +232,7 @@ async function perform(path, body, success, retry, label = "Kérés küldése…
 }
 
 function mutate(action, body = {}, onSuccess = update) {
-  const labels = { turn: "Kitérés küldése…", decision: "Döntés küldése…", requeue: "Új partner keresése…", start: "Párosítás…" };
+  const labels = { turn: "Kitérés küldése…", decision: "Döntés küldése…", requeue: "Futam előkészítése…", start: "Párosítás…" };
   return perform(endpoint(action), body, onSuccess, () => mutate(action, body, onSuccess), labels[action]);
 }
 
@@ -386,7 +386,7 @@ function downloadPersonalReport() {
   const headings = ["Játék","Kimenetel","Távolság (m)","Időpont","Saját döntés","Partner","Partner döntése","Kapcsolati megjegyzés"];
   const rows = state.report.flatMap(pair => (pair.history.length ? pair.history : [{}]).map(row => [
     pair.number,outcomes[pair.outcome],row.distance,time(row.at),moves[row.own],
-    pair.bot ? "Tesztjátékos" : "A másik autó",moves[row.other],
+    "A másik autó",moves[row.other],
     pair.reason === "ready-timeout" ? "Rajt elmaradt" : pair.connectionGap ? "A futam végén hiányzott a kapcsolati jel" : "",
   ]));
   downloadCsv(headings,rows,"sajat");
@@ -436,7 +436,7 @@ function revealTitle(pair, event, names) {
 }
 
 function paintScreening(target, pair, frames, index, loading) {
-  const names = ["Játékos A",pair.bot ? "Tesztjátékos" : "Játékos B"];
+  const names = ["Játékos A","Játékos B"];
   const event = frames[index];
   const closing = event.kind === "reveal" && index === frames.length-1 && pair.result !== "stopped";
   const meters = closing && pair.result === "crash" ? 0 : event.distance;

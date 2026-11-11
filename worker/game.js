@@ -136,7 +136,7 @@ function view(room, auth, online) {
   const report = room.pairs.flatMap((match, index) => {
     const seat = match.players.indexOf(player.id);
     return seat < 0 || !match.result ? [] : [{
-      number: index + 1, outcome: outcome(match, seat), bot: match.players.includes(null),
+      number: index + 1, outcome: outcome(match, seat),
       history: playerHistory(match, seat),
       reason: match.reason,
       ...(match.race ? {
@@ -146,10 +146,6 @@ function view(room, auth, online) {
     }];
   });
   const details = { ...base, role: "player", queued: room.queue?.includes(player.id) ?? false, report };
-  if (details.queued) {
-    details.queueUntil = room.queueUntil?.[player.id];
-    details.serverAt = Date.now();
-  }
   if (!pair) return { ...details, spectator: true };
   const seat = pair.players.indexOf(player.id);
   return {

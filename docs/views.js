@@ -153,11 +153,12 @@ function resultMetrics(pairs) {
     metric("Ütközés", counts.crash, "Mindketten haladtak", "critical")+'</div>';
 }
 
-function resultSummary(groups) {
-  return '<div class="result-groups"><section><h3>Ember–ember · '+groups.human.length+' játék</h3>'+
-    resultMetrics(groups.human)+'</section>'+
-    (groups.test.length ? '<section><h3>Tesztjátékos ellen · '+groups.test.length+' játék</h3>'+resultMetrics(groups.test)+'</section>' : '')+
-    (groups.stopped.length ? '<p class="muted">Félbemaradt játék: '+groups.stopped.length+'</p>' : '')+'</div>';
+function resultSummary(pairs) {
+  const completed = pairs.filter(pair => pair.result && pair.result !== "stopped");
+  const stopped = pairs.filter(pair => pair.result === "stopped").length;
+  return '<div class="result-groups"><section><h3>'+completed.length+' befejezett játék</h3>'+
+    resultMetrics(completed)+'</section>'+
+    (stopped ? '<p class="muted">Félbemaradt játék: '+stopped+'</p>' : '')+'</div>';
 }
 function reportTotals(groups) {
   const group = (label,pairs) => {
@@ -245,7 +246,7 @@ export function trainer(s, context) {
 function namedPairings(pairs) {
   if (!pairs.length) return empty("Még nincs párosítás", "A játék indítása után itt jelennek meg a párok.");
   const rows = pairs.map(pair => '<tr><th scope="row">'+pair.number+'. játék</th><td>'+time(pair.startedAt)+'</td>'+
-    '<td>'+escape(pair.names[0])+'</td><td>'+escape(pair.names[1])+'</td></tr>').join("");
+    '<td>'+escape(pair.names[0])+'</td><td>'+escape(pair.bot ? "A másik játékos" : pair.names[1])+'</td></tr>').join("");
   return '<div class="table-wrap projection-pairs"><table><thead><tr><th scope="col">Játék</th><th scope="col">Kezdés</th>'+
     '<th scope="col">Egyik játékos</th><th scope="col">Másik játékos</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
@@ -263,8 +264,8 @@ export function projector(s, room, selection, showPairings = false, screeningCas
   return '<div class="projection">'+(!lobby && !showPairings && chosen ? story :
     '<div class="screening-head"><h1>'+title+'</h1></div>'+
     (lobby ? card("Csatlakozás",'<div class="qr" id="inline-qr"></div><p class="qr-code">'+room+'</p><p>'+s.count+' résztvevő csatlakozott</p>',"invite")
-      : showPairings ? namedPairings(s.pairs) : resultSummary(pairGroups(s.pairs))+
-        '<p class="projection-status">'+active+' aktív pár · '+s.queue.length+' játékos vár új partnerre</p>'))+'</div>';
+      : showPairings ? namedPairings(s.pairs) : resultSummary(s.pairs)+
+        '<p class="projection-status">'+active+' aktív pár</p>'))+'</div>';
 }
 export function personalReport(state, opened) {
   if (!state.report?.length) return "";
@@ -274,7 +275,7 @@ export function personalReport(state, opened) {
     const id = "report-"+m.number;
     return '<details id="'+id+'"'+(opened.has(id) || !opened.seen?.has(id) && i===state.report.length-1 ? " open" : "")+
       '><summary><span class="pair-name"><small>#'+m.number+'</small><strong>'+(m.reason === "ready-timeout" ? "Rajt elmaradt" : outcomes[m.outcome])+'</strong></span>'+
-      (m.timed ? badge("45 mp") : "")+(m.bot ? badge("Tesztjátékos") : "")+'</summary><div class="detail-content">'+
+      (m.timed ? badge("45 mp") : "")+'</summary><div class="detail-content">'+
       (m.reason === "ready-timeout" ? '<p class="muted">A rajt kapcsolati okból elmaradt.</p>' :
         m.timed && m.outcome !== "stopped" ? '<p class="muted">'+(m.target ? "Kért kitérés: "+m.target+" m." :
           m.connectionGap ? "A futam végén nem érkezett kapcsolati jel." : "Továbbhaladás kitérési kérés nélkül.")+'</p>' : "")+
@@ -284,10 +285,9 @@ export function personalReport(state, opened) {
 
 function rematch(s) {
   if (s.phase === "closed") return '<p class="muted">A tréner lezárta a futamot. A riportod itt elérhető.</p>';
-  if (s.queued) return '<div class="feedback warm"><strong role="status">Játékosra vársz</strong> · '+queueTimer(s.queueUntil)+
-    '<p>Ha addig nincs szabad partner, tesztjátékos érkezik.</p></div>'+action("cancel","Kilépek a várólistáról","secondary");
-  return action("requeue","Új játékot indítok","primary")+
-    '<p class="muted">Legfeljebb 30 másodpercig keresünk új partnert.</p>';
+  if (s.queued) return '<div class="feedback warm"><strong role="status">A következő futam előkészítése…</strong></div>'+
+    action("cancel","Mégsem","secondary");
+  return action("requeue","Új játékot indítok","primary");
 }
 
 function conversation(opened, finished) {
@@ -344,6 +344,6 @@ export function player(s, context) {
   if (s.phase === "lobby") return '<div class="player-shell"><div class="banner">'+road(920)+'</div>'+
     waitingPage(room,"A rajtra vársz", "Sikeresen csatlakoztál. A tréner indítja a párosítást.",
       '<p class="lobby-counter"><strong>'+s.count+'</strong> résztvevő a váróban</p>')+'</div>';
-  if (s.spectator) return waitingPage(room,"Új játék","A párosítás a jelentkezők között történik.",rematch(s));
+  if (s.spectator) return waitingPage(room,"Új játék","",rematch(s));
   return nightPlayer(s,context);
 }
