@@ -11,6 +11,13 @@ const choice = x => x === "X" || x === "Y";
 const current = s => s.rounds[s.index];
 const totals = s => Array.from({length:4}, (_,i) => s.rounds.reduce((sum,r) => sum + (r.scores?.[i] ?? 0),0));
 const names = s => s.teams.map((t,i) => t?.name || `${i+1}. csapat`);
+function resultReport(s) {
+  return {code:s.code,names:names(s),totals:totals(s),createdAt:new Date().toISOString(),
+    rounds:s.rounds.flatMap((r,i)=>r.scores || r.notes.some(Boolean) ? [{
+      number:i+1,multiplier:r.multiplier,negotiations:r.played,moves:r.scores?r.moves:null,
+      scores:r.scores ?? null,notes:r.notes
+    }] : []),reflections:s.teams.map(t=>t?.reflection || "")};
+}
 const presenceWindow = 25_000;
 async function presentView(s, auth, store, id, pulse = false) {
   const result = view(s,auth);
@@ -56,7 +63,7 @@ function view(s, auth) {
       text:s.rounds[s.screenRound]?.notes[s.screenSeat], round:s.screenRound,
       name:s.anonymous ? "" : names(s)[s.screenSeat]
     } : undefined,
-    focus:s.focus };
+    focus:s.focus, reportShared:(host || seat>=0) ? !!s.sharedReport : undefined };
 }
 function action(s, auth, act, b, transfer) {
   const r = current(s);
@@ -93,7 +100,10 @@ function action(s, auth, act, b, transfer) {
     return;
   }
   if (s.host !== auth) fail(403,"Tréneri hozzáférés szükséges.");
-  if (act === "config") {
+  if (act === "reportshare") {
+    check(s.phase === "finished");
+    s.sharedReport = b.enabled === true ? resultReport(s) : null;
+  } else if (act === "config") {
     const target = s.rounds[b.index];
     check(target && b.index >= s.index && (b.index > s.index || ["lobby","ready","negotiation"].includes(s.phase)));
     check(multipliers.includes(b.multiplier) && Number.isSafeInteger(b.negotiations) && b.negotiations >= target.played);
@@ -183,7 +193,7 @@ export async function xyApi(req, store) {
       return reply(view(s,host),201);
     }
     const match = /^\/api\/xy\/rooms\/([A-Z2-9]{6})(?:\/([a-z]+))?$/.exec(path);
-    if (!match || (req.method === "GET") !== !match[2]) fail(404,"Ismeretlen útvonal.");
+    if (!match || (req.method === "GET") !== (!match[2] || match[2]==="report")) fail(404,"Ismeretlen útvonal.");
     const [,code,act] = match;
     const key = req.headers.get("Authorization")?.replace(/^Bearer /,"");
     if (!keyPattern.test(key || "")) fail(403,"Érvénytelen belépő.");
@@ -194,6 +204,12 @@ export async function xyApi(req, store) {
       const row = await store.get(id);
       if (!row || row.expires_at <= Date.now()) fail(404,"A szoba nem található vagy lejárt.");
       const s = JSON.parse(row.state);
+      if (act==="report") {
+        check(s.phase==="finished","A PDF a játék lezárása után érhető el.");
+        if(s.host===auth) return reply(resultReport(s));
+        if(s.sharedReport && s.teams.some(t=>t?.key===auth)) return reply(s.sharedReport);
+        fail(403,"A tréner még nem osztotta meg a PDF-et.");
+      }
       if (!act || action(s,auth,act,b,transfer) === false)
         return reply(await presentView(s,auth,store,id,act === "join" || (!act && !url.searchParams.has("idle"))));
       if (await store.put(id,row.revision,JSON.stringify(s)))

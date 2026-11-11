@@ -23,7 +23,7 @@ test("four teams, negotiations, concurrent moves, recovery, projection and refle
   const call=async(act,key,body,status=200)=>{
     const path=act==="create"?"/api/xy/rooms":"/api/xy/rooms/"+code+(act==="idle"?"?idle=1":act?"/"+act:"");
     const response=await xyApi(new Request("https://example.test"+path,{
-      method:act&&act!=="idle"?"POST":"GET",headers:key?{authorization:"Bearer "+key}:{},body:act&&act!=="idle"?JSON.stringify(body||{}):undefined
+      method:act&&act!=="idle"&&act!=="report"?"POST":"GET",headers:key?{authorization:"Bearer "+key}:{},body:act&&act!=="idle"&&act!=="report"?JSON.stringify(body||{}):undefined
     }),store);
     const data=await response.json();
     assert.equal(response.status,status,JSON.stringify(data));
@@ -125,4 +125,18 @@ test("four teams, negotiations, concurrent moves, recovery, projection and refle
   assert.equal(teamView.totals,undefined);
   assert.equal(teamView.rounds[0].moves,undefined);
   assert.equal(teamView.rounds[0].scores,undefined);
+  await call("report",b,undefined,403);
+  assert.equal((await call("report",host)).rounds[0].notes[0],"Első kör");
+  await call("reportshare",b,{enabled:true},403);
+  await call("reportshare",host,{enabled:true});
+  assert.equal((await call("",b)).reportShared,true);
+  const report=await call("report",b);
+  assert.equal(report.rounds[0].notes[0],"Első kör");
+  assert.equal(report.reflections[0],"Az első tárgyalás után változott.");
+  await call("reflection",replacement,{text:"Később módosított szöveg."});
+  assert.equal((await call("report",b)).reflections[0],report.reflections[0]);
+  await call("reportshare",host,{enabled:true});
+  assert.equal((await call("report",b)).reflections[0],"Később módosított szöveg.");
+  await call("reportshare",host,{enabled:false});
+  await call("report",b,undefined,403);
 });

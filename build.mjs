@@ -16,6 +16,7 @@ const files = {
   "/QR-LICENSE.txt": "text/plain; charset=utf-8",
   "/xy/index.html": "text/html; charset=utf-8",
   "/xy/app.js": "text/javascript; charset=utf-8",
+  "/xy/report-pdf.js": "text/javascript; charset=utf-8",
   "/xy/style.css": "text/css; charset=utf-8",
 };
 const assets = Object.fromEntries(await Promise.all(Object.entries(files).map(async ([path,type]) => [

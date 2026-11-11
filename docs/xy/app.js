@@ -1,4 +1,5 @@
 import { command, readState, saved, secret } from "../connection.js?v=5";
+import { createReportPdf } from "./report-pdf.js?v=1";
 
 const $ = id => document.getElementById(id);
 const screen = $("screen"), dialog = $("dialog"), signal = $("signal");
@@ -97,7 +98,7 @@ function hostView() {
   if (phase==="open") {title="Döntésre nyitva";desc=`${count}/4 döntés beérkezett`;action=btn("Kör lezárása","close","","primary",count!==4);}
   if (phase==="result") {title=split(now.countX);desc="A kör lezárult, a csapatok látják a saját pontjukat.";action=btn(state.index+1===state.rounds.length?"Játék lezárása és reflexiók":"Következő kör",state.index+1===state.rounds.length?"finish":"next","","primary");}
   if (["ready","negotiation","open"].includes(phase) || phase==="result" && state.index+1<state.rounds.length) action+=btn("Játék lezárása","finish");
-  if (phase==="finished") {title="Feldolgozás";desc=`${state.reflections.filter(Boolean).length}/4 reflexió beérkezett`;action=btn("Végeredmény kivetítése","results","","primary")+btn("CSV letöltése","csv");}
+  if (phase==="finished") {title="Feldolgozás";desc=`${state.reflections.filter(Boolean).length}/4 reflexió beérkezett${state.reportShared?" · PDF megosztva":""}`;action=btn("Végeredmény kivetítése","results","","primary")+btn("PDF letöltése","pdf")+btn(state.reportShared?"Megosztott PDF frissítése":"PDF megosztása a csapatokkal","share-pdf")+(state.reportShared?btn("Megosztás leállítása","unshare-pdf"):"");}
   const weight = ["lobby","ready","negotiation"].includes(phase) ? `<label class="quick-weight">Körszorzó<select id="quick-weight">${options.map(n=>`<option value="${n}" ${n===now.multiplier?"selected":""}>×${n}</option>`).join("")}</select></label>` : `<strong>×${now.multiplier}</strong>`;
   return `<section class="hero board"><div><p class="kicker">Tréneri vezérlő · ${code}</p><h1>${title}</h1><p>${desc}</p></div><div class="weight"><span>${state.index+1} / ${state.rounds.length}. kör</span>${weight}</div><div class="actions">${action}</div></section>
   <div class="teams-panel ${phase==="lobby"?"with-qr":""}">${roster()}${phase==="lobby"?qrBlock():""}</div>
@@ -117,6 +118,7 @@ function participant() {
   let title={lobby:"Várjuk a csapatokat",ready:"A következő körre vártok",negotiation:"Tárgyalás",open:"Mi a döntésetek?",result:"Kör lezárva",finished:"A játék véget ért"}[phase];
   if (phase==="open" && now.own) title=`Mentett döntés: ${now.own}`;
   return `<div class="participant"><section class="hero"><p class="kicker">${esc(state.name)} · ${phase==="finished"?`${state.rounds.filter(x=>x.scored).length} lezárt kör`:`${state.index+1} / ${state.rounds.length}. kör`}</p><h1>${title}</h1><div class="stats"><div><small>Összpont</small><strong>${score(state.ownTotal)}</strong></div>${["open","result"].includes(phase) && now.multiplier?`<div><small>Körszorzó</small><strong>×${now.multiplier}</strong></div>`:""}</div></section>
+    ${phase==="finished" && state.reportShared?`<section class="paper"><h2>A tréner megosztotta a végeredményt</h2>${btn("Végeredmény letöltése PDF-ben","pdf","","primary")}</section>`:""}
     ${phase==="open"?`<div class="choices">${["X","Y"].map(v=>btn(v,"move",`data-choice="${v}" aria-label="${v} választása" aria-pressed="${now.own===v}"`,"choice "+v,now.own===v)).join("")}</div>`:""}
     ${phase==="open" && now.own?'<p class="paper">A kör lezárásáig módosíthatjátok a döntést.</p>':""}
     ${phase==="open" && now.own || phase==="result"?noteForm(now,state.index,true):""}
@@ -215,21 +217,29 @@ function confirmBox(title,body,callback) {
   dialog.showModal();
   dialog.addEventListener("close",()=>{if(dialog.returnValue==="yes")callback();render();},{once:true});
 }
-function download() {
-  const quote=x=>'"'+(typeof x==="number"?String(x):String(x??"").replace(/^[\s]*[=+@-]/,c=>"'"+c)).replaceAll('"','""')+'"';
-  const rows=[["Kör","Tárgyalások előtte","Szorzó","Csapat","Döntés","Körpont","Futó pont","Kézi rögzítés","Reflexió"]];
-  const totals=[0,0,0,0];
-  const lastScored=state.rounds.findLastIndex(r=>r.scored);
-  state.rounds.forEach((r,i)=>r.scored&&state.names.forEach((name,j)=>rows.push([i+1,r.played,r.multiplier,name,r.moves[j],r.scores[j],totals[j]+=r.scores[j],r.manual[j]?"igen":"",i===lastScored?state.reflections[j]:""])));
-  if(lastScored<0) state.names.forEach((name,j)=>rows.push(["","","",name,"","",0,"",state.reflections[j]]));
-  const href=URL.createObjectURL(new Blob(["\ufeff"+rows.map(row=>row.map(quote).join(";")).join("\r\n")],{type:"text/csv;charset=utf-8"}));
-  const a=document.createElement("a"); a.href=href;a.download="nagy-xy-"+code+".csv";a.click();setTimeout(()=>URL.revokeObjectURL(href),1000);
+async function downloadReport() {
+  busy=true;revision++;setError("");signal.textContent="PDF készül…";
+  try{
+    const report=await readState(endpoint("report"),key);
+    const href=URL.createObjectURL(await createReportPdf(report));
+    const a=document.createElement("a");
+    a.href=href;a.download="nagy-xy-vegeredmeny-"+code+".pdf";
+    document.body.append(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(href),30000);
+  }catch(e){setError(e.message);}
+  finally{busy=false;signal.textContent="Kapcsolódva";}
 }
 screen.addEventListener("click",e=>{
   const b=e.target.closest("button[data-act]"); if(!b||busy)return;
   const {act,seat,choice,mode,named}=b.dataset;
   if(act==="recover"){location.href="?room="+saved.get(last);return;}
-  if(act==="csv"){download();return;}
+  if(act==="pdf"){void downloadReport();return;}
+  if(act==="share-pdf"){
+    confirmBox(state.reportShared?"Frissíted a megosztott PDF-et?":"Megosztod a PDF-et a csapatokkal?",
+      "<p>A csatlakozott csapatok letölthetik a végeredményt, az eddig beérkezett körjegyzetekkel és reflexiókkal együtt.</p>",
+      ()=>run("reportshare",{enabled:true}));return;
+  }
+  if(act==="unshare-pdf"){void run("reportshare",{enabled:false});return;}
   if(act==="screen"){void run(act,{mode});return;}
   if(act==="results"){void run("focus",{index:null});return;}
   if(act==="read-note" && (state.host || projector) || act==="read-reflection" && projector){
