@@ -9,6 +9,7 @@ export const trainerGuide = `
       <button type="button" data-guide-target="guide-start">Indítás</button>
       <button type="button" data-guide-target="guide-play">Játékmenet</button>
       <button type="button" data-guide-target="guide-debrief">Kivezetés</button>
+      <button type="button" data-guide-target="guide-controls">Felület használata</button>
     </div>
     <section id="guide-start">
       <h3>Előkészítés és indítás</h3>
@@ -43,6 +44,42 @@ export const trainerGuide = `
         <li><strong>Tanulságok.</strong> „Mit kezdenek ezzel a tudással holnap reggel?” Hagyd, hogy a résztvevők mondják ki, mit próbálnának ki. Kérdezz rá, ki tudja kezdeményezni a beszélgetést, és milyen feltételen lehetne változtatni ahhoz, hogy vállalható legyen az együttműködés.</li>
       </ol>
       <p><strong>A tréner feladata végig ugyanaz.</strong> Kérdezz rá arra, mit láttak, mitől tartottak, és miért tűnt az adott döntés ésszerűnek. A ponttábla segítségével az egymásra ható döntéseket vizsgáljátok.</p>
+    </section>
+    <section id="guide-controls">
+      <h3>A felület használata</h3>
+      <p>A játékhoz nyisd meg és zárd le a köröket. A tétemelés, a tárgyalás, a kivetítés és a PDF használata a te döntésed. A telefoncsere és a kézi bevitel akkor segít, ha valamelyik csapat elakad.</p>
+
+      <h4>Csatlakozás és az első kör</h4>
+      <p>A nyitóoldalon állítsd be a <strong>Fordulók száma</strong> mezőt, majd kattints az <strong>Új játék és QR-kód</strong> gombra. Csapatonként egy telefon olvassa be a QR-kódot. A szobakóddal is be lehet lépni. Négy betöltött csapathelynél válik elérhetővé a <strong>Játék indítása</strong>. Ekkor még várnak a csapatok. Az első döntést a <strong>Kör megnyitása</strong> gombbal indítod.</p>
+
+      <h4>Kör megnyitása, pontozása és továbblépés</h4>
+      <p>A nyitott körben a csapatok leadhatják az X vagy Y döntésüket, és a lezárásig módosíthatják is. A tréneri táblán látod, hány döntés érkezett be, és melyik csapat mit választott. Ha mind a négy döntés megvan, a <strong>Kör lezárása</strong> kiszámolja és rögzíti a pontokat. A <strong>Következő kör</strong> előkészíti a következő fordulót. A döntéshez azt is külön meg kell nyitnod.</p>
+
+      <h4>Tét változtatása és tárgyalás beiktatása</h4>
+      <ul>
+        <li><strong>Tét.</strong> Az aktuális kör előtt a <strong>Körszorzó</strong> mezőben válassz ×1, ×2, ×5, ×10, ×100 vagy ×1000 értéket. Ez a kör összes pontértékére érvényes. A későbbi köröket a <strong>Menetrend</strong> megfelelő sorában állíthatod be a <strong>Szorzó</strong> mezővel és a <strong>Mentés</strong> gombbal. A kör megnyitása után az adott szorzó már rögzített.</li>
+        <li><strong>Tervezett tárgyalás.</strong> A <strong>Menetrendben</strong> annak a körnek a sorában add meg a <strong>Tárgyalások előtte</strong> számát, amelyik előtt beszéljenek. A 4. kör utáni tárgyalást például az 5. kör sorában állítsd be, majd mentsd. Amikor odaérsz, kattints a <strong>Tárgyalás indítása</strong> gombra. A <strong>Tárgyalás lezárása</strong> után te nyitod meg a döntési kört. Ha több tárgyalást állítottál be, azokat előbb egyenként indítsd és zárd le.</li>
+        <li><strong>Menet közben beiktatott tárgyalás.</strong> Ha a következő döntési kör még nincs nyitva, és nincs hátra tervezett tárgyalás, a <strong>Tárgyalás beszúrása</strong> rögtön elindít egyet. A felület jelzi a tárgyalást a telefonokon. Az időt te méred.</li>
+      </ul>
+
+      <h4>Ha egy telefon kiesik</h4>
+      <p>Ha a csapat mellett megszakadt kapcsolatot jelző pont jelenik meg, először kérd meg őket, hogy nyissák meg újra a játékot ugyanazon a telefonon, ugyanabban a böngészőben. Ha készüléket cserélnek, a csapat mellett kattints a <strong>Telefoncsere</strong> gombra. Az új telefon olvassa be az egyszer használható QR-kódot, vagy nyissa meg a hozzá tartozó belépőt, majd válassza a <strong>Csatlakozás</strong> gombot. A csapat ugyanazon a helyen folytatja, a neve, pontjai és mentett döntései megmaradnak.</p>
+      <p>Ha csak a mostani döntés leadása akadt el, a nyitott körben a csapat mellett válaszd a <strong>Kézi döntés</strong> gombot. A csapat által megadott X-et vagy Y-t rögzítsd. Ez a gomb addig érhető el, amíg onnan még nem érkezett döntés. Ha egy csapat már az elején telefon nélkül játszik, a váróban a <strong>Kézi hely</strong> gombbal adj neki helyet. Utána minden körben rögzítheted a választását. Ha a tréneri lapot zártad be véletlenül, ugyanabban a böngészőben a nyitóoldalon keresd a <strong>Legutóbbi tréneri szoba</strong> gombot.</p>
+
+      <h4>A gyakorlat lezárása</h4>
+      <p>Az utolsó lepontozott kör után kattints a <strong>Játék lezárása és reflexiók</strong> gombra. Ha korábban állítod le a gyakorlatot, válaszd a <strong>Játék lezárása</strong> gombot, és erősítsd meg. A már lezárt körök pontjai megmaradnak. Ha ekkor épp nyitva van egy kör, annak döntései kimaradnak a pontozásból. A lezárás után a csapatok elküldhetik a reflexiójukat.</p>
+
+      <h4>Kivetítés és kommentek a kivezetésben</h4>
+      <p>A <strong>Kivetítő megnyitása</strong> külön böngészőfület nyit. Ezt a fület tedd a vászonra. Ha később akarod megmutatni a végeredményt, a játék lezárása előtt állítsd le a vászon megosztását vagy zárd be a kivetítőfület. A lezárás ugyanis automatikusan a végeredményre vált. Ha közben más képet szeretnél mutatni, még a kivetítő visszakapcsolása előtt válaszd a <strong>Pontozási mátrix</strong> vagy az <strong>Üres vászon</strong> nézetet.</p>
+      <ul>
+        <li>A <strong>Végeredmény kivetítése</strong> a teljes döntéssort mutatja. Ha egy fordulóhoz értek a beszélgetésben, a <strong>Kiemelt forduló a vásznon</strong> listában válaszd ki azt a kört. A teljes táblához a listában a <strong>Teljes döntéssor</strong> visz vissza. Hosszabb játéknál a kivetített táblát a vásznon lehet lapozni.</li>
+        <li>A <strong>▤ körjegyzet</strong> ikon a kör és a csapat találkozásánál jelenik meg. Ha a tréneri táblán kattintasz rá, nálad nyílik meg a jegyzet. Ha a vásznon kattintasz ugyanarra az ikonra, ott jelenik meg, a csapat nevével. A <strong>Vissza a táblához</strong> gomb zárja be.</li>
+        <li>A <strong>◇ csapatreflexió</strong> ikon a csapat neve mellett látszik a kivetített végeredményben. Innen a szöveg névvel nyílik meg. A tréneri oldalon a <strong>Csapatreflexiók</strong> részből is kiteheted: válaszd a <strong>Kivetítés név nélkül</strong> vagy a <strong>Névvel</strong> gombot. Utána a <strong>Végeredmény kivetítése</strong> gombbal térhetsz vissza a táblához.</li>
+      </ul>
+
+      <h4>PDF letöltése és megosztása</h4>
+      <p>A lezárás után a <strong>PDF letöltése</strong> elkészíti a riportot a döntéssorral, pontokkal, beérkezett körjegyzetekkel és csapatreflexiókkal. Ez a te eszközödre töltődik le. Ha a csapatoknak is oda akarod adni, válaszd a <strong>PDF megosztása a csapatokkal</strong> gombot, majd erősítsd meg. Ekkor a csapatok saját felületén megjelenik a <strong>Végeredmény letöltése PDF-ben</strong> gomb.</p>
+      <p>A közös PDF a megosztás pillanatában beérkezett szövegeket tartalmazza, a csapatnevekkel együtt. Ha később újabb jegyzet vagy reflexió érkezik, a <strong>Megosztott PDF frissítése</strong> teszi elérhetővé a frissebb változatot. A <strong>Megosztás leállítása</strong> leveszi a letöltési gombot. A korábban letöltött példányok a csapatoknál maradnak.</p>
     </section>
     <footer>
       <p>Ez egy nagyszerű gyakorlat. Az általam ismert egyik legnehezebb, de nehéz helyzetek edzik a trénert. Élvezd!</p>
