@@ -104,10 +104,15 @@ function hostView() {
   return `<section class="hero board"><div><p class="kicker">Tréneri vezérlő · ${code}</p><h1>${title}</h1><p>${desc}</p></div><div class="weight"><span>${state.index+1} / ${state.rounds.length}. kör</span>${weight}</div><div class="actions">${action}</div></section>
   <div class="teams-panel ${phase==="lobby"?"with-qr":""}">${roster()}${phase==="lobby"?qrBlock():""}</div>
   <section class="paper tools"><div><a href="${screenUrl()}" target="_blank" rel="noopener">Kivetítő megnyitása ↗</a></div>
-  <div class="actions">${[["Élő nézet","live"],["Pontozási mátrix","matrix"],["QR-kód","join"],["Üres vászon","blank"]].map(([label,mode])=>btn(label,"screen",`data-mode="${mode}" aria-pressed="${state.mode===mode}"`)).join("")}</div></section>
+  <div class="actions">${[[phase==="finished"?"Élő nézet":"Játéknézet · mátrix","live"],...(phase==="finished"?[["Pontozási mátrix","matrix"]]:[]),["QR-kód","join"],["Üres vászon","blank"]].map(([label,mode])=>btn(label,"screen",`data-mode="${mode}" aria-pressed="${state.mode===mode || phase!=="finished" && mode==="live" && state.mode==="matrix"}"`)).join("")}</div></section>
   <section class="paper report"><h2>Döntések és pontok</h2>${timeline()}
   ${phase==="finished"?`<label class="focus">Kiemelt forduló a vásznon<select id="focus"><option value="">Teljes döntéssor</option>${state.rounds.map((round,i)=>round.scored?`<option value="${i}" ${state.focus===i?"selected":""}>${i+1}. kör</option>`:"").join("")}</select></label>`:""}</section>
   ${phase==="finished"?`<section class="paper host-reflections"><h2>Csapatreflexiók</h2><div class="reflections">${state.reflections.map((t,i)=>`<article><h3>${esc(state.names[i])}</h3><p>${esc(t || "Várjuk a reflexiót.")}</p>${t?btn("Kivetítés név nélkül","reflect",`data-seat="${i}"`,"quiet")+btn("Névvel","reflect",`data-seat="${i}" data-named="1"`,"quiet"):""}</article>`).join("")}</div></section>`:schedule()}`;
+}
+const noteDrafts = new Map();
+function noteForm(round,index,inline=false) {
+  const draft=noteDrafts.get(index);
+  return `<form ${inline?'class="paper live-note"':""} data-kind="note" data-index="${index}">${inline?'<h2>Körjegyzet · opcionális</h2>':""}<label>Kérlek kommentáld a döntéseteket.<textarea name="text" maxlength="800" rows="2">${esc(draft ?? round.note)}</textarea></label><button>Jegyzet mentése</button>${round.note && (draft===undefined || draft===round.note)?'<span role="status">Elmentve</span>':""}</form>`;
 }
 function participant() {
   const now=r(), phase=state.phase;
@@ -116,10 +121,11 @@ function participant() {
   return `<div class="participant"><section class="hero"><p class="kicker">${esc(state.name)} · ${phase==="finished"?`${state.rounds.filter(x=>x.scored).length} lezárt kör`:`${state.index+1} / ${state.rounds.length}. kör`}</p><h1>${title}</h1><div class="stats"><div><small>Összpont</small><strong>${score(state.ownTotal)}</strong></div>${["open","result"].includes(phase) && now.multiplier?`<div><small>Körszorzó</small><strong>×${now.multiplier}</strong></div>`:""}</div></section>
     ${phase==="open"?`<div class="choices">${["X","Y"].map(v=>btn(v,"move",`data-choice="${v}" aria-label="${v} választása" aria-pressed="${now.own===v}"`,"choice "+v,now.own===v)).join("")}</div>`:""}
     ${phase==="open" && now.own?'<p class="paper">A kör lezárásáig módosíthatjátok a döntést.</p>':""}
+    ${phase==="open" && now.own || phase==="result"?noteForm(now,state.index,true):""}
     ${phase==="result"?`<div class="paper"><strong>${split(now.countX)}</strong><p>Saját döntés: ${tag(now.own)} · Körpont: <b>${score(now.ownScore)}</b></p></div>`:""}
     ${matrixFold()}
     ${state.rounds.some(x=>x.scored)?`<details class="paper fold"><summary>Saját döntéseink</summary><ol class="own-history">${state.rounds.map((x,i)=>x.scored?`<li><strong>${i+1}. kör</strong> · ${tag(x.own)} · ${split(x.countX)} · ×${x.multiplier} · <b>${score(x.ownScore)}</b>
-    <form data-kind="note" data-index="${i}"><label>Körjegyzet<input name="text" maxlength="800" value="${esc(x.note)}"></label><button>Mentés</button></form></li>`:"").join("")}</ol></details>`:""}
+    ${phase==="result" && i===state.index?"":noteForm(x,i)}</li>`:"").join("")}</ol></details>`:""}
     ${phase==="finished"?`<form class="paper" data-kind="reflection"><h2>Csapatreflexió</h2><label>Melyik körben változott meg, mire számítottatok a többiektől?<textarea name="text" maxlength="1600" rows="4" required>${esc(state.ownReflection)}</textarea></label><button class="primary">${state.ownReflection?"Reflexió frissítése":"Reflexió elküldése"}</button>${state.ownReflection?'<span role="status"> · Elmentve</span>':""}</form>`:""}
     </div>`;
 }
@@ -127,6 +133,10 @@ function projection() {
   const phase=state.phase, now=r(), focus=state.rounds[state.focus];
   if (state.mode==="blank") return '<div class="blank"></div>';
   if (state.mode==="join" || phase==="lobby" && state.mode==="live") return `<div class="project"><p class="kicker">Csatlakozás</p><h1>Nagy X/Y</h1>${qrBlock()}</div>`;
+  if (["lobby","ready","negotiation","open","result"].includes(phase)) {
+    const label={lobby:"Indításra vár",ready:"Indításra vár",negotiation:"Tárgyalás",open:"Döntésre nyitva",result:"Lezárva"}[phase];
+    return `<div class="project project-round"><header class="project-round-head"><div><p class="kicker">Pontozási mátrix</p><h1>${state.index+1}. kör</h1></div><span class="round-status ${phase}">${label}</span><strong class="round-stake">${now.multiplier?"×"+now.multiplier:"Alappontok"}</strong></header>${matrix(now.multiplier ?? 1)}</div>`;
+  }
   if (state.mode==="matrix") return `<div class="project"><p class="kicker">${state.index+1}. kör · ${now.multiplier?"×"+now.multiplier:"Alappontok"}</p><h1>Pontozási mátrix</h1>${matrix(now.multiplier ?? 1)}</div>`;
   if (state.mode==="reflection") return `<div class="project"><p class="kicker">Reflexió ${esc(state.projectedReflection?.name)}</p><blockquote>${esc(state.projectedReflection?.text)}</blockquote></div>`;
   if (state.mode==="note") return `<div class="project"><p class="kicker">${(state.projectedNote?.round ?? 0)+1}. kör · Körjegyzet ${esc(state.projectedNote?.name)}</p><blockquote>${esc(state.projectedNote?.text)}</blockquote></div>`;
@@ -137,7 +147,7 @@ function projection() {
       :timeline()+`<div class="project-legend">${state.rounds.some(r=>r.noteFlags?.some(Boolean))?`<span>${noteIcon} Körjegyzet</span>`:""}${state.projectorReflections?.some(Boolean)?`<span>${reflectionIcon} Csapatreflexió</span>`:""}${pages>1?`<nav aria-label="Döntéstábla lapozása">${btn("← Előző","project-page",'data-step="-1"',"",projectionPage===0)} <span>${projectionPage+1} / ${pages}</span> ${btn("Következő →","project-page",'data-step="1"',"",projectionPage>=pages-1)}</nav>`:""}</div>`
     }</div>`;
   }
-  return `<div class="project"><p class="kicker">${state.index+1}. kör${now.multiplier?" · ×"+now.multiplier:""}</p><h1>${{ready:"Következő kör",negotiation:"Tárgyalás",open:"Döntésre nyitva",result:split(now.countX)}[phase]}</h1>${phase==="open"?'<div class="projectXY">X<span>/</span>Y</div>':""}</div>`;
+  return "";
 }
 function startView() {
   if (projector) return '<section class="paper"><h1>A kivetítő kapcsolódik</h1><p>A kivetítőt a tréneri vezérlőből nyisd meg.</p></section>';
@@ -277,6 +287,10 @@ screen.addEventListener("change",e=>{
   if(e.target.id==="focus")void run("focus",{index:e.target.value===""?null:Number(e.target.value)});
   if(e.target.id==="quick-weight")void run("config",{multiplier:Number(e.target.value),negotiations:r().negotiations});
 });
+screen.addEventListener("input",e=>{
+  const form=e.target.closest('form[data-kind="note"]');
+  if(form && e.target.name==="text") noteDrafts.set(Number(form.dataset.index),e.target.value);
+});
 screen.addEventListener("submit",async e=>{
   const form=e.target.closest("form[data-kind]");if(!form)return;e.preventDefault();if(busy)return;
   const b=Object.fromEntries(new FormData(form)), kind=form.dataset.kind;
@@ -302,7 +316,12 @@ screen.addEventListener("submit",async e=>{
   }
   const index=Number(form.dataset.index);
   if(kind==="config") await run(kind,{index,multiplier:Number(b.multiplier),negotiations:Number(b.negotiations)});
-  else if(kind==="note") await run(kind,{index,text:b.text});
+  else if(kind==="note") {
+    if(await run(kind,{index,text:b.text}) && noteDrafts.get(index)===b.text) {
+      noteDrafts.delete(index);
+      render(true);
+    }
+  }
   else await run(kind,{text:b.text});
 });
 let pollTimer;

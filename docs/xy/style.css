@@ -163,6 +163,13 @@ dialog{color:var(--ink);background:var(--paper);border:1px solid var(--line);bor
 .project-results button.note-mark:hover{border-color:#1a53a3;background:#dbeaff}
 .reflection-icon{color:#245977;font-weight:900;line-height:1}
 .project-results button.reflection-mark{border-color:#b3ced5;background:#e5f0f2}
+.project-round-head{display:flex;align-items:center;gap:clamp(.5rem,2vw,1.8rem);flex-wrap:wrap;margin-bottom:.45rem}
+.projection .project-round-head h1{margin:0}
+.round-status,.round-stake{font-size:clamp(.8rem,min(2.5vw,3.1vh),1.65rem);white-space:nowrap}
+.round-status{background:#eaf0f7;color:#10233f;font-weight:800;padding:.35em .65em;border-radius:3px}
+.round-status.open{background:#dbeaff}.round-status.negotiation{background:#eee6da}
+.round-stake{margin-left:auto}
+.participant .live-note label,.participant .own-history form label{width:100%}
 .project-legend{justify-content:flex-start;gap:1rem}
 .projection dialog.project-note{width:min(83vw,920px);max-height:90dvh;padding:clamp(.7rem,3vh,2rem)}
 .project-note h2{font-size:clamp(1.35rem,4vh,2.6rem)}

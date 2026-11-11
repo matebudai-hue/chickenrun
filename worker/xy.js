@@ -32,7 +32,7 @@ function view(s, auth) {
     const scored = !!r.scores;
     const published = scored || (i === s.index && s.phase === "open");
     return { multiplier:host || published ? r.multiplier : undefined, negotiations:scored || host || i === s.index ? r.negotiations : undefined,
-      played:r.played, scored, countX:r.countX,
+      played:r.played, scored, countX:projector && s.phase !== "finished" ? undefined : r.countX,
       moves:host || (scored && s.phase === "finished" && projector) ? r.moves : undefined,
       scores:host || (scored && s.phase === "finished" && projector) ? r.scores : undefined,
       manual:host ? r.manual : undefined,
@@ -78,8 +78,10 @@ function action(s, auth, act, b, transfer) {
       check(s.phase === "finished");
       s.teams[seat].reflection = clean(b.text,1600);
     } else if (act === "note") {
-      check(Number.isInteger(b.index) && !!s.rounds[b.index]?.scores);
-      s.rounds[b.index].notes[seat] = clean(b.text,800);
+      const round = s.rounds[b.index];
+      check(Number.isInteger(b.index) && (round?.scores ||
+        (s.phase === "open" && b.index === s.index && choice(round?.moves[seat]))));
+      round.notes[seat] = clean(b.text,800);
     } else {
       check(choice(b.choice) && Number.isInteger(b.index));
       if (s.rounds[b.index]?.moves[seat] === b.choice) return false;

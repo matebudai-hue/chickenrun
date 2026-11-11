@@ -61,8 +61,12 @@ test("four teams, negotiations, concurrent moves, recovery, projection and refle
   await call("screen",host,{mode:"matrix"});
   assert.equal((await call("",projector)).mode,"matrix");
   await call("close",projector,{index:0},403);
+  await call("note",a,{index:0,text:"Túl korán"},409);
   await Promise.all(teams.map((key,i)=>call("move",key,{index:0,choice:i===0?"X":"Y"})));
+  assert.equal((await call("note",a,{index:0,text:"Első kör"})).rounds[0].note,"Első kör");
   assert.equal((await call("move",a,{index:0,choice:"Y"})).rounds[0].own,"Y");
+  assert.equal((await call("",a)).rounds[0].note,"Első kör");
+  assert.equal((await call("",b)).rounds[0].note,"");
   assert.equal((await call("",host)).rounds[0].moves[0],"Y");
   await call("move",a,{index:0,choice:"X"});
   assert.deepEqual((await call("",host)).rounds[0].moves,["X","Y","Y","Y"]);
@@ -70,9 +74,11 @@ test("four teams, negotiations, concurrent moves, recovery, projection and refle
   assert.equal((await call("",b)).rounds[0].moves,undefined);
   const close=await call("close",host,{index:0});
   assert.deepEqual(close.totals,[30000,-10000,-10000,-10000]);
+  assert.equal((await call("",projector)).rounds[0].countX,undefined);
+  assert.equal((await call("",projector)).rounds[0].multiplier,1000);
+  assert.equal((await call("",projector)).rounds[0].projectorNotes,undefined);
   await call("move",a,{index:0,choice:"Y"},409);
   await call("close",host,{index:0});
-  await call("note",a,{index:0,text:"Első kör"});
   await call("transfer",host,{seat:0,transfer:invite});
   assert.equal((await call("join",replacement,{transfer:invite})).ownTotal,30000);
   await call("",a,undefined,403);
