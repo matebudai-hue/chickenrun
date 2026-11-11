@@ -1,4 +1,5 @@
 import { api, d1Store } from "./game.js";
+import { xyApi } from "./xy.js";
 import assets from "./assets.js";
 
 const headers = {
@@ -19,7 +20,9 @@ async function handleApi(request, env, ctx) {
   }
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   const response = env.DB
-    ? await api(request, d1Store(env.DB), promise => ctx.waitUntil(promise))
+    ? new URL(request.url).pathname.startsWith("/api/xy/")
+      ? await xyApi(request, d1Store(env.DB))
+      : await api(request, d1Store(env.DB), promise => ctx.waitUntil(promise))
     : Response.json({ error: "Az adatbázis nem elérhető." }, { status: 503 });
   for (const [key, value] of cors) response.headers.set(key, value);
   return response;
@@ -32,7 +35,7 @@ export default {
     if (request.method !== "GET" && request.method !== "HEAD") {
       return new Response("Érvénytelen kérés.", { status: 405, headers });
     }
-    const asset = assets[url.pathname === "/" ? "/index.html" : url.pathname];
+    const asset = assets[url.pathname.endsWith("/") ? url.pathname + "index.html" : url.pathname];
     if (!asset) return new Response("Ez az oldal nem található.", { status: 404, headers });
     return new Response(request.method === "HEAD" ? null : Uint8Array.from(atob(asset.base64), c => c.charCodeAt(0)), {
       headers: { ...headers, "Content-Type": asset.type, "Cache-Control": "no-cache" },

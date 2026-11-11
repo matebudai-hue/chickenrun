@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { Readable } from "node:stream";
 import { api } from "./worker/game.js";
+import { xyApi } from "./worker/xy.js";
 import { fileURLToPath } from "node:url";
 
 export function memoryStore() {
@@ -68,7 +69,8 @@ export function localServer(assets) {
         method: incoming.method, headers: incoming.headers,
         ...(["GET", "HEAD"].includes(incoming.method) ? {} : { body: Readable.toWeb(incoming), duplex: "half" }),
       });
-      const res = incoming.url.startsWith("/api/") ? await api(req, store) : await assets.fetch(req, {});
+      const res = incoming.url.startsWith("/api/xy/") ? await xyApi(req, store)
+        : incoming.url.startsWith("/api/") ? await api(req, store) : await assets.fetch(req, {});
       outgoing.writeHead(res.status, Object.fromEntries(res.headers));
       outgoing.end(Buffer.from(await res.arrayBuffer()));
     } catch {
