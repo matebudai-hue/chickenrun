@@ -26,7 +26,7 @@ export const trainerGuide = `
         <li><strong>Az első kör a tárgyalás után.</strong> A könyv egyik menetében itt duplázódik a tét. A menetrend ezt választhatóként kezeli. Ha emeled, nyitás előtt állítsd be a szorzót. Figyeld meg, mi lett a kint elhangzott ígéretekből, és hogyan hatott ez a következő döntésre.</li>
         <li><strong>Második tárgyalás a 7. vagy 8. kör után.</strong> Ugyanaz a menet, de minden csapat új küldöttet küld. Figyeld, hogyan kerülnek szóba a korábbi megállapodások és a tapasztalatok.</li>
         <li><strong>Végjáték.</strong> A 9. és 10. körben emelheted a tétet. A könyv gyors menetrendje például ×5 és ×10 szorzót ad, más leírásában ×10 és ×100 szerepel. Az utolsó kör bejelentése megváltoztatja a helyzetet: már nincs következő döntés, amelyben a többiek viszonozhatnák a mostanit.</li>
-        <li><strong>Lezárás.</strong> Kérj engedélyt a tábla megmutatására, majd válaszd a <b>Végeredmény kivetítése</b> gombot. Adj időt, hogy végignézzék a döntéssort és a pontokat. Ha úgy értelmezik, hogy az nyert, akinek a legkisebb a mínusza, elsőre hallgasd meg őket. A feldolgozás előtt ne iktass be szünetet.</li>
+        <li><strong>Lezárás.</strong> Trénerként te döntöd el, hogy azonnal megmutatod a végeredményt, vagy a kivezetés során teszed nyilvánossá. Érdemes megvárni az érzelmi ventilálás végét. A döntések és a pontok láttán gyakran újra felzúdul a csoport. Adj időt ennek is, mielőtt rátértek az elemzésre. Amikor eljön az ideje, kérj engedélyt a tábla megmutatására, majd válaszd a <b>Végeredmény kivetítése</b> gombot. Hagyd, hogy végignézzék a döntéssort és a pontokat. Ha úgy értelmezik, hogy az nyert, akinek a legkisebb a mínusza, elsőre hallgasd meg őket. A feldolgozás előtt ne iktass be szünetet.</li>
       </ol>
       <aside><strong>Vészfék.</strong> Ha személyeskedés vagy kezelhetetlenné váló feszültség indul, zárd le korábban a játékot. „Ez volt az utolsó kör. Innen nem megyünk tovább, nézzük meg, mi történt velünk.”</aside>
     </section>
@@ -44,5 +44,9 @@ export const trainerGuide = `
       </ol>
       <p><strong>A tréner feladata végig ugyanaz.</strong> Kérdezz rá arra, mit láttak, mitől tartottak, és miért tűnt az adott döntés ésszerűnek. A ponttábla segítségével az egymásra ható döntéseket vizsgáljátok.</p>
     </section>
+    <footer>
+      <p>Ez egy nagyszerű gyakorlat. Az általam ismert egyik legnehezebb, de nehéz helyzetek edzik a trénert. Élvezd!</p>
+      <p>Szeretettel: Máté</p>
+    </footer>
   </div>
 `;
