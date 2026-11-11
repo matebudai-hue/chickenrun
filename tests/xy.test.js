@@ -103,6 +103,8 @@ test("four teams, negotiations, concurrent moves, recovery, projection and refle
   await call("reflection",replacement,{text:"Az első tárgyalás után változott."});
   assert.equal((await call("",host)).reflections[0],"Az első tárgyalás után változott.");
   assert.equal((await call("",b)).reflections,undefined);
+  assert.equal((await call("",projector)).projectorReflections[0],"Az első tárgyalás után változott.");
+  assert.equal((await call("",b)).projectorReflections,undefined);
   await call("screen",host,{mode:"reflection",seat:0,anonymous:true});
   const projected=await call("",projector);
   assert.deepEqual(projected.projectedReflection,{name:"",text:"Az első tárgyalás után változott."});

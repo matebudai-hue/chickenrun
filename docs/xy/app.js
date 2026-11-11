@@ -53,6 +53,11 @@ function qrBlock() {
 let projectionPage=0;
 const projectionPageSize=10;
 const noteIcon='<span class="note-icon" aria-hidden="true">▤</span>';
+const reflectionIcon='<span class="reflection-icon" aria-hidden="true">◇</span>';
+function reflectionMark(name, seat) {
+  if(!projector || !state.projectorReflections?.[seat]) return "";
+  return btn(reflectionIcon,"read-reflection",`data-seat="${seat}" aria-label="${esc(name)}: reflexió megnyitása" title="Csapatreflexió megnyitása"`,"note-mark reflection-mark");
+}
 function noteMark(round,i,j) {
   if(!round.noteFlags?.[j]) return "";
   const label=`${i+1}. kör, ${state.names[j]}: körjegyzet érkezett`;
@@ -67,7 +72,7 @@ function timeline() {
   if (!visible.length) return '<p class="muted">A lezárt körök itt jelennek meg.</p>';
   const sum = values => values.reduce((a,b)=>a+b,0);
   return `<div class="scroll"><table class="timeline"><thead><tr><th scope="col">Kör</th>${
-    state.names.map(name=>`<th scope="col">${esc(name)}</th>`).join("")
+    state.names.map((name,seat)=>`<th scope="col">${esc(name)}${reflectionMark(name,seat)}</th>`).join("")
   }<th scope="col">Kör összesen</th></tr></thead><tbody>${visible.map(({round,i})=>`
     <tr class="${round.played?"after-negotiation":""}"><th scope="row">${i+1}. kör <small>×${round.multiplier}${round.played?` · Tárgyalás${round.played>1?" ×"+round.played:""}`:""}</small></th>${
       round.moves.map((move,j)=>`<td>${tag(move)} <small class="cell-score">${score(round.scores[j])}${round.manual?.[j]?" · kézi":""}</small>${noteMark(round,i,j)}</td>`).join("")
@@ -129,7 +134,7 @@ function projection() {
     const pages=Math.ceil(state.rounds.filter(x=>x.scored).length/projectionPageSize);
     return `<div class="project ${focus?"":"project-results"}"><p class="kicker">Feldolgozás</p><h1>${focus?`${state.focus+1}. kör · ×${focus.multiplier}`:"Végeredmény"}</h1>${
       focus?`<p class="large">${split(focus.countX)}</p><div class="focusTeams">${state.names.map((n,i)=>`<div><strong>${esc(n)}</strong>${tag(focus.moves[i])}<span>${score(focus.scores[i])}</span></div>`).join("")}</div>${focus.played?`<p>Tárgyalás a kör előtt · ${focus.played}</p>`:""}`
-      :timeline()+`<div class="project-legend">${state.rounds.some(r=>r.noteFlags?.some(Boolean))?`<span>${noteIcon} Körjegyzet</span>`:""}${pages>1?`<nav aria-label="Döntéstábla lapozása">${btn("← Előző","project-page",'data-step="-1"',"",projectionPage===0)} <span>${projectionPage+1} / ${pages}</span> ${btn("Következő →","project-page",'data-step="1"',"",projectionPage>=pages-1)}</nav>`:""}</div>`
+      :timeline()+`<div class="project-legend">${state.rounds.some(r=>r.noteFlags?.some(Boolean))?`<span>${noteIcon} Körjegyzet</span>`:""}${state.projectorReflections?.some(Boolean)?`<span>${reflectionIcon} Csapatreflexió</span>`:""}${pages>1?`<nav aria-label="Döntéstábla lapozása">${btn("← Előző","project-page",'data-step="-1"',"",projectionPage===0)} <span>${projectionPage+1} / ${pages}</span> ${btn("Következő →","project-page",'data-step="1"',"",projectionPage>=pages-1)}</nav>`:""}</div>`
     }</div>`;
   }
   return `<div class="project"><p class="kicker">${state.index+1}. kör${now.multiplier?" · ×"+now.multiplier:""}</p><h1>${{ready:"Következő kör",negotiation:"Tárgyalás",open:"Döntésre nyitva",result:split(now.countX)}[phase]}</h1>${phase==="open"?'<div class="projectXY">X<span>/</span>Y</div>':""}</div>`;
@@ -220,14 +225,22 @@ screen.addEventListener("click",e=>{
   if(act==="screen"){void run(act,{mode});return;}
   if(act==="results"){void run("focus",{index:null});return;}
   if(act==="show-note"){void run("screen",{mode:"note",round:Number(b.dataset.round),seat:Number(seat),anonymous:true});return;}
-  if(act==="read-note" && projector){
+  if((act==="read-note" || act==="read-reflection") && projector){
     const index=Number(b.dataset.round);
-    const note=state.rounds[index]?.projectorNotes?.[Number(seat)];
-    if(!note) return;
+    const isReflection=act==="read-reflection";
+    const comment=isReflection?state.projectorReflections?.[Number(seat)]:state.rounds[index]?.projectorNotes?.[Number(seat)];
+    if(!comment) return;
+    const context=isReflection?state.names[Number(seat)]:`${index+1}. kör · ${state.names[Number(seat)]}`;
     dialog.classList.add("project-note");
-    dialog.innerHTML=`<form method="dialog"><p class="kicker">${index+1}. kör</p><h2>Körjegyzet</h2><p class="project-note-text">${esc(note)}</p><button class="primary">Vissza a táblához</button></form>`;
+    dialog.innerHTML=`<form method="dialog"><p class="kicker">${esc(context)}</p><h2>${isReflection?"Csapatreflexió":"Körjegyzet"}</h2><p class="project-note-text">${esc(comment)}</p><button class="primary">Vissza a táblához</button></form>`;
     dialog.addEventListener("close",()=>{dialog.classList.remove("project-note");render();},{once:true});
     dialog.showModal();
+    const commentBox=dialog.querySelector(".project-note-text");
+    let size=parseFloat(getComputedStyle(commentBox).fontSize);
+    while(dialog.scrollHeight>dialog.clientHeight+1 && size>9){
+      size=Math.max(9,size*.9);
+      commentBox.style.fontSize=size+"px";
+    }
     return;
   }
   if(act==="project-page"){projectionPage+=Number(b.dataset.step);render(true);return;}

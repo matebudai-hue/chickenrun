@@ -49,6 +49,7 @@ function view(s, auth) {
     totals:host || s.phase === "finished" && projector ? total : undefined,
     ownTotal:total[seat], ownReflection:reflections[seat],
     reflections:host ? reflections : undefined,
+    projectorReflections:projector && s.phase === "finished" ? reflections : undefined,
     projectedReflection:projector && s.mode === "reflection" ? {text:reflections[s.screenSeat],name:s.anonymous ? "" : names(s)[s.screenSeat]} : undefined,
     projectedNote:projector && s.mode === "note" ? {
       text:s.rounds[s.screenRound]?.notes[s.screenSeat], round:s.screenRound,
