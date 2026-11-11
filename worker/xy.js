@@ -14,7 +14,7 @@ const totals = s => Array.from({length:4}, (_,i) => s.rounds.reduce((sum,r) => s
 const names = s => s.teams.map((t,i) => t?.name || `${i+1}. csapat`);
 function resultReport(s) {
   return {code:s.code,names:names(s),totals:totals(s),createdAt:new Date().toISOString(),
-    rounds:s.rounds.flatMap((r,i)=>r.scores || r.notes.some(Boolean) ? [{
+    rounds:s.rounds.flatMap((r,i)=>r.scores || r.played || r.notes.some(Boolean) ? [{
       number:i+1,multiplier:r.multiplier,negotiations:r.played,moves:r.scores?r.moves:null,
       scores:r.scores ?? null,notes:r.notes
     }] : []),reflections:s.teams.map(t=>t?.reflection || "")};

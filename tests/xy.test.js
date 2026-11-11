@@ -95,6 +95,8 @@ test("four teams, negotiations, concurrent moves, recovery, projection and refle
   await Promise.all([b,c,d].map(key=>call("move",key,{index:1,choice:"Y"})));
   await call("close",host,{index:1});
   await call("next",host,{index:1});
+  await call("negotiation",host,{index:2});
+  await call("resume",host,{index:2});
   await call("open",host,{index:2});
   await call("move",replacement,{index:2,choice:"X"});
   const early=await call("finish",host,{index:2});
@@ -126,7 +128,10 @@ test("four teams, negotiations, concurrent moves, recovery, projection and refle
   assert.equal(teamView.rounds[0].moves,undefined);
   assert.equal(teamView.rounds[0].scores,undefined);
   await call("report",b,undefined,403);
-  assert.equal((await call("report",host)).rounds[0].notes[0],"Első kör");
+  const hostReport=await call("report",host);
+  assert.equal(hostReport.rounds[0].notes[0],"Első kör");
+  assert.equal(hostReport.rounds[2].negotiations,1);
+  assert.equal(hostReport.rounds[2].scores,null);
   await call("reportshare",b,{enabled:true},403);
   await call("reportshare",host,{enabled:true});
   assert.equal((await call("",b)).reportShared,true);

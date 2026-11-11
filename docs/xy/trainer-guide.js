@@ -52,6 +52,7 @@ export const trainerGuide = `
     <section id="guide-controls">
       <h3>A felület használata</h3>
       <p>A játékhoz nyisd meg és zárd le a köröket. A tétemelés, a tárgyalás, a kivetítés és a PDF használata a te döntésed. A telefoncsere és a kézi bevitel akkor segít, ha valamelyik csapat elakad.</p>
+      <p>A <strong>Tréneri játékleírás</strong> gombot az <strong>Üres vászon</strong> jobb oldalán találod. Az útmutató külön ablakban nyílik meg, így közben a tréneri vezérlőn is dolgozhatsz.</p>
 
       <h4>Csatlakozás és az első kör</h4>
       <p>A nyitóoldalon állítsd be a <strong>Fordulók száma</strong> mezőt, majd kattints az <strong>Új játék és QR-kód</strong> gombra. Csapatonként egy telefon olvassa be a QR-kódot. A szobakóddal is be lehet lépni. Négy betöltött csapathelynél válik elérhetővé a <strong>Játék indítása</strong>. Ekkor még várnak a csapatok. Az első döntést a <strong>Kör megnyitása</strong> gombbal indítod.</p>
@@ -66,6 +67,8 @@ export const trainerGuide = `
         <li><strong>Menet közben beiktatott tárgyalás.</strong> Ha a következő döntési kör még nincs nyitva, és nincs hátra tervezett tárgyalás, a <strong>Tárgyalás beszúrása</strong> rögtön elindít egyet. A felület jelzi a tárgyalást a telefonokon. Az időt te méred.</li>
       </ul>
 
+      <p>A tréneri táblán, a kivetített végeredményben és a PDF-ben a <strong>Tárgyalás következik</strong> felirat az előző kör sorában, a kék vonal fölött van. Ha a 2. kör után tárgyaltatok, a felirat a 2. körhöz kerül, a vonal pedig a 2. és a 3. kör közé.</p>
+
       <h4>Ha egy telefon kiesik</h4>
       <p>Ha a csapat mellett megszakadt kapcsolatot jelző pont jelenik meg, először kérd meg őket, hogy nyissák meg újra a játékot ugyanazon a telefonon, ugyanabban a böngészőben. Ha készüléket cserélnek, a csapat mellett kattints a <strong>Telefoncsere</strong> gombra. Az új telefon olvassa be az egyszer használható QR-kódot, vagy nyissa meg a hozzá tartozó belépőt, majd válassza a <strong>Csatlakozás</strong> gombot. A csapat ugyanazon a helyen folytatja, a neve, pontjai és mentett döntései megmaradnak.</p>
       <p>Ha csak a mostani döntés leadása akadt el, a nyitott körben a csapat mellett válaszd a <strong>Kézi döntés</strong> gombot. A csapat által megadott X-et vagy Y-t rögzítsd. Ez a gomb addig érhető el, amíg onnan még nem érkezett döntés. Ha egy csapat már az elején telefon nélkül játszik, a váróban a <strong>Kézi hely</strong> gombbal adj neki helyet. Utána minden körben rögzítheted a választását. Ha a tréneri lapot zártad be véletlenül, ugyanabban a böngészőben a nyitóoldalon keresd a <strong>Legutóbbi tréneri szoba</strong> gombot.</p>
@@ -73,7 +76,7 @@ export const trainerGuide = `
       <h4>A gyakorlat lezárása</h4>
       <p>Az utolsó lepontozott kör után kattints a <strong>Játék lezárása és reflexiók</strong> gombra. Ha korábban állítod le a gyakorlatot, válaszd a <strong>Játék lezárása</strong> gombot, és erősítsd meg. A már lezárt körök pontjai megmaradnak. Ha ekkor épp nyitva van egy kör, annak döntései kimaradnak a pontozásból. A lezárás után a csapatok elküldhetik a reflexiójukat.</p>
 
-      <p>Ha túl korán zártad le a játékot, a <strong>Tovább játszom</strong> gombbal folytathatod. Ha már lepontoztad a kört, a <strong>Következő kör</strong> gombbal lépsz tovább. Ha a kör még nyitva volt, ugyanaz a kör nyílik vissza a már leadott döntésekkel. A lezárt körök pontjai megmaradnak. Folytatáskor a korábban megosztott PDF letöltési lehetősége megszűnik. Az új végeredményt a következő lezárás után oszthatod meg.</p>
+      <p>Ha a 10. kör előtt lezárod a játékot, például a 7. körben, a <strong>Tovább játszom</strong> gombbal folytathatod. Más körszámnál ugyanez érvényes, amíg van hátra pontozatlan kör. Ha már lepontoztad az utolsó lejátszott kört, a <strong>Következő kör</strong> gombbal lépsz tovább. Ha a kör még nyitva volt, ugyanaz a kör nyílik vissza a már leadott döntésekkel. A lezárt körök pontjai megmaradnak. Folytatáskor a korábban megosztott PDF letöltési lehetősége megszűnik. Az új végeredményt a következő lezárás után oszthatod meg.</p>
 
       <h4>Kivetítés és kommentek a kivezetésben</h4>
       <p>A <strong>Kivetítő megnyitása</strong> külön böngészőfület nyit. Ezt a fület tedd a vászonra. Ha később akarod megmutatni a végeredményt, a játék lezárása előtt állítsd le a vászon megosztását vagy zárd be a kivetítőfület. A lezárás ugyanis automatikusan a végeredményre vált. Ha közben más képet szeretnél mutatni, még a kivetítő visszakapcsolása előtt válaszd a <strong>Pontozási mátrix</strong> vagy az <strong>Üres vászon</strong> nézetet.</p>

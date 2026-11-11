@@ -1,5 +1,5 @@
 import { command, readState, saved, secret } from "../connection.js?v=5";
-import { createReportPdf } from "./report-pdf.js?v=2";
+import { createReportPdf } from "./report-pdf.js?v=3";
 
 const $ = id => document.getElementById(id);
 const screen = $("screen"), dialog = $("dialog"), signal = $("signal");
@@ -28,6 +28,7 @@ const rnd = () => Array.from(crypto.getRandomValues(new Uint8Array(6)),n=>"ABCDE
 const setError = message => { $("error").textContent=message; $("error").hidden=!message; };
 const r = () => state.rounds[state.index];
 const split = count => `${count} X · ${4-count} Y`;
+const negotiationAfter = count => `Tárgyalás következik${count>1?` (×${count})`:""}`;
 function matrix(multiplier) {
   return `<table class="matrix"><thead><tr><th>A négy döntés</th><th>Egy X pontja</th><th>Egy Y pontja</th></tr></thead><tbody>${
     [[0,null,10],[1,30,-10],[2,20,-20],[3,10,-30],[4,-10,null]].map(([x,a,b])=>`<tr><th>${split(x)}</th>${
@@ -72,10 +73,14 @@ function timeline() {
   const sum = values => values.reduce((a,b)=>a+b,0);
   return `<div class="scroll"><table class="timeline"><thead><tr><th scope="col">Kör</th>${
     state.names.map((name,seat)=>`<th scope="col">${esc(name)}${reflectionMark(name,seat)}</th>`).join("")
-  }<th scope="col">Kör összesen</th></tr></thead><tbody>${visible.map(({round,i})=>`
-    <tr class="${round.played?"after-negotiation":""}"><th scope="row">${i+1}. kör <small>×${round.multiplier}${round.played?` · Tárgyalás${round.played>1?" ×"+round.played:""}`:""}</small></th>${
+  }<th scope="col">Kör összesen</th></tr></thead><tbody>${visible.map(({round,i})=>{
+    const after=state.rounds[i+1]?.played;
+    const beforeFirst=i===0 && round.played;
+    return `
+    <tr class="${beforeFirst?"negotiation-before-first ":""}${after?"negotiation-follows":""}"><th scope="row">${i+1}. kör <small>×${round.multiplier}</small>${beforeFirst?`<small class="negotiation-label">Tárgyalás az első kör előtt${round.played>1?` (×${round.played})`:""}</small>`:""}${after?`<small class="negotiation-label">${negotiationAfter(after)}</small>`:""}</th>${
       round.moves.map((move,j)=>`<td>${tag(move)} <small class="cell-score">${score(round.scores[j])}${round.manual?.[j]?" · kézi":""}</small>${noteMark(round,i,j)}</td>`).join("")
-    }<td class="total">${score(sum(round.scores))}</td></tr>`).join("")}</tbody><tfoot><tr class="group"><th scope="row">Összpont</th>${
+    }<td class="total">${score(sum(round.scores))}</td></tr>`;
+  }).join("")}</tbody><tfoot><tr class="group"><th scope="row">Összpont</th>${
     state.totals.map(total=>`<td class="total">${score(total)}</td>`).join("")
   }<td class="total">${score(sum(state.totals))}</td></tr></tfoot></table></div>`;
 }
@@ -103,8 +108,8 @@ function hostView() {
   if (state.canContinue) action=btn("Tovább játszom","continue","","primary")+action;
   return `<section class="hero board"><div><p class="kicker">Tréneri vezérlő · ${code}</p><h1>${title}</h1><p>${desc}</p></div><div class="weight"><span>${state.index+1} / ${state.rounds.length}. kör</span>${weight}</div><div class="actions">${action}</div></section>
   <div class="teams-panel ${phase==="lobby"?"with-qr":""}">${roster()}${phase==="lobby"?qrBlock():""}</div>
-  <section class="paper tools"><div class="trainer-links"><a href="${screenUrl()}" target="_blank" rel="noopener">Kivetítő megnyitása ↗</a><a href="./trainer-guide.html?v=2" target="_blank" rel="noopener" data-guide-window>Tréneri játékleírás ↗</a></div>
-  <div class="actions">${[[phase==="finished"?"Élő nézet":"Játéknézet · mátrix","live"],...(phase==="finished"?[["Pontozási mátrix","matrix"]]:[]),["QR-kód","join"],["Üres vászon","blank"]].map(([label,mode])=>btn(label,"screen",`data-mode="${mode}" aria-pressed="${state.mode===mode || phase!=="finished" && mode==="live" && state.mode==="matrix"}"`)).join("")}</div></section>
+  <section class="paper tools"><div class="trainer-links"><a href="${screenUrl()}" target="_blank" rel="noopener">Kivetítő megnyitása ↗</a></div>
+  <div class="actions">${[[phase==="finished"?"Élő nézet":"Játéknézet · mátrix","live"],...(phase==="finished"?[["Pontozási mátrix","matrix"]]:[]),["QR-kód","join"],["Üres vászon","blank"]].map(([label,mode])=>btn(label,"screen",`data-mode="${mode}" aria-pressed="${state.mode===mode || phase!=="finished" && mode==="live" && state.mode==="matrix"}"`)).join("")}<a class="guide-button" href="./trainer-guide.html?v=3" target="_blank" rel="noopener" data-guide-window>Tréneri játékleírás</a></div></section>
   <section class="paper report"><h2>Döntések és pontok</h2>${timeline()}
   ${phase==="finished"?`<label class="focus">Kiemelt forduló a vásznon<select id="focus"><option value="">Teljes döntéssor</option>${state.rounds.map((round,i)=>round.scored?`<option value="${i}" ${state.focus===i?"selected":""}>${i+1}. kör</option>`:"").join("")}</select></label>`:""}</section>
   ${phase==="finished"?`<section class="paper host-reflections"><h2>Csapatreflexiók</h2><div class="reflections">${state.reflections.map((t,i)=>`<article><h3>${esc(state.names[i])}</h3><p>${esc(t || "Várjuk a reflexiót.")}</p>${t?btn("Kivetítés név nélkül","reflect",`data-seat="${i}"`,"quiet")+btn("Névvel","reflect",`data-seat="${i}" data-named="1"`,"quiet"):""}</article>`).join("")}</div></section>`:schedule()}`;

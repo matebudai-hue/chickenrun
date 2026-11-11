@@ -29,8 +29,9 @@ a{color:inherit;text-underline-offset:.2em}small{font-size:.78em}.kicker{font-si
 label{display:grid;gap:.35rem;font-size:.85rem;font-weight:650}input,select,textarea,button{font:inherit}
 input,select,textarea{border:1px solid #a8b5c8;border-radius:3px;background:#fff;padding:.62rem .7rem;color:var(--ink);min-height:42px;max-width:100%}
 input[type=number]{width:7.5rem}textarea{resize:vertical;width:100%}
-button{border:1px solid #a8b5c8;border-radius:3px;background:var(--paper);color:var(--ink);padding:.65rem .9rem;min-height:42px;font-weight:720;cursor:pointer;line-height:1.15}
-button:hover,[aria-pressed=true]{background:var(--ice);border-color:var(--blue)}button:disabled{opacity:.43;cursor:default}
+button,.guide-button{border:1px solid #a8b5c8;border-radius:3px;background:var(--paper);color:var(--ink);padding:.65rem .9rem;min-height:42px;font-weight:720;cursor:pointer;line-height:1.15}
+.guide-button{display:inline-flex;align-items:center;text-decoration:none;background:#eaf1f8;border-color:#b0c1d5}
+button:hover,.guide-button:hover,[aria-pressed=true]{background:var(--ice);border-color:var(--blue)}button:disabled{opacity:.43;cursor:default}
 .primary{background:#2461b8;border-color:#2461b8;color:white}.primary:hover{background:#174781;color:white}.hero .primary{background:#a6cbff;border-color:#a6cbff;color:var(--ink)}.hero .primary:hover{background:#d1e4ff}
 .quiet,.link{font-size:.76rem;min-height:35px;padding:.35rem .5rem}.link,.ghost{background:transparent}.link{border-color:transparent;text-decoration:underline;text-underline-offset:.2em}.ghost{color:white;margin-top:1rem}.ghost:hover{color:var(--ink)}
 :focus-visible{outline:3px solid #4085eb;outline-offset:3px}
@@ -72,7 +73,7 @@ dialog{color:var(--ink);background:var(--paper);border:1px solid var(--line);bor
 .trainer .weight strong{font-size:1.55rem;letter-spacing:-.04em}
 .trainer .quick-weight{display:flex;align-items:center;gap:.35rem;font-size:.72rem;margin-top:.2rem}
 .trainer .quick-weight select{min-height:1.8rem;padding:.1rem .25rem;background:#f2f7ff}
-.trainer button,.trainer .schedule input,.trainer .schedule select,.trainer .focus select{min-height:1.95rem;padding:.26rem .52rem;font-size:.77rem}
+.trainer button,.trainer .tools .guide-button,.trainer .schedule input,.trainer .schedule select,.trainer .focus select{min-height:1.95rem;padding:.26rem .52rem;font-size:.77rem}
 .trainer .seat{padding:.36rem .48rem;gap:.15rem .38rem;min-height:2.5rem}
 .trainer .seat strong{font-size:.85rem}.trainer .seat .link{padding:.15rem .22rem;font-size:.69rem}
 .trainer .seatNo{font-size:.65rem}.trainer .seat .quiet{font-size:.7rem}
@@ -91,8 +92,9 @@ dialog{color:var(--ink);background:var(--paper);border:1px solid var(--line);bor
 .trainer .timeline .chip{padding:.08rem .22rem}
 .timeline{table-layout:fixed}
 .timeline th,.timeline td{overflow-wrap:anywhere}
-.timeline .after-negotiation>*{border-top:4px solid #1a53a3}
-.timeline .after-negotiation th small{color:#1a53a3;font-weight:750}
+.timeline .negotiation-before-first>*{border-top:4px solid #1a53a3}
+.timeline .negotiation-follows>*{border-bottom:4px solid #1a53a3}
+.timeline .negotiation-label{display:block;color:#1a53a3;font-weight:750}
 .timeline td .cell-score{display:inline-block;margin-left:.15em}
 .trainer .report .scroll{overflow-x:auto;overflow-y:hidden}
 .trainer .timeline th:first-child{left:auto}

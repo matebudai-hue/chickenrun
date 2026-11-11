@@ -66,13 +66,19 @@ function reportLayout(ctx, data, width, height, size, paint=false) {
   headers.forEach((ls,i)=>ls.forEach((s,j)=>line(s,columns[i]+5,y+4+j*size*1.18,"#ffffff")));
   y+=headH;
   const played=data.rounds.filter(r=>r.scores);
+  const roundsByNumber=new Map(data.rounds.map(round=>[round.number,round]));
   for(const [i,r] of played.entries()){
     font(size,true);
-    const roundLabel=wrap(ctx,`${r.number}. kör · ×${r.multiplier}${r.negotiations?" · Tárgyalás"+(r.negotiations>1?" ×"+r.negotiations:""):""}`,widths[0]-10);
-    const actualHeight=rowHeight+(roundLabel.length-1)*size*1.18;
+    const after=roundsByNumber.get(r.number+1)?.negotiations;
+    const beforeFirst=r.number===1 && r.negotiations;
+    const roundLabel=wrap(ctx,`${r.number}. kör · ×${r.multiplier}`,widths[0]-10);
+    const negotiation=beforeFirst?wrap(ctx,`Tárgyalás az első kör előtt${beforeFirst>1?` (×${beforeFirst})`:""}`,widths[0]-10):[];
+    const following=after?wrap(ctx,`Tárgyalás következik${after>1?` (×${after})`:""}`,widths[0]-10):[];
+    const actualHeight=rowHeight+(roundLabel.length+negotiation.length+following.length-1)*size*1.18;
     rect(margin,y,span,actualHeight,i%2?"#ffffff":pale);
-    if(r.negotiations) rect(margin,y,span,1.4,blue);
-    roundLabel.forEach((label,i)=>line(label,columns[0]+5,y+size*.32+i*size*1.18));
+    if(beforeFirst) rect(margin,y,span,1.4,blue);
+    if(after) rect(margin,y+actualHeight-1.4,span,1.4,blue);
+    [...roundLabel,...negotiation,...following].forEach((label,i)=>line(label,columns[0]+5,y+size*.32+i*size*1.18,i<roundLabel.length?ink:blue));
     r.moves.forEach((v,j)=>{
       const x=columns[j+1]+5;
       font(size,true);line(v,x,y+size*.32,v==="X"?ink:blue);
