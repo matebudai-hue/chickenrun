@@ -39,7 +39,8 @@ function matrixFold() {
 function roster() {
   return `<div class="roster">${state.occupied.map((yes,i)=>{
     const move=r().moves?.[i], label=yes ? state.names[i] : "Szabad csapathely";
-    return `<div class="seat"><span class="seatNo">0${i+1}</span><strong>${esc(label)}</strong>
+    const away = state.presence?.[i] === "offline";
+    return `<div class="seat"><span class="seatNo">0${i+1}</span><strong class="${away?"away":""}" ${away?'title="A telefon egy ideje nem jelentkezett"':""}>${esc(label)}${away?'<span class="away-dot" aria-hidden="true"></span><span class="sr-only"> · Nincs kapcsolat</span>':""}</strong>
       ${state.phase==="open" ? (move ? tag(move,move+(r().manual[i]?" · kézi":"")) : btn("Kézi döntés","manual",`data-seat="${i}"`,"quiet")) :
          state.phase==="lobby" ? btn(yes?"Eltávolítás":"Kézi hely","seat",`data-seat="${i}"`,"quiet") : `<span class="total">${score(state.totals[i])}</span>`}
       ${yes ? btn("Telefoncsere","transfer",`data-seat="${i}"`,"link") : ""}</div>`;
@@ -51,14 +52,15 @@ function qrBlock() {
 function timeline() {
   const visible = state.rounds.map((round,i)=>({round,i})).filter(({round})=>round.scored);
   if (!visible.length) return '<p class="muted">A lezárt körök itt jelennek meg.</p>';
-  const marker = (round,i,head=false) => round.played ? (head ? `<th class="neg" title="${round.played} tárgyalás a ${i+1}. kör előtt">T${round.played>1?" · "+round.played:""}</th>` : '<td class="neg"></td>') : "";
-  return `<div class="scroll"><table class="timeline"><thead><tr><th>Csapat</th><th>Összpont</th>${
-    visible.map(({round,i})=>marker(round,i,true)+`<th>${i+1}. kör <small>×${round.multiplier}</small></th>`).join("")
-  }</tr></thead><tbody>${state.names.map((name,j)=>`<tr><th>${esc(name)}</th><td class="total">${score(state.totals[j])}</td>${
-    visible.map(({round,i})=>marker(round,i)+`<td>${tag(round.moves[j])}<small>${score(round.scores[j])}${round.manual?.[j]?" · kézi":""}</small></td>`).join("")
-  }</tr>`).join("")}<tr class="group"><th>Együttesen</th><td>${score(state.totals.reduce((a,b)=>a+b,0))}</td>${
-    visible.map(({round,i})=>marker(round,i)+`<td>${score(round.scores.reduce((a,b)=>a+b,0))}</td>`).join("")
-  }</tr></tbody></table></div>`;
+  const sum = values => values.reduce((a,b)=>a+b,0);
+  return `<div class="scroll"><table class="timeline"><thead><tr><th scope="col">Kör</th>${
+    state.names.map(name=>`<th scope="col">${esc(name)}</th>`).join("")
+  }<th scope="col">Kör összesen</th></tr></thead><tbody>${visible.map(({round,i})=>`
+    <tr class="${round.played?"after-negotiation":""}"><th scope="row">${i+1}. kör <small>×${round.multiplier}${round.played?` · Tárgyalás${round.played>1?" ×"+round.played:""}`:""}</small></th>${
+      round.moves.map((move,j)=>`<td>${tag(move)} <small class="cell-score">${score(round.scores[j])}${round.manual?.[j]?" · kézi":""}</small></td>`).join("")
+    }<td class="total">${score(sum(round.scores))}</td></tr>`).join("")}</tbody><tfoot><tr class="group"><th scope="row">Összpont</th>${
+    state.totals.map(total=>`<td class="total">${score(total)}</td>`).join("")
+  }<td class="total">${score(sum(state.totals))}</td></tr></tfoot></table></div>`;
 }
 function schedule() {
   return `<details class="paper fold"><summary>Menetrend <span>${state.rounds.length} kör</span></summary>
@@ -125,7 +127,8 @@ function render(force=false) {
   const next=JSON.stringify(state);
   if (!force && (next===signature || dialog.open || screen.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) return;
   const opened=[...screen.querySelectorAll("details")].map(x=>x.open);
-  const scroll=screen.querySelector(".scroll")?.scrollLeft || 0;
+  const previousTable=screen.querySelector(".scroll");
+  const scroll=[previousTable?.scrollLeft || 0,previousTable?.scrollTop || 0];
   signature=next;
   document.body.classList.toggle("projection",projector);
   document.body.classList.toggle("trainer",!!state?.host);
@@ -133,7 +136,7 @@ function render(force=false) {
   document.body.classList.toggle("blackout",projector&&state?.mode==="blank");
   screen.innerHTML=!state?startView():state.host?hostView():projector?projection():participant();
   screen.querySelectorAll("details").forEach((d,i)=>d.open=opened[i]||false);
-  if (screen.querySelector(".scroll")) screen.querySelector(".scroll").scrollLeft=scroll;
+  screen.querySelector(".scroll")?.scrollTo(...scroll);
   if ($("qr") && window.qrcode) {
     const qr=window.qrcode(0,"M"); qr.addData(joinUrl()); qr.make();
     $("qr").innerHTML=qr.createSvgTag({cellSize:5,margin:20,scalable:true,alt:"Csatlakozási QR-kód"});
@@ -224,12 +227,16 @@ screen.addEventListener("submit",async e=>{
   else if(kind==="note") await run(kind,{index,text:b.text});
   else await run(kind,{text:b.text});
 });
+let lastPulse=0, pollTimer;
 async function poll() {
+  clearTimeout(pollTimer);
   if (!busy && !pending && key && pattern.test(code)) {
     pending=true;
     const requestedAt=revision;
     try {
-      const next=await readState(endpoint(),key);
+      const pulse=!document.hidden && !projector && (!state || state.seat>=0) && Date.now()-lastPulse>=5000;
+      const next=await readState(endpoint()+(pulse?"?pulse=1":""),key);
+      if(pulse) lastPulse=Date.now();
       if(!busy && revision===requestedAt){state=next;signal.textContent="Kapcsolódva";setError("");render();}
     } catch(e) {
       signal.textContent="Kapcsolat keresése…";
@@ -237,7 +244,8 @@ async function poll() {
       else if(e.status===404 || e.status===403)setError(e.message);
     } finally {pending=false;}
   }
-  setTimeout(poll,document.hidden?4500:1250);
+  pollTimer=setTimeout(poll,document.hidden?4500:1250);
 }
+document.addEventListener("visibilitychange",()=>{if(!document.hidden){lastPulse=0;void poll();}});
 render(true);
 void poll();

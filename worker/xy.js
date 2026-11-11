@@ -11,6 +11,17 @@ const choice = x => x === "X" || x === "Y";
 const current = s => s.rounds[s.index];
 const totals = s => Array.from({length:4}, (_,i) => s.rounds.reduce((sum,r) => sum + (r.scores?.[i] ?? 0),0));
 const names = s => s.teams.map((t,i) => t?.name || `${i+1}. csapat`);
+const presenceWindow = 14_000;
+async function presentView(s, auth, store, id, pulse = false) {
+  const result = view(s,auth);
+  if (result.seat >= 0 && pulse) await store.pulse(id,auth).catch(() => {});
+  if (result.host) {
+    const seen = await store.seen(id);
+    result.presence = s.teams.map(t => !t ? null : !t.key ? "manual" :
+      (seen.get(t.key) ?? 0) > Date.now()-presenceWindow ? "online" : "offline");
+  }
+  return result;
+}
 function view(s, auth) {
   const host = s.host === auth;
   const projector = s.projector === auth;
@@ -131,7 +142,8 @@ function action(s, auth, act, b, transfer) {
 export async function xyApi(req, store) {
   const reply = (data,status=200) => Response.json(data,{status,headers:{"Cache-Control":"no-store"}});
   try {
-    const path = new URL(req.url).pathname;
+    const url = new URL(req.url);
+    const path = url.pathname;
     if (req.method !== "GET" && req.method !== "POST") fail(405,"Érvénytelen kérés.");
     let b = {};
     if (req.method === "POST") {
@@ -166,8 +178,10 @@ export async function xyApi(req, store) {
       const row = await store.get(id);
       if (!row || row.expires_at <= Date.now()) fail(404,"A szoba nem található vagy lejárt.");
       const s = JSON.parse(row.state);
-      if (!act || action(s,auth,act,b,transfer) === false) return reply(view(s,auth));
-      if (await store.put(id,row.revision,JSON.stringify(s))) return reply(view(s,auth));
+      if (!act || action(s,auth,act,b,transfer) === false)
+        return reply(await presentView(s,auth,store,id,act === "join" || url.searchParams.has("pulse")));
+      if (await store.put(id,row.revision,JSON.stringify(s)))
+        return reply(await presentView(s,auth,store,id,true));
     }
     return reply({error:"Több döntés érkezett egyszerre. Próbáld újra."},503);
   } catch (err) {

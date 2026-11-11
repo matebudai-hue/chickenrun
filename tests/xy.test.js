@@ -12,13 +12,16 @@ test("paper payouts at every supported stake", () => {
 
 test("four teams, negotiations, concurrent moves, recovery, projection and reflections", async () => {
   const store=memoryStore();
+  const originalSeen=store.seen;
+  let agePresence=false;
+  store.seen=code=>new Map([...originalSeen(code)].map(([key,time])=>[key,time-(agePresence?15000:0)]));
   const [host,projector,a,b,c,d,replacement,invite,outsider]=Array.from({length:9},(_,i)=>String(i+1).repeat(32));
   const code="ABC234";
   const teams=[a,b,c,d];
   const call=async(act,key,body,status=200)=>{
-    const path=act==="create"?"/api/xy/rooms":"/api/xy/rooms/"+code+(act?"/"+act:"");
+    const path=act==="create"?"/api/xy/rooms":"/api/xy/rooms/"+code+(act==="pulse"?"?pulse=1":act?"/"+act:"");
     const response=await xyApi(new Request("https://example.test"+path,{
-      method:act?"POST":"GET",headers:key?{authorization:"Bearer "+key}:{},body:act?JSON.stringify(body||{}):undefined
+      method:act&&act!=="pulse"?"POST":"GET",headers:key?{authorization:"Bearer "+key}:{},body:act&&act!=="pulse"?JSON.stringify(body||{}):undefined
     }),store);
     const data=await response.json();
     assert.equal(response.status,status,JSON.stringify(data));
@@ -28,6 +31,13 @@ test("four teams, negotiations, concurrent moves, recovery, projection and refle
   await call("create",null,{code,key:host,projector,rounds:2});
   await call("start",host,{},409);
   await Promise.all(teams.map((key,i)=>call("join",key,{name:"Team "+(i+1)})));
+  assert.deepEqual((await call("",host)).presence,Array(4).fill("online"));
+  agePresence=true;
+  assert.deepEqual((await call("",host)).presence,Array(4).fill("offline"));
+  agePresence=false;
+  await call("pulse",a);
+  assert.equal((await call("",host)).presence[0],"online");
+  assert.equal((await call("",a)).presence,undefined);
   await call("join",outsider,{name:"Fifth"},409);
   await call("config",host,{index:0,multiplier:1000,negotiations:2});
   await call("start",host,{});
