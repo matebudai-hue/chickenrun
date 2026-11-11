@@ -34,7 +34,8 @@ function matrix(multiplier) {
     }</tbody></table>`;
 }
 function matrixFold() {
-  return `<details class="paper fold"><summary>Pontozási mátrix <span>×${r().multiplier}</span></summary>${matrix(r().multiplier)}</details>`;
+  const multiplier=r().multiplier;
+  return `<details class="paper fold"><summary>Pontozási mátrix <span>${multiplier ? "×"+multiplier : "Alappontok"}</span></summary>${matrix(multiplier ?? 1)}</details>`;
 }
 function roster() {
   return `<div class="roster">${state.occupied.map((yes,i)=>{
@@ -91,6 +92,7 @@ function hostView() {
   if (phase==="negotiation") {title="Tárgyalás";desc="A résztvevőknél a tárgyalás jelzése látszik.";action=btn("Tárgyalás lezárása","resume","","primary");}
   if (phase==="open") {title="Döntésre nyitva";desc=`${count}/4 döntés beérkezett`;action=btn("Kör lezárása","close","","primary",count!==4);}
   if (phase==="result") {title=split(now.countX);desc="A kör lezárult, a csapatok látják a saját pontjukat.";action=btn(state.index+1===state.rounds.length?"Játék lezárása és reflexiók":"Következő kör",state.index+1===state.rounds.length?"finish":"next","","primary");}
+  if (["ready","negotiation","open"].includes(phase) || phase==="result" && state.index+1<state.rounds.length) action+=btn("Játék lezárása","finish");
   if (phase==="finished") {title="Feldolgozás";desc=`${state.reflections.filter(Boolean).length}/4 reflexió beérkezett`;action=btn("Végeredmény kivetítése","results","","primary")+btn("CSV letöltése","csv")+btn(state.revealed?"Csapatriport elrejtése":"Csapatriport megosztása","reveal");}
   const weight = ["lobby","ready","negotiation"].includes(phase) ? `<label class="quick-weight">Körszorzó<select id="quick-weight">${options.map(n=>`<option value="${n}" ${n===now.multiplier?"selected":""}>×${n}</option>`).join("")}</select></label>` : `<strong>×${now.multiplier}</strong>`;
   return `<section class="hero board"><div><p class="kicker">Tréneri vezérlő · ${code}</p><h1>${title}</h1><p>${desc}</p></div><div class="weight"><span>${state.index+1} / ${state.rounds.length}. kör</span>${weight}</div><div class="actions">${action}</div></section>
@@ -98,16 +100,16 @@ function hostView() {
   <section class="paper tools"><div><a href="${screenUrl()}" target="_blank" rel="noopener">Kivetítő megnyitása ↗</a></div>
   <div class="actions">${[["Élő nézet","live"],["Pontozási mátrix","matrix"],["QR-kód","join"],["Üres vászon","blank"]].map(([label,mode])=>btn(label,"screen",`data-mode="${mode}" aria-pressed="${state.mode===mode}"`)).join("")}</div></section>
   <section class="paper report"><h2>Döntések és pontok</h2>${timeline()}
-  ${phase==="finished"?`<label class="focus">Kiemelt forduló a vásznon<select id="focus"><option value="">Teljes döntéssor</option>${state.rounds.map((_,i)=>`<option value="${i}" ${state.focus===i?"selected":""}>${i+1}. kör</option>`).join("")}</select></label>`:""}</section>
+  ${phase==="finished"?`<label class="focus">Kiemelt forduló a vásznon<select id="focus"><option value="">Teljes döntéssor</option>${state.rounds.map((round,i)=>round.scored?`<option value="${i}" ${state.focus===i?"selected":""}>${i+1}. kör</option>`:"").join("")}</select></label>`:""}</section>
   ${phase==="finished"?`<section class="paper host-reflections"><h2>Csapatreflexiók</h2><div class="reflections">${state.reflections.map((t,i)=>`<article><h3>${esc(state.names[i])}</h3><p>${esc(t || "Várjuk a reflexiót.")}</p>${t?btn("Kivetítés név nélkül","reflect",`data-seat="${i}"`,"quiet")+btn("Névvel","reflect",`data-seat="${i}" data-named="1"`,"quiet"):""}</article>`).join("")}</div></section>`:schedule()}`;
 }
 function participant() {
   const now=r(), phase=state.phase;
   let title={lobby:"Várjuk a csapatokat",ready:"A következő körre vártok",negotiation:"Tárgyalás",open:"Mi a döntésetek?",result:"Kör lezárva",finished:"A játék véget ért"}[phase];
-  if (phase==="open" && now.own) title=`Az ${now.own} beérkezett`;
-  return `<div class="participant"><section class="hero"><p class="kicker">${esc(state.name)} · ${state.index+1} / ${state.rounds.length}. kör</p><h1>${title}</h1><div class="stats"><div><small>Összpont</small><strong>${score(state.ownTotal)}</strong></div>${phase!=="negotiation"?`<div><small>Körszorzó</small><strong>×${now.multiplier}</strong></div>`:""}</div></section>
-    ${phase==="open" && !now.own?`<div class="choices">${["X","Y"].map(v=>btn(v,"move",`data-choice="${v}" aria-label="${v} választása"`,"choice "+v)).join("")}</div>`:""}
-    ${phase==="open" && now.own?'<p class="paper">A döntést rögzítettük. A tréner zárja a kört.</p>':""}
+  if (phase==="open" && now.own) title=`Mentett döntés: ${now.own}`;
+  return `<div class="participant"><section class="hero"><p class="kicker">${esc(state.name)} · ${phase==="finished"?`${state.rounds.filter(x=>x.scored).length} lezárt kör`:`${state.index+1} / ${state.rounds.length}. kör`}</p><h1>${title}</h1><div class="stats"><div><small>Összpont</small><strong>${score(state.ownTotal)}</strong></div>${["open","result"].includes(phase) && now.multiplier?`<div><small>Körszorzó</small><strong>×${now.multiplier}</strong></div>`:""}</div></section>
+    ${phase==="open"?`<div class="choices">${["X","Y"].map(v=>btn(v,"move",`data-choice="${v}" aria-label="${v} választása" aria-pressed="${now.own===v}"`,"choice "+v,now.own===v)).join("")}</div>`:""}
+    ${phase==="open" && now.own?'<p class="paper">A kör lezárásáig módosíthatjátok a döntést.</p>':""}
     ${phase==="result"?`<div class="paper"><strong>${split(now.countX)}</strong><p>Saját döntés: ${tag(now.own)} · Körpont: <b>${score(now.ownScore)}</b></p></div>`:""}
     ${matrixFold()}
     ${state.rounds.some(x=>x.scored)?`<details class="paper fold"><summary>Saját döntéseink</summary><ol class="own-history">${state.rounds.map((x,i)=>x.scored?`<li><strong>${i+1}. kör</strong> · ${tag(x.own)} · ${split(x.countX)} · ×${x.multiplier} · <b>${score(x.ownScore)}</b>
@@ -119,7 +121,7 @@ function projection() {
   const phase=state.phase, now=r(), focus=state.rounds[state.focus];
   if (state.mode==="blank") return '<div class="blank"></div>';
   if (state.mode==="join" || phase==="lobby" && state.mode==="live") return `<div class="project"><p class="kicker">Csatlakozás</p><h1>Nagy X/Y</h1>${qrBlock()}</div>`;
-  if (state.mode==="matrix") return `<div class="project"><p class="kicker">${state.index+1}. kör · ×${now.multiplier}</p><h1>Pontozási mátrix</h1>${matrix(now.multiplier)}</div>`;
+  if (state.mode==="matrix") return `<div class="project"><p class="kicker">${state.index+1}. kör · ${now.multiplier?"×"+now.multiplier:"Alappontok"}</p><h1>Pontozási mátrix</h1>${matrix(now.multiplier ?? 1)}</div>`;
   if (state.mode==="reflection") return `<div class="project"><p class="kicker">Reflexió ${esc(state.projectedReflection?.name)}</p><blockquote>${esc(state.projectedReflection?.text)}</blockquote></div>`;
   if (state.mode==="note") return `<div class="project"><p class="kicker">${(state.projectedNote?.round ?? 0)+1}. kör · Körjegyzet ${esc(state.projectedNote?.name)}</p><blockquote>${esc(state.projectedNote?.text)}</blockquote></div>`;
   if (phase==="finished") {
@@ -129,7 +131,7 @@ function projection() {
       :timeline()+`<div class="project-legend">${state.rounds.some(r=>r.noteFlags?.some(Boolean))?`<span>${noteIcon} Körjegyzet</span>`:""}${pages>1?`<nav aria-label="Döntéstábla lapozása">${btn("← Előző","project-page",'data-step="-1"',"",projectionPage===0)} <span>${projectionPage+1} / ${pages}</span> ${btn("Következő →","project-page",'data-step="1"',"",projectionPage>=pages-1)}</nav>`:""}</div>`
     }</div>`;
   }
-  return `<div class="project"><p class="kicker">${state.index+1}. kör${phase==="negotiation"?"":" · ×"+now.multiplier}</p><h1>${{ready:"Következő kör",negotiation:"Tárgyalás",open:"Döntésre nyitva",result:split(now.countX)}[phase]}</h1>${phase==="open"?'<div class="projectXY">X<span>/</span>Y</div>':""}</div>`;
+  return `<div class="project"><p class="kicker">${state.index+1}. kör${now.multiplier?" · ×"+now.multiplier:""}</p><h1>${{ready:"Következő kör",negotiation:"Tárgyalás",open:"Döntésre nyitva",result:split(now.countX)}[phase]}</h1>${phase==="open"?'<div class="projectXY">X<span>/</span>Y</div>':""}</div>`;
 }
 function startView() {
   if (projector) return '<section class="paper"><h1>A kivetítő kapcsolódik</h1><p>A kivetítőt a tréneri vezérlőből nyisd meg.</p></section>';
@@ -191,7 +193,9 @@ function download() {
   const quote=x=>'"'+(typeof x==="number"?String(x):String(x??"").replace(/^[\s]*[=+@-]/,c=>"'"+c)).replaceAll('"','""')+'"';
   const rows=[["Kör","Tárgyalások előtte","Szorzó","Csapat","Döntés","Körpont","Futó pont","Kézi rögzítés","Reflexió"]];
   const totals=[0,0,0,0];
-  state.rounds.forEach((r,i)=>r.scored&&state.names.forEach((name,j)=>rows.push([i+1,r.played,r.multiplier,name,r.moves[j],r.scores[j],totals[j]+=r.scores[j],r.manual[j]?"igen":"",i===state.rounds.length-1?state.reflections[j]:""])));
+  const lastScored=state.rounds.findLastIndex(r=>r.scored);
+  state.rounds.forEach((r,i)=>r.scored&&state.names.forEach((name,j)=>rows.push([i+1,r.played,r.multiplier,name,r.moves[j],r.scores[j],totals[j]+=r.scores[j],r.manual[j]?"igen":"",i===lastScored?state.reflections[j]:""])));
+  if(lastScored<0) state.names.forEach((name,j)=>rows.push(["","","",name,"","",0,"",state.reflections[j]]));
   const href=URL.createObjectURL(new Blob(["\ufeff"+rows.map(row=>row.map(quote).join(";")).join("\r\n")],{type:"text/csv;charset=utf-8"}));
   const a=document.createElement("a"); a.href=href;a.download="nagy-xy-"+code+".csv";a.click();setTimeout(()=>URL.revokeObjectURL(href),1000);
 }
@@ -206,7 +210,13 @@ screen.addEventListener("click",e=>{
   if(act==="project-page"){projectionPage+=Number(b.dataset.step);render(true);return;}
   if(act==="reflect"){void run("screen",{mode:"reflection",seat:Number(seat),anonymous:!named});return;}
   if(act==="reveal"){void run(act,{enabled:!state.revealed});return;}
-  if(act==="move"){confirmBox(`${choice} legyen a döntés?`,"<p>A megerősített döntést erre a körre rögzítjük.</p>",()=>run(act,{choice}));return;}
+  if(act==="move"){const index=state.index;confirmBox(`${choice} legyen a döntés?`,"<p>A kör lezárásáig még módosíthatjátok.</p>",()=>run(act,{choice,index}));return;}
+  if(act==="finish"){
+    const index=state.index;
+    if(state.phase==="result" && index===state.rounds.length-1){void run(act,{index});return;}
+    const detail=state.phase==="open"?"A nyitott kör döntései nem számítanak bele.":"A lezárt körök pontjai megmaradnak.";
+    confirmBox("Lezárod a játékot?",`<p>${detail} A csapatok ezután reflexiót írhatnak.</p>`,()=>run(act,{index}));return;
+  }
   if(act==="manual"){
     dialog.innerHTML=`<form method="dialog"><h2>Kézi döntés · ${esc(state.names[seat])}</h2><p>A csapat által megadott döntést rögzítsd.</p><div class="actions"><button value="">Mégse</button><button value="X">X</button><button value="Y">Y</button></div></form>`;
     dialog.showModal();dialog.addEventListener("close",()=>{if(["X","Y"].includes(dialog.returnValue))void run(act,{seat:Number(seat),choice:dialog.returnValue});render();},{once:true});return;
@@ -260,16 +270,14 @@ screen.addEventListener("submit",async e=>{
   else if(kind==="note") await run(kind,{index,text:b.text});
   else await run(kind,{text:b.text});
 });
-let lastPulse=0, pollTimer;
+let pollTimer;
 async function poll() {
   clearTimeout(pollTimer);
   if (!busy && !pending && key && pattern.test(code)) {
     pending=true;
     const requestedAt=revision;
     try {
-      const pulse=!document.hidden && !projector && (!state || state.seat>=0) && Date.now()-lastPulse>=5000;
-      const next=await readState(endpoint()+(pulse?"?pulse=1":""),key);
-      if(pulse) lastPulse=Date.now();
+      const next=await readState(endpoint()+(document.hidden?"?idle=1":""),key);
       if(!busy && revision===requestedAt){state=next;signal.textContent="Kapcsolódva";setError("");render();}
     } catch(e) {
       signal.textContent="Kapcsolat keresése…";
@@ -279,6 +287,7 @@ async function poll() {
   }
   pollTimer=setTimeout(poll,document.hidden?4500:1250);
 }
-document.addEventListener("visibilitychange",()=>{if(!document.hidden){lastPulse=0;void poll();}});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)void poll();});
+window.addEventListener("pageshow",()=>void poll());
 render(true);
 void poll();

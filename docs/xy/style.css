@@ -115,6 +115,7 @@ dialog{color:var(--ink);background:var(--paper);border:1px solid var(--line);bor
 .team-view .choices{margin:.65rem 0;gap:.55rem}
 .team-view .choice{min-height:clamp(100px,28vw,150px);font-size:clamp(3.8rem,15vw,6.5rem);transition:background .15s,color .15s}
 .team-view .choice.X{background:var(--navy);color:#fff9ec}.team-view .choice.X:hover{background:#203d64}
+.team-view .choice[aria-pressed=true]:disabled{opacity:1;outline:3px solid #4387e8;outline-offset:-5px}
 .team-view .paper{margin-top:.55rem;padding:.7rem .85rem}
 @media(max-width:780px){
   .trainer .board{grid-template-columns:minmax(0,1fr) auto;gap:.45rem}

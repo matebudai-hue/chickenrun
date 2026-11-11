@@ -11,10 +11,10 @@ const choice = x => x === "X" || x === "Y";
 const current = s => s.rounds[s.index];
 const totals = s => Array.from({length:4}, (_,i) => s.rounds.reduce((sum,r) => sum + (r.scores?.[i] ?? 0),0));
 const names = s => s.teams.map((t,i) => t?.name || `${i+1}. csapat`);
-const presenceWindow = 14_000;
+const presenceWindow = 25_000;
 async function presentView(s, auth, store, id, pulse = false) {
   const result = view(s,auth);
-  if (result.seat >= 0 && pulse) await store.pulse(id,auth).catch(() => {});
+  if (result.seat >= 0 && pulse) await store.pulse(id,auth,4000).catch(() => {});
   if (result.host) {
     const seen = await store.seen(id);
     result.presence = s.teams.map(t => !t ? null : !t.key ? "manual" :
@@ -30,10 +30,11 @@ function view(s, auth) {
   const total = totals(s);
   const rounds = s.rounds.map((r,i) => {
     const scored = !!r.scores;
-    return { multiplier:r.multiplier, negotiations:scored || host || i === s.index ? r.negotiations : undefined,
+    const published = scored || (i === s.index && s.phase === "open");
+    return { multiplier:host || published ? r.multiplier : undefined, negotiations:scored || host || i === s.index ? r.negotiations : undefined,
       played:r.played, scored, countX:r.countX,
-      moves:host || (s.phase === "finished" && (projector || s.reveal)) ? r.moves : undefined,
-      scores:host || (s.phase === "finished" && (projector || s.reveal)) ? r.scores : undefined,
+      moves:host || (scored && s.phase === "finished" && (projector || s.reveal)) ? r.moves : undefined,
+      scores:host || (scored && s.phase === "finished" && (projector || s.reveal)) ? r.scores : undefined,
       manual:host ? r.manual : undefined,
       noteFlags:scored && (host || (projector && s.phase === "finished")) ? r.notes.map(Boolean) : undefined,
       own:seat >= 0 ? r.moves[seat] : undefined,
@@ -80,8 +81,9 @@ function action(s, auth, act, b, transfer) {
     } else {
       check(choice(b.choice) && Number.isInteger(b.index));
       if (s.rounds[b.index]?.moves[seat] === b.choice) return false;
-      check(s.phase === "open" && b.index === s.index && !r.moves[seat],"A kör zárva van, vagy már érkezett döntés.");
+      check(s.phase === "open" && b.index === s.index,"Ez a kör már nem módosítható.");
       r.moves[seat] = b.choice;
+      r.manual[seat] = false;
     }
     return;
   }
@@ -129,7 +131,12 @@ function action(s, auth, act, b, transfer) {
     s.index++;
     s.phase = "ready";
   } else if (act === "finish") {
-    check(s.phase === "result" && b.index === s.index && s.index === s.rounds.length-1);
+    if (s.phase === "finished" && b.index === s.index) return false;
+    check(["ready","negotiation","open","result"].includes(s.phase) && b.index === s.index);
+    if (!r.scores) {
+      r.moves.fill(null);
+      r.manual.fill(false);
+    }
     s.phase = "finished";
     s.mode = "live";
   } else if (act === "reveal") {
@@ -186,7 +193,7 @@ export async function xyApi(req, store) {
       if (!row || row.expires_at <= Date.now()) fail(404,"A szoba nem található vagy lejárt.");
       const s = JSON.parse(row.state);
       if (!act || action(s,auth,act,b,transfer) === false)
-        return reply(await presentView(s,auth,store,id,act === "join" || url.searchParams.has("pulse")));
+        return reply(await presentView(s,auth,store,id,act === "join" || (!act && !url.searchParams.has("idle"))));
       if (await store.put(id,row.revision,JSON.stringify(s)))
         return reply(await presentView(s,auth,store,id,true));
     }

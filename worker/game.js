@@ -436,10 +436,10 @@ export function d1Store(db) {
         : db.prepare(columns + " ORDER BY pair, rowid").bind(code);
       return (await statement.all()).results;
     },
-    async pulse(code, id) {
+    async pulse(code, id, minimumInterval = 0) {
       const now = Date.now();
-      await db.prepare("INSERT INTO presence (code, player, seen_at) VALUES (?, ?, ?) ON CONFLICT(code, player) DO UPDATE SET seen_at = excluded.seen_at WHERE presence.seen_at < excluded.seen_at")
-        .bind(code, id, now).run();
+      await db.prepare("INSERT INTO presence (code, player, seen_at) VALUES (?, ?, ?) ON CONFLICT(code, player) DO UPDATE SET seen_at = excluded.seen_at WHERE presence.seen_at < excluded.seen_at - ?")
+        .bind(code, id, now, minimumInterval).run();
     },
     async online(code) {
       const { results } = await db.prepare("SELECT player FROM presence WHERE code = ? AND seen_at > ?")
