@@ -35,6 +35,7 @@ function view(s, auth) {
       moves:host || (s.phase === "finished" && (projector || s.reveal)) ? r.moves : undefined,
       scores:host || (s.phase === "finished" && (projector || s.reveal)) ? r.scores : undefined,
       manual:host ? r.manual : undefined,
+      noteFlags:scored && (host || (projector && s.phase === "finished")) ? r.notes.map(Boolean) : undefined,
       own:seat >= 0 ? r.moves[seat] : undefined,
       ownScore:seat >= 0 ? r.scores?.[seat] : undefined,
       note:seat >= 0 ? r.notes[seat] : undefined };
@@ -47,6 +48,10 @@ function view(s, auth) {
     ownTotal:total[seat], ownReflection:reflections[seat],
     reflections:host ? reflections : undefined,
     projectedReflection:projector && s.mode === "reflection" ? {text:reflections[s.screenSeat],name:s.anonymous ? "" : names(s)[s.screenSeat]} : undefined,
+    projectedNote:projector && s.mode === "note" ? {
+      text:s.rounds[s.screenRound]?.notes[s.screenSeat], round:s.screenRound,
+      name:s.anonymous ? "" : names(s)[s.screenSeat]
+    } : undefined,
     focus:s.focus, revealed:host ? !!s.reveal : undefined };
 }
 function action(s, auth, act, b, transfer) {
@@ -131,12 +136,14 @@ function action(s, auth, act, b, transfer) {
     check(s.phase === "finished");
     s.reveal = !!b.enabled;
   } else if (act === "screen") {
-    check(["live","matrix","blank","join","reflection"].includes(b.mode));
+    check(["live","matrix","blank","join","reflection","note"].includes(b.mode));
     if (b.mode === "reflection") check(s.phase === "finished" && !!s.teams[b.seat]?.reflection);
-    Object.assign(s,{mode:b.mode,screenSeat:b.seat,anonymous:b.anonymous !== false});
+    if (b.mode === "note") check(s.phase === "finished" && !!s.rounds[b.round]?.scores && !!s.rounds[b.round]?.notes[b.seat]);
+    Object.assign(s,{mode:b.mode,screenSeat:b.seat,screenRound:b.round,anonymous:b.anonymous !== false});
   } else if (act === "focus") {
     check(s.phase === "finished" && (b.index === null || !!s.rounds[b.index]?.scores));
     s.focus = b.index;
+    s.mode = "live";
   } else fail(404,"Ismeretlen művelet.");
 }
 export async function xyApi(req, store) {

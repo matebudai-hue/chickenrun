@@ -128,3 +128,35 @@ dialog{color:var(--ink);background:var(--paper);border:1px solid var(--line);bor
 }
 @media(max-width:760px){.poster{display:none}.landing{grid-template-columns:1fr}.roster{grid-template-columns:repeat(2,1fr)}.project{min-height:68vh}.focusTeams{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:440px){#screen,#error{width:calc(100% - 1.2rem);margin:.7rem auto}.board{grid-template-columns:1fr}.weight{border-left:0;border-top:1px solid #6d829e;padding:.55rem 0 0;display:flex;justify-content:space-between;align-items:center}.weight strong{font-size:2.3rem}.reflections{grid-template-columns:1fr}.matrix th,.matrix td{padding:.5em .28em}}
+.note-icon{color:#1a53a3;font-weight:850;line-height:1}
+.note-mark{display:inline-flex;align-items:center;justify-content:center;margin-left:.28em;vertical-align:middle}
+.trainer button.note-mark{min-height:0;padding:.1em .25em;border-color:#b8cdeb;background:#e4effd;font-size:.83em}
+.projection{height:100dvh;overflow:hidden;display:flex;flex-direction:column}
+.projection .mast{padding:.3rem clamp(.65rem,2vw,1.5rem)}
+.projection #screen{display:flex;flex:1;min-height:0;width:calc(100% - 1.4rem);margin:.45rem auto}
+.projection #error{margin:.2rem auto;padding:.35rem .65rem}
+.projection .project{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow:hidden;
+  padding:clamp(.4rem,2.3vh,1.6rem) clamp(.55rem,3vw,2.5rem);border-top:5px solid var(--blue)}
+.projection .project .kicker{margin:0 0 .35em;font-size:clamp(.65rem,1.7vh,1rem)}
+.projection .project h1{font-size:clamp(1.1rem,min(5vw,6.4vh),4.2rem);margin:0 0 .22em}
+.projection .project .matrix{width:100%;flex:1;font-size:clamp(.8rem,min(3.3vw,4.4vh),3rem);line-height:1.12}
+.projection .project .matrix td,.projection .project .matrix th{padding:.11em .55em}
+.projection .project .matrix small{font-size:.55em}
+.projection .project .qr-card{margin-top:.35rem;padding:.45rem}
+.projection .project .qr-card svg{width:min(42vh,35vw,300px)}
+.projection .project .projectXY{font-size:clamp(3rem,min(20vw,36vh),16rem)}
+.projection .project blockquote{font-size:clamp(1rem,min(3.2vw,4.5vh),2.75rem);white-space:normal}
+.projection .project .large{font-size:clamp(1rem,5vh,3.5rem)}
+.projection .project .focusTeams{margin:.4rem 0;grid-template-columns:repeat(4,minmax(0,1fr))}
+.projection .project .focusTeams div{padding:.35rem;font-size:clamp(.75rem,min(2.4vw,4vh),2.5rem);overflow-wrap:anywhere}
+.project-results .scroll{display:flex;flex:1;min-height:0;overflow:visible}
+.project-results .timeline{min-width:0;font-size:clamp(.54rem,min(2.2vw,2.85vh),2rem);line-height:1.05}
+.project-results .timeline td,.project-results .timeline th{padding:.08em .26em}
+.project-results .timeline small{font-size:.72em}
+.project-results .timeline th small{white-space:normal}
+.project-results .timeline .chip{padding:.1em .24em}
+.project-results .timeline .group{background:#dbeaff}
+.project-legend{display:flex;justify-content:space-between;align-items:center;gap:.5rem;font-size:clamp(.65rem,2vh,.95rem);margin-top:.3rem}
+.project-legend:empty{display:none}
+.project-legend nav{margin-left:auto;white-space:nowrap}
+.project-legend button{min-height:0;padding:.22em .5em;font-size:inherit}

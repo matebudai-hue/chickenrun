@@ -72,6 +72,14 @@ test("four teams, negotiations, concurrent moves, recovery, projection and refle
   await Promise.all([b,c,d].map(key=>call("move",key,{index:1,choice:"Y"})));
   await call("close",host,{index:1});
   await call("finish",host,{index:1});
+  assert.deepEqual((await call("",projector)).rounds[0].noteFlags,[true,false,false,false]);
+  assert.equal((await call("",b)).rounds[0].noteFlags,undefined);
+  assert.equal((await call("",projector)).projectedNote,undefined);
+  await call("screen",host,{mode:"note",round:0,seat:0,anonymous:true});
+  assert.deepEqual((await call("",projector)).projectedNote,{text:"Első kör",round:0,name:""});
+  assert.equal((await call("",b)).projectedNote,undefined);
+  await call("focus",host,{index:null});
+  assert.equal((await call("",projector)).mode,"live");
   await call("reflection",replacement,{text:"Az első tárgyalás után változott."});
   assert.equal((await call("",host)).reflections[0],"Az első tárgyalás után változott.");
   assert.equal((await call("",b)).reflections,undefined);
