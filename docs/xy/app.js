@@ -56,6 +56,7 @@ const noteIcon='<span class="note-icon" aria-hidden="true">▤</span>';
 function noteMark(round,i,j) {
   if(!round.noteFlags?.[j]) return "";
   const label=`${i+1}. kör, ${state.names[j]}: körjegyzet érkezett`;
+  if(projector) return btn(noteIcon,"read-note",`data-round="${i}" data-seat="${j}" aria-label="${esc(label)} – megnyitás" title="Körjegyzet megnyitása"`,"note-mark");
   return state.host && state.phase==="finished"
     ? btn(noteIcon,"show-note",`data-round="${i}" data-seat="${j}" aria-label="${esc(label)} – kivetítés név nélkül" title="${esc(label)}"`,"note-mark")
     : `<span class="note-mark" role="img" aria-label="${esc(label)}" title="${esc(label)}">${noteIcon}</span>`;
@@ -93,7 +94,7 @@ function hostView() {
   if (phase==="open") {title="Döntésre nyitva";desc=`${count}/4 döntés beérkezett`;action=btn("Kör lezárása","close","","primary",count!==4);}
   if (phase==="result") {title=split(now.countX);desc="A kör lezárult, a csapatok látják a saját pontjukat.";action=btn(state.index+1===state.rounds.length?"Játék lezárása és reflexiók":"Következő kör",state.index+1===state.rounds.length?"finish":"next","","primary");}
   if (["ready","negotiation","open"].includes(phase) || phase==="result" && state.index+1<state.rounds.length) action+=btn("Játék lezárása","finish");
-  if (phase==="finished") {title="Feldolgozás";desc=`${state.reflections.filter(Boolean).length}/4 reflexió beérkezett`;action=btn("Végeredmény kivetítése","results","","primary")+btn("CSV letöltése","csv")+btn(state.revealed?"Csapatriport elrejtése":"Csapatriport megosztása","reveal");}
+  if (phase==="finished") {title="Feldolgozás";desc=`${state.reflections.filter(Boolean).length}/4 reflexió beérkezett`;action=btn("Végeredmény kivetítése","results","","primary")+btn("CSV letöltése","csv");}
   const weight = ["lobby","ready","negotiation"].includes(phase) ? `<label class="quick-weight">Körszorzó<select id="quick-weight">${options.map(n=>`<option value="${n}" ${n===now.multiplier?"selected":""}>×${n}</option>`).join("")}</select></label>` : `<strong>×${now.multiplier}</strong>`;
   return `<section class="hero board"><div><p class="kicker">Tréneri vezérlő · ${code}</p><h1>${title}</h1><p>${desc}</p></div><div class="weight"><span>${state.index+1} / ${state.rounds.length}. kör</span>${weight}</div><div class="actions">${action}</div></section>
   <div class="teams-panel ${phase==="lobby"?"with-qr":""}">${roster()}${phase==="lobby"?qrBlock():""}</div>
@@ -115,7 +116,7 @@ function participant() {
     ${state.rounds.some(x=>x.scored)?`<details class="paper fold"><summary>Saját döntéseink</summary><ol class="own-history">${state.rounds.map((x,i)=>x.scored?`<li><strong>${i+1}. kör</strong> · ${tag(x.own)} · ${split(x.countX)} · ×${x.multiplier} · <b>${score(x.ownScore)}</b>
     <form data-kind="note" data-index="${i}"><label>Körjegyzet<input name="text" maxlength="800" value="${esc(x.note)}"></label><button>Mentés</button></form></li>`:"").join("")}</ol></details>`:""}
     ${phase==="finished"?`<form class="paper" data-kind="reflection"><h2>Csapatreflexió</h2><label>Melyik körben változott meg, mire számítottatok a többiektől?<textarea name="text" maxlength="1600" rows="4" required>${esc(state.ownReflection)}</textarea></label><button class="primary">${state.ownReflection?"Reflexió frissítése":"Reflexió elküldése"}</button>${state.ownReflection?'<span role="status"> · Elmentve</span>':""}</form>`:""}
-    ${state.names && phase==="finished"?`<section class="paper"><h2>Közös döntéssor</h2>${timeline()}</section>`:""}</div>`;
+    </div>`;
 }
 function projection() {
   const phase=state.phase, now=r(), focus=state.rounds[state.focus];
@@ -161,6 +162,16 @@ function render(force=false) {
     $("qr").innerHTML=qr.createSvgTag({cellSize:5,margin:20,scalable:true,alt:"Csatlakozási QR-kód"});
   }
   fitProjectedQuote();
+  fitProjectionTable();
+}
+function fitProjectionTable() {
+  if(!projector) return;
+  const table=screen.querySelector(".project-results .timeline");
+  if(!table) return;
+  table.style.zoom="";
+  const frame=table.parentElement.getBoundingClientRect();
+  const box=table.getBoundingClientRect();
+  if(box.height>frame.height+1 && frame.height>0) table.style.zoom=String(frame.height/box.height);
 }
 function fitProjectedQuote() {
   const quote=projector && screen.querySelector(".project blockquote");
@@ -174,6 +185,8 @@ function fitProjectedQuote() {
   }
 }
 window.addEventListener("resize",fitProjectedQuote);
+window.addEventListener("resize",fitProjectionTable);
+if(projector) document.fonts?.ready.then(fitProjectionTable);
 async function run(act,b={}) {
   if (busy) return false;
   busy=true; revision++; setError(""); signal.textContent="Mentés…";
@@ -207,9 +220,18 @@ screen.addEventListener("click",e=>{
   if(act==="screen"){void run(act,{mode});return;}
   if(act==="results"){void run("focus",{index:null});return;}
   if(act==="show-note"){void run("screen",{mode:"note",round:Number(b.dataset.round),seat:Number(seat),anonymous:true});return;}
+  if(act==="read-note" && projector){
+    const index=Number(b.dataset.round);
+    const note=state.rounds[index]?.projectorNotes?.[Number(seat)];
+    if(!note) return;
+    dialog.classList.add("project-note");
+    dialog.innerHTML=`<form method="dialog"><p class="kicker">${index+1}. kör</p><h2>Körjegyzet</h2><p class="project-note-text">${esc(note)}</p><button class="primary">Vissza a táblához</button></form>`;
+    dialog.addEventListener("close",()=>{dialog.classList.remove("project-note");render();},{once:true});
+    dialog.showModal();
+    return;
+  }
   if(act==="project-page"){projectionPage+=Number(b.dataset.step);render(true);return;}
   if(act==="reflect"){void run("screen",{mode:"reflection",seat:Number(seat),anonymous:!named});return;}
-  if(act==="reveal"){void run(act,{enabled:!state.revealed});return;}
   if(act==="move"){const index=state.index;confirmBox(`${choice} legyen a döntés?`,"<p>A kör lezárásáig még módosíthatjátok.</p>",()=>run(act,{choice,index}));return;}
   if(act==="finish"){
     const index=state.index;

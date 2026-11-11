@@ -33,19 +33,20 @@ function view(s, auth) {
     const published = scored || (i === s.index && s.phase === "open");
     return { multiplier:host || published ? r.multiplier : undefined, negotiations:scored || host || i === s.index ? r.negotiations : undefined,
       played:r.played, scored, countX:r.countX,
-      moves:host || (scored && s.phase === "finished" && (projector || s.reveal)) ? r.moves : undefined,
-      scores:host || (scored && s.phase === "finished" && (projector || s.reveal)) ? r.scores : undefined,
+      moves:host || (scored && s.phase === "finished" && projector) ? r.moves : undefined,
+      scores:host || (scored && s.phase === "finished" && projector) ? r.scores : undefined,
       manual:host ? r.manual : undefined,
       noteFlags:scored && (host || (projector && s.phase === "finished")) ? r.notes.map(Boolean) : undefined,
+      projectorNotes:scored && projector && s.phase === "finished" ? r.notes : undefined,
       own:seat >= 0 ? r.moves[seat] : undefined,
       ownScore:seat >= 0 ? r.scores?.[seat] : undefined,
       note:seat >= 0 ? r.notes[seat] : undefined };
   });
   const reflections = s.teams.map(t => t?.reflection || "");
   return { code:s.code, phase:s.phase, index:s.index, rounds, seat, host, projector,
-    mode:s.mode, names:host || projector || (s.phase === "finished" && s.reveal) ? names(s) : undefined,
+    mode:s.mode, names:host || projector ? names(s) : undefined,
     occupied:s.teams.map(Boolean), name:s.teams[seat]?.name,
-    totals:host || s.phase === "finished" && (projector || s.reveal) ? total : undefined,
+    totals:host || s.phase === "finished" && projector ? total : undefined,
     ownTotal:total[seat], ownReflection:reflections[seat],
     reflections:host ? reflections : undefined,
     projectedReflection:projector && s.mode === "reflection" ? {text:reflections[s.screenSeat],name:s.anonymous ? "" : names(s)[s.screenSeat]} : undefined,
@@ -53,7 +54,7 @@ function view(s, auth) {
       text:s.rounds[s.screenRound]?.notes[s.screenSeat], round:s.screenRound,
       name:s.anonymous ? "" : names(s)[s.screenSeat]
     } : undefined,
-    focus:s.focus, revealed:host ? !!s.reveal : undefined };
+    focus:s.focus };
 }
 function action(s, auth, act, b, transfer) {
   const r = current(s);
@@ -139,9 +140,6 @@ function action(s, auth, act, b, transfer) {
     }
     s.phase = "finished";
     s.mode = "live";
-  } else if (act === "reveal") {
-    check(s.phase === "finished");
-    s.reveal = !!b.enabled;
   } else if (act === "screen") {
     check(["live","matrix","blank","join","reflection","note"].includes(b.mode));
     if (b.mode === "reflection") check(s.phase === "finished" && !!s.teams[b.seat]?.reflection);

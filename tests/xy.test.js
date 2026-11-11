@@ -91,6 +91,8 @@ test("four teams, negotiations, concurrent moves, recovery, projection and refle
   assert.deepEqual(early.totals,[30010,-9990,-9990,-9990]);
   assert.deepEqual(early.rounds[2].moves,[null,null,null,null]);
   assert.deepEqual((await call("",projector)).rounds[0].noteFlags,[true,false,false,false]);
+  assert.equal((await call("",projector)).rounds[0].projectorNotes[0],"Első kör");
+  assert.equal((await call("",b)).rounds[0].projectorNotes,undefined);
   assert.equal((await call("",b)).rounds[0].noteFlags,undefined);
   assert.equal((await call("",projector)).projectedNote,undefined);
   await call("screen",host,{mode:"note",round:0,seat:0,anonymous:true});
@@ -105,6 +107,9 @@ test("four teams, negotiations, concurrent moves, recovery, projection and refle
   const projected=await call("",projector);
   assert.deepEqual(projected.projectedReflection,{name:"",text:"Az első tárgyalás után változott."});
   assert.equal((await call("",b)).rounds[0].moves,undefined);
-  await call("reveal",host,{enabled:true});
-  assert.deepEqual((await call("",b)).rounds[0].moves,["X","Y","Y","Y"]);
+  const teamView=await call("",b);
+  assert.equal(teamView.names,undefined);
+  assert.equal(teamView.totals,undefined);
+  assert.equal(teamView.rounds[0].moves,undefined);
+  assert.equal(teamView.rounds[0].scores,undefined);
 });
