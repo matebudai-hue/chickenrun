@@ -91,9 +91,7 @@ dialog{color:var(--ink);background:var(--paper);border:1px solid var(--line);bor
 .timeline .after-negotiation>*{border-top:4px solid #1a53a3}
 .timeline .after-negotiation th small{color:#1a53a3;font-weight:750}
 .timeline td .cell-score{display:inline-block;margin-left:.15em}
-.trainer .report .scroll{max-height:clamp(8rem,50vh,35rem)}
-.trainer .timeline thead th{position:sticky;top:0;z-index:2;background:var(--paper)}
-.trainer .timeline tfoot td,.trainer .timeline tfoot th{position:sticky;bottom:0;z-index:2;background:#eeeae0}
+.trainer .report .scroll{overflow-x:auto;overflow-y:hidden}
 .trainer .timeline th:first-child{left:auto}
 @media(max-width:560px){.timeline{min-width:460px}}
 .trainer .schedule{max-height:clamp(5rem,21vh,12rem);overflow:auto;gap:0}
