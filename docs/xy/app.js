@@ -44,6 +44,7 @@ function roster() {
     return `<div class="seat"><span class="seatNo">0${i+1}</span><strong class="${away?"away":""}" ${away?'title="A telefon egy ideje nem jelentkezett"':""}>${esc(label)}${away?'<span class="away-dot" aria-hidden="true"></span><span class="sr-only"> · Nincs kapcsolat</span>':""}</strong>
       ${state.phase==="open" ? (move ? tag(move,move+(r().manual[i]?" · kézi":"")) : btn("Kézi döntés","manual",`data-seat="${i}"`,"quiet")) :
          state.phase==="lobby" ? btn(yes?"Eltávolítás":"Kézi hely","seat",`data-seat="${i}"`,"quiet") : `<span class="total">${score(state.totals[i])}</span>`}
+      ${state.phase==="open"?noteMark(r(),state.index,i):""}
       ${yes ? btn("Telefoncsere","transfer",`data-seat="${i}"`,"link") : ""}</div>`;
   }).join("")}</div>`;
 }
@@ -61,10 +62,7 @@ function reflectionMark(name, seat) {
 function noteMark(round,i,j) {
   if(!round.noteFlags?.[j]) return "";
   const label=`${i+1}. kör, ${state.names[j]}: körjegyzet érkezett`;
-  if(projector) return btn(noteIcon,"read-note",`data-round="${i}" data-seat="${j}" aria-label="${esc(label)} – megnyitás" title="Körjegyzet megnyitása"`,"note-mark");
-  return state.host && state.phase==="finished"
-    ? btn(noteIcon,"show-note",`data-round="${i}" data-seat="${j}" aria-label="${esc(label)} – kivetítés név nélkül" title="${esc(label)}"`,"note-mark")
-    : `<span class="note-mark" role="img" aria-label="${esc(label)}" title="${esc(label)}">${noteIcon}</span>`;
+  return btn(noteIcon,"read-note",`data-round="${i}" data-seat="${j}" aria-label="${esc(label)} – megnyitás" title="Körjegyzet megnyitása"`,"note-mark");
 }
 function timeline() {
   const scored = state.rounds.map((round,i)=>({round,i})).filter(({round})=>round.scored);
@@ -234,20 +232,21 @@ screen.addEventListener("click",e=>{
   if(act==="csv"){download();return;}
   if(act==="screen"){void run(act,{mode});return;}
   if(act==="results"){void run("focus",{index:null});return;}
-  if(act==="show-note"){void run("screen",{mode:"note",round:Number(b.dataset.round),seat:Number(seat),anonymous:true});return;}
-  if((act==="read-note" || act==="read-reflection") && projector){
+  if(act==="read-note" && (state.host || projector) || act==="read-reflection" && projector){
     const index=Number(b.dataset.round);
     const isReflection=act==="read-reflection";
-    const comment=isReflection?state.projectorReflections?.[Number(seat)]:state.rounds[index]?.projectorNotes?.[Number(seat)];
+    const round=state.rounds[index];
+    const comment=isReflection?state.projectorReflections?.[Number(seat)]:
+      (state.host?round?.hostNotes:round?.projectorNotes)?.[Number(seat)];
     if(!comment) return;
     const context=isReflection?state.names[Number(seat)]:`${index+1}. kör · ${state.names[Number(seat)]}`;
     dialog.classList.add("project-note");
-    dialog.innerHTML=`<form method="dialog"><p class="kicker">${esc(context)}</p><h2>${isReflection?"Csapatreflexió":"Körjegyzet"}</h2><p class="project-note-text">${esc(comment)}</p><button class="primary">Vissza a táblához</button></form>`;
+    dialog.innerHTML=`<form method="dialog"><p class="kicker">${esc(context)}</p><h2>${isReflection?"Csapatreflexió":"Körjegyzet"}</h2><p class="project-note-text">${esc(comment)}</p><button class="primary">${state.host?"Bezárás":"Vissza a táblához"}</button></form>`;
     dialog.addEventListener("close",()=>{dialog.classList.remove("project-note");render();},{once:true});
     dialog.showModal();
     const commentBox=dialog.querySelector(".project-note-text");
     let size=parseFloat(getComputedStyle(commentBox).fontSize);
-    while(dialog.scrollHeight>dialog.clientHeight+1 && size>9){
+    while(projector && dialog.scrollHeight>dialog.clientHeight+1 && size>9){
       size=Math.max(9,size*.9);
       commentBox.style.fontSize=size+"px";
     }

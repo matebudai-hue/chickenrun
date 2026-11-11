@@ -64,6 +64,11 @@ test("four teams, negotiations, concurrent moves, recovery, projection and refle
   await call("note",a,{index:0,text:"Túl korán"},409);
   await Promise.all(teams.map((key,i)=>call("move",key,{index:0,choice:i===0?"X":"Y"})));
   assert.equal((await call("note",a,{index:0,text:"Első kör"})).rounds[0].note,"Első kör");
+  const liveNote=await call("",host);
+  assert.deepEqual(liveNote.rounds[0].noteFlags,[true,false,false,false]);
+  assert.equal(liveNote.rounds[0].hostNotes[0],"Első kör");
+  assert.equal((await call("",projector)).rounds[0].hostNotes,undefined);
+  assert.equal((await call("",b)).rounds[0].hostNotes,undefined);
   assert.equal((await call("move",a,{index:0,choice:"Y"})).rounds[0].own,"Y");
   assert.equal((await call("",a)).rounds[0].note,"Első kör");
   assert.equal((await call("",b)).rounds[0].note,"");

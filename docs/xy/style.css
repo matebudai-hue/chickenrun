@@ -172,5 +172,7 @@ dialog{color:var(--ink);background:var(--paper);border:1px solid var(--line);bor
 .participant .live-note label,.participant .own-history form label{width:100%}
 .project-legend{justify-content:flex-start;gap:1rem}
 .projection dialog.project-note{width:min(83vw,920px);max-height:90dvh;padding:clamp(.7rem,3vh,2rem)}
+.trainer dialog.project-note{width:min(92vw,560px);max-height:85dvh}
+.trainer dialog.project-note .project-note-text{font-size:1.05rem}
 .project-note h2{font-size:clamp(1.35rem,4vh,2.6rem)}
 .project-note .project-note-text{font-size:clamp(.95rem,min(2.25vw,3.65vh),2rem);line-height:1.22;overflow-wrap:anywhere}
