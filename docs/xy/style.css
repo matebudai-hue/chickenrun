@@ -54,5 +54,64 @@ dialog{color:var(--ink);background:var(--paper);border:1px solid var(--line);bor
 .project .qr-card svg{width:clamp(170px,31vw,350px)}.projectXY{font-size:clamp(5rem,19vw,15rem);font-weight:900;line-height:1;letter-spacing:-.09em}
 .project blockquote,.large{font:700 clamp(1.8rem,5vw,5rem)/1.18 Display,Georgia,serif;margin:0}.focusTeams{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin:1.3rem 0}.focusTeams div{display:grid;justify-items:start;background:var(--ice);padding:1rem;gap:.5rem;font-size:clamp(1rem,2.4vw,2.5rem)}
 .blackout{background:#090f18}.blackout .mast{display:none}
+/* Trainer controls share a compact workspace. */
+.trainer .mast{padding:.45rem clamp(.65rem,2vw,1.5rem)}
+.trainer #screen,.trainer #error{width:min(1600px,calc(100% - 1.4rem));margin:.55rem auto}
+.trainer #screen{display:grid;gap:.45rem}
+.trainer .board{grid-template-columns:minmax(0,1fr) auto auto;gap:.8rem;padding:.65rem .9rem;align-items:center}
+.trainer .board h1{font:800 clamp(1.25rem,2.2vw,2rem)/1.08 system-ui,sans-serif;margin:.14rem 0;letter-spacing:-.045em}
+.trainer .board .kicker,.trainer .board p:not(.kicker){font-size:.72rem;margin:0}
+.trainer .board .actions,.trainer .paper,.trainer .roster,.trainer .qr-card{margin:0}
+.trainer .weight{padding-left:.75rem}.trainer .weight span{font-size:.72rem}
+.trainer .weight strong{font-size:1.55rem;letter-spacing:-.04em}
+.trainer .quick-weight{display:flex;align-items:center;gap:.35rem;font-size:.72rem;margin-top:.2rem}
+.trainer .quick-weight select{min-height:1.8rem;padding:.1rem .25rem;background:#f2f7ff}
+.trainer button,.trainer .schedule input,.trainer .schedule select,.trainer .focus select{min-height:1.95rem;padding:.26rem .52rem;font-size:.77rem}
+.trainer .seat{padding:.36rem .48rem;gap:.15rem .38rem;min-height:2.5rem}
+.trainer .seat strong{font-size:.85rem}.trainer .seat .link{padding:.15rem .22rem;font-size:.69rem}
+.trainer .seatNo{font-size:.65rem}.trainer .seat .quiet{font-size:.7rem}
+.trainer .with-qr{display:grid;grid-template-columns:minmax(0,1fr) minmax(160px,210px);gap:.45rem}
+.trainer .with-qr .roster{grid-template-columns:repeat(2,minmax(0,1fr))}
+.trainer .qr-card{padding:.22rem .4rem;gap:.4rem;flex-wrap:nowrap}
+.trainer .qr-card svg{width:4.5rem}.trainer .qr-card strong{font-size:1rem}.trainer .qr-card a{font-size:.68rem}
+.trainer .paper{padding:.45rem .65rem}
+.trainer h2,.trainer .fold summary{font-size:.92rem;letter-spacing:-.02em;margin:0 0 .3rem}
+.trainer .tools{gap:.35rem;padding:.3rem .55rem}.trainer .tools a{font-size:.8rem;font-weight:750}
+.trainer .tools .actions{gap:.25rem}
+.trainer .timeline th,.trainer .timeline td{padding:.26rem .28rem;font-size:.77rem;line-height:1.18}
+.trainer .timeline td{min-width:2.55rem}.trainer .timeline .neg{min-width:.6rem}
+.trainer .timeline th:first-child{position:sticky;left:0;z-index:1;background:var(--paper);overflow-wrap:anywhere;min-width:5rem;max-width:10rem}
+.trainer .timeline .group th:first-child{background:#eeeae0}
+.trainer .timeline .chip{padding:.08rem .22rem}
+.trainer .schedule{max-height:clamp(5rem,21vh,12rem);overflow:auto;gap:0}
+.trainer .scheduleRow{padding:.24rem 0;gap:.45rem}
+.trainer .schedule label{font-size:.72rem;gap:.12rem}
+.trainer .focus{display:flex;align-items:center;gap:.5rem;margin:.3rem 0 0;max-width:none;font-size:.75rem}
+.trainer .reflections{grid-template-columns:repeat(4,minmax(0,1fr));gap:.45rem}
+.trainer .reflections article{padding-top:.25rem}
+.trainer .reflections p{max-height:4rem;overflow:auto;font-size:.8rem;margin-bottom:.25rem}
+.trainer .reflections h3{font-size:.82rem;margin-bottom:.25rem}
+/* Team screens prioritize the decision and the two live numbers. */
+.team-view #screen{margin:.75rem auto}
+.team-view .mast{padding:.6rem clamp(.75rem,4vw,2rem)}
+.team-view .participant .hero{padding:clamp(.9rem,3.5vw,1.6rem)}
+.team-view .participant .hero h1{font-size:clamp(1.85rem,7.2vw,3.25rem)}
+.team-view .participant .kicker{margin-bottom:.55rem}
+.team-view .stats{margin-top:.65rem;gap:1.5rem}
+.team-view .stats strong{font-size:clamp(1.35rem,6vw,2.1rem)}
+.team-view .choices{margin:.65rem 0;gap:.55rem}
+.team-view .choice{min-height:clamp(100px,28vw,150px);font-size:clamp(3.8rem,15vw,6.5rem);transition:background .15s,color .15s}
+.team-view .choice.X{background:var(--navy);color:#fff9ec}.team-view .choice.X:hover{background:#203d64}
+.team-view .paper{margin-top:.55rem;padding:.7rem .85rem}
+@media(max-width:780px){
+  .trainer .board{grid-template-columns:minmax(0,1fr) auto;gap:.45rem}
+  .trainer .board .actions{grid-column:1/-1}
+  .trainer .reflections{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:480px){
+  .trainer .with-qr{grid-template-columns:1fr}
+  .trainer .with-qr .roster{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .trainer .weight{border-top:0;border-left:1px solid #6d829e;display:block}
+}
 @media(max-width:760px){.poster{display:none}.landing{grid-template-columns:1fr}.roster{grid-template-columns:repeat(2,1fr)}.project{min-height:68vh}.focusTeams{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:440px){#screen,#error{width:calc(100% - 1.2rem);margin:.7rem auto}.board{grid-template-columns:1fr}.weight{border-left:0;border-top:1px solid #6d829e;padding:.55rem 0 0;display:flex;justify-content:space-between;align-items:center}.weight strong{font-size:2.3rem}.reflections{grid-template-columns:1fr}.matrix th,.matrix td{padding:.5em .28em}}

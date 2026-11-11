@@ -79,13 +79,14 @@ function hostView() {
   if (phase==="open") {title="Döntésre nyitva";desc=`${count}/4 döntés beérkezett`;action=btn("Kör lezárása","close","","primary",count!==4);}
   if (phase==="result") {title=split(now.countX);desc="A kör lezárult, a csapatok látják a saját pontjukat.";action=btn(state.index+1===state.rounds.length?"Játék lezárása és reflexiók":"Következő kör",state.index+1===state.rounds.length?"finish":"next","","primary");}
   if (phase==="finished") {title="Feldolgozás";desc=`${state.reflections.filter(Boolean).length}/4 reflexió beérkezett`;action=btn("CSV letöltése","csv","","primary")+btn(state.names&&state.rounds.length&&(state.revealed?"Csapatriport elrejtése":"Csapatriport megosztása"),"reveal");}
-  return `<section class="hero board"><div><p class="kicker">Tréneri vezérlő · ${code}</p><h1>${title}</h1><p>${desc}</p><div class="actions">${action}</div></div><div class="weight"><span>${state.index+1} / ${state.rounds.length}. kör</span><strong>×${now.multiplier}</strong></div></section>
-  ${phase==="lobby"?qrBlock():""}${roster()}
-  <section class="paper tools"><div><h2>Kivetítő</h2><a href="${screenUrl()}" target="_blank" rel="noopener">Kivetítő megnyitása ↗</a></div>
+  const weight = ["lobby","ready","negotiation"].includes(phase) ? `<label class="quick-weight">Körszorzó<select id="quick-weight">${options.map(n=>`<option value="${n}" ${n===now.multiplier?"selected":""}>×${n}</option>`).join("")}</select></label>` : `<strong>×${now.multiplier}</strong>`;
+  return `<section class="hero board"><div><p class="kicker">Tréneri vezérlő · ${code}</p><h1>${title}</h1><p>${desc}</p></div><div class="weight"><span>${state.index+1} / ${state.rounds.length}. kör</span>${weight}</div><div class="actions">${action}</div></section>
+  <div class="teams-panel ${phase==="lobby"?"with-qr":""}">${roster()}${phase==="lobby"?qrBlock():""}</div>
+  <section class="paper tools"><div><a href="${screenUrl()}" target="_blank" rel="noopener">Kivetítő megnyitása ↗</a></div>
   <div class="actions">${[["Élő nézet","live"],["Pontozási mátrix","matrix"],["QR-kód","join"],["Üres vászon","blank"]].map(([label,mode])=>btn(label,"screen",`data-mode="${mode}" aria-pressed="${state.mode===mode}"`)).join("")}</div></section>
   <section class="paper report"><h2>Döntések és pontok</h2>${timeline()}
   ${phase==="finished"?`<label class="focus">Kiemelt forduló a vásznon<select id="focus"><option value="">Teljes döntéssor</option>${state.rounds.map((_,i)=>`<option value="${i}" ${state.focus===i?"selected":""}>${i+1}. kör</option>`).join("")}</select></label>`:""}</section>
-  ${phase==="finished"?`<section class="paper"><h2>Csapatreflexiók</h2><div class="reflections">${state.reflections.map((t,i)=>`<article><h3>${esc(state.names[i])}</h3><p>${esc(t || "Várjuk a reflexiót.")}</p>${t?btn("Kivetítés név nélkül","reflect",`data-seat="${i}"`,"quiet")+btn("Névvel","reflect",`data-seat="${i}" data-named="1"`,"quiet"):""}</article>`).join("")}</div></section>`:schedule()}`;
+  ${phase==="finished"?`<section class="paper host-reflections"><h2>Csapatreflexiók</h2><div class="reflections">${state.reflections.map((t,i)=>`<article><h3>${esc(state.names[i])}</h3><p>${esc(t || "Várjuk a reflexiót.")}</p>${t?btn("Kivetítés név nélkül","reflect",`data-seat="${i}"`,"quiet")+btn("Névvel","reflect",`data-seat="${i}" data-named="1"`,"quiet"):""}</article>`).join("")}</div></section>`:schedule()}`;
 }
 function participant() {
   const now=r(), phase=state.phase;
@@ -127,6 +128,8 @@ function render(force=false) {
   const scroll=screen.querySelector(".scroll")?.scrollLeft || 0;
   signature=next;
   document.body.classList.toggle("projection",projector);
+  document.body.classList.toggle("trainer",!!state?.host);
+  document.body.classList.toggle("team-view",!!state && !state.host && !projector);
   document.body.classList.toggle("blackout",projector&&state?.mode==="blank");
   screen.innerHTML=!state?startView():state.host?hostView():projector?projection():participant();
   screen.querySelectorAll("details").forEach((d,i)=>d.open=opened[i]||false);
@@ -189,7 +192,10 @@ screen.addEventListener("click",e=>{
   }
   void run(act);
 });
-screen.addEventListener("change",e=>{if(e.target.id==="focus")void run("focus",{index:e.target.value===""?null:Number(e.target.value)});});
+screen.addEventListener("change",e=>{
+  if(e.target.id==="focus")void run("focus",{index:e.target.value===""?null:Number(e.target.value)});
+  if(e.target.id==="quick-weight")void run("config",{multiplier:Number(e.target.value),negotiations:r().negotiations});
+});
 screen.addEventListener("submit",async e=>{
   const form=e.target.closest("form[data-kind]");if(!form)return;e.preventDefault();if(busy)return;
   const b=Object.fromEntries(new FormData(form)), kind=form.dataset.kind;
