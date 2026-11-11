@@ -31,6 +31,10 @@ export const trainerGuide = `
       <aside><strong>Vészfék.</strong> Ha személyeskedés vagy kezelhetetlenné váló feszültség indul, zárd le korábban a játékot. „Ez volt az utolsó kör. Innen nem megyünk tovább, nézzük meg, mi történt velünk.”</aside>
     </section>
     <section id="guide-debrief">
+      <h3>A kivezetés szakmai alapja</h3>
+      <p>Ez a gyakorlat a trénert és a csoportot is próbára teheti. Tapasztalt trénernek való. A vezetéséhez elengedhetetlen, hogy alaposan ismerd a fogolydilemma logikáját, és értsd, milyen körülmények között válik vállalhatóvá az együttműködés, vagy éppen ésszerűvé az önvédelem.</p>
+      <p><strong>Ez nem erkölcsi játék.</strong> Abból, hogy valaki X-et vagy Y-t választott, semmi sem következik arra nézve, hogy jó ember-e. Az Y kockázatát egy csapat jó okkal ítélheti túl nagynak, és ilyenkor az X is lehet ésszerű döntés. Súlyos szakmai hiba a kivezetést erkölcsi minősítésbe vinni. Ezzel félreértelmezed a gyakorlatot, és elsikkad, hogy a csapatok milyen információk alapján döntöttek, mit kockáztattak, és hogyan hatottak egymásra.</p>
+      <p>A kivezetés irányát az alakítja, ami a csoportot foglalkoztatja, és amit trénerként érdemesnek látsz közösen megvizsgálni. Ha valakit feldühített egy megszegett megállapodás, adj neki teret elmondani, hogyan élte meg. Személyeskedésnél állítsd meg a beszélgetést, és hozd vissza ahhoz, hogy mi történt az adott körben. A pontok és a körjegyzetek segítségével megmutathatod, hogyan erősítették egymást a csapatok döntései, mikor kezdtek védekezni, és minek kellett volna változnia ahhoz, hogy újra vállalható legyen számukra az együttműködés.</p>
       <h3>A kivezetés négy lépése</h3>
       <ol>
         <li><strong>Ventilálás.</strong> „Hogy vagytok?” „Hogyan hatott rátok a gyakorlat?” Adj időt a reakcióknak. Jegyezd fel szó szerint a fontos mondatokat. Az elemzéssel várj, amíg a csoport készen áll rá.</li>
