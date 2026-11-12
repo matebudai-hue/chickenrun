@@ -24,20 +24,17 @@ export function pairGroups(pairs) {
   return { human, test, stopped };
 }
 
-export function pairStory(pair, messages, visibleQuotes = null) {
+export function pairStory(pair, messages, {includeSubmissions = true} = {}) {
   const events = [];
-  const projected = visibleQuotes !== null;
   for (const row of pair.history) {
-    if (!projected) {
+    if (includeSubmissions) {
       for (const [seat, at] of (row.submitted ?? []).entries()) {
         if (Number.isFinite(at)) events.push({ kind:"choice", distance:row.distance, at, seat, choice:row.choices[seat] });
       }
     }
     events.push({ kind:"reveal", distance:row.distance, at:row.at, choices:row.choices });
   }
-  messages.forEach((message,index) => {
-    if (!projected || visibleQuotes.includes(index)) events.push({ ...message, kind:"message", index });
-  });
+  for (const message of messages) events.push({ ...message, kind:"message" });
   if (pair.timed) {
     (pair.turns ?? []).forEach((turn,seat) => {
       if (turn) events.push({ ...turn, seat, kind:"turn" });
@@ -50,24 +47,11 @@ export function pairStory(pair, messages, visibleQuotes = null) {
     Number(a.kind === "reveal") - Number(b.kind === "reveal"));
 }
 
-export function screeningFrames(pair, messages, quotes) {
+export function screeningFrames(pair, messages) {
   const opening = pair.timed ? 1500 : (pair.distances ?? legacyPoints)[0];
-  const events = pairStory(pair,messages,quotes);
+  const events = pairStory(pair,messages,{includeSubmissions:false});
   const frames = [{ kind:"start", distance:opening }];
   frames.push(...events);
   if (pair.result === "stopped") frames.push({kind:"stopped", distance:pair.distance});
   return frames;
-}
-
-export function changeSelection(selection, number, quote) {
-  const current = selection.find(entry => entry.number === number);
-  if (quote === undefined) {
-    if (current) return selection.filter(entry => entry.number !== number);
-    if (selection.length >= 2) return selection;
-    return [...selection,{ number, quotes:[] }];
-  }
-  if (!current) return selection;
-  return selection.map(entry => entry === current ? {
-    number, quotes: entry.quotes.includes(quote) ? entry.quotes.filter(i => i !== quote) : [...entry.quotes,quote],
-  } : entry);
 }

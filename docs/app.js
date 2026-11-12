@@ -1,9 +1,9 @@
-import { presentationPages } from "./learning.js?v=23";
-import { normalizePresentation, changePresentation } from "./presentation.js?v=23";
+import { presentationPages } from "./learning.js?v=24";
+import { normalizePresentation, changePresentation } from "./presentation.js?v=24";
 import { animateRace } from "./live-race.js?v=15";
-import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=15";
+import { nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=24";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=23";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=24";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -23,7 +23,6 @@ const roomKey = "cr:"+(isTrainer ? "host" : "player")+":"+room;
 const decisionKey = "cr:pending-decision:"+room;
 const joinKey = "cr:pending-join:"+room;
 const createKey = "cr:pending-create";
-const selectionKey = "cr:projection:"+room;
 const projectionModeKey = "cr:projection-mode:"+room;
 
 let auth = saved.get(roomKey);
@@ -35,13 +34,17 @@ const screenPositions = new Map();
 let selectedGameMode = "steps";
 let raceOffset = Date.now() - performance.now(), stopAnimation, turnPending = false;
 let chatPending, chatNotice = "", turnAck;
-let selection = readSelection();
 let showPairings = saved.get(projectionModeKey) === "pairings";
 let reportTarget = saved.get(projectionModeKey)?.startsWith("learning:") ? saved.get(projectionModeKey).slice(9) : undefined;
 const presentationKey = "cr:presentation:"+room;
 let presentation;
-try { presentation = normalizePresentation(JSON.parse(saved.get(presentationKey) || "{}")); } catch { presentation = normalizePresentation(); }
-selection = presentation.target === "case" ? [{number:presentation.number,quotes:presentation.quotes}] : [];
+try {
+  const stored = JSON.parse(saved.get(presentationKey) || "{}");
+  // Old replays could omit messages, so their saved frame numbers cannot be reused.
+  if (stored.target === "case" && Array.isArray(stored.quotes)) stored.step = 0;
+  presentation = normalizePresentation(stored);
+} catch { presentation = normalizePresentation(); }
+let selection = presentation.target === "case" ? [{number:presentation.number}] : [];
 filter = presentation.scope;
 let projectorWindow, projectionPicker, projectionChoice;
 const projectionChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(presentationKey) : null;
@@ -49,7 +52,7 @@ function adoptPresentation(value) {
  const next = normalizePresentation(value);
  if (next.revision < presentation.revision) return;
  presentation = next;
- selection = next.target === "case" ? [{number:next.number,quotes:next.quotes}] : [];
+ selection = next.target === "case" ? [{number:next.number}] : [];
  screeningCase = next.number;
  screenPositions.set(next.number,next.step);
  if (state) render();
@@ -64,10 +67,14 @@ function publishPresentation(patch,open = false) {
  if(open) openProjector();
 }
 function openProjector() {
- if(projectorWindow && !projectorWindow.closed) { projectorWindow.focus(); return; }
+ if (projectorWindow && !projectorWindow.closed) return;
  projectorWindow = window.open(roomLink(room,"projector"),"chicken-projector-"+room);
  if(!projectorWindow) showNotice("A böngésző letiltotta a kivetítőablakot. Engedélyezd a felugró ablakot, majd kattints a Kivetítő megnyitása gombra.");
- else showNotice();
+ else {
+  // The browser can activate a newly created window. Ask it to keep the trainer in front.
+  window.focus();
+  showNotice();
+ }
 }
 projectionChannel?.addEventListener("message",event=>adoptPresentation(event.data));
 window.addEventListener("message",event=>{
@@ -75,7 +82,6 @@ window.addEventListener("message",event=>{
  adoptPresentation(event.data.value);
 });
 if(mode === "projector") {
- selection = presentation.target === "case" ? [{number:presentation.number,quotes:presentation.quotes}] : [];
  screeningCase = presentation.number;
  screenPositions.set(presentation.number,presentation.step);
  setInterval(()=>{
@@ -95,20 +101,9 @@ function roomLink(code, view) {
   return url.href;
 }
 
-function readSelection() {
-  try {
-    const entries = JSON.parse(saved.get(selectionKey));
-    return Array.isArray(entries) ? entries.filter(entry =>
-      entry && Number.isInteger(entry.number) && entry.number > 0 && Array.isArray(entry.quotes)).slice(0,2) : [];
-  } catch { return []; }
-}
-
-function selectStory(number,quote) {
- const pair=state.pairs.find(p=>p.number===number&&p.result);
- if(!pair)return;
- let quotes=presentation.target==='case'&&presentation.number===number?presentation.quotes.slice():[];
- if(quote!==undefined) quotes=quotes.includes(quote)?quotes.filter(q=>q!==quote):[...quotes,quote];
- publishPresentation({target:'case',number,quotes,scope:filter,page:0,step:quote===undefined?0:presentation.step},quote===undefined);
+function selectStory(number) {
+  if (!state.pairs.some(pair => pair.number === number && pair.result)) return;
+  publishPresentation({target:"case",number,scope:filter,page:0,step:0},true);
 }
 
 function endpoint(action) {
@@ -512,9 +507,8 @@ function paintScreening(target, pair, frames, index, loading) {
 }
 
 function renderPairStory(section, pair, messages, projected, loading = false) {
-  const picked = selection.find(entry => entry.number === pair.number);
   if (projected) {
-    const frames = screeningFrames(pair,messages,picked?.quotes ?? []);
+    const frames = screeningFrames(pair,messages);
     const index = Math.min(screenPositions.get(pair.number) ?? 0,frames.length-1);
     section.screening = { pair, frames, index, loading };
     paintScreening(section.querySelector("[data-transcript-body]"),pair,frames,index,loading);
@@ -529,12 +523,7 @@ function renderPairStory(section, pair, messages, projected, loading = false) {
     const marker = showDistance ? '<h4>'+(distance === undefined ? "Korábbi üzenetek" : distance+" m")+'</h4>' : "";
     let content;
     if (event.kind === "message") {
-      const selected = picked?.quotes.includes(event.index) ?? false;
-      const quoteButton = picked
-        ? '<button id="quote-'+pair.number+'-'+event.index+'" type="button" class="text-link" data-do="project-quote" data-number="'+
-          pair.number+'" data-quote="'+event.index+'" aria-pressed="'+selected+'">'+
-          (selected ? "Idézet elrejtése" : "Idézet kivetítése")+'</button>' : "";
-      content = '<strong>'+names[event.seat]+'</strong><blockquote>'+escape(event.text)+'</blockquote>'+quoteButton;
+      content = '<strong>'+names[event.seat]+'</strong><blockquote>'+escape(event.text)+'</blockquote>';
     } else if (event.kind === "turn") {
       content = '<strong>'+names[event.seat]+'</strong> · Kitérést kért '+event.target+' m-nél';
     } else if (event.kind === "choice") {
@@ -562,10 +551,43 @@ function stepScreening(by) {
   const current = section.screening;
   const index = Math.max(0,Math.min(current.frames.length-1,current.index+by));
   if (index === current.index) return;
-  current.index = index;
   publishPresentation({step:index});
-  screenPositions.set(current.pair.number,index);
-  paintScreening(section.querySelector("[data-transcript-body]"),current.pair,current.frames,index,false);
+}
+
+function getTranscript(pair) {
+  const count = pair.messageCount ?? 0;
+  let entry = transcriptCache.get(pair.number);
+  if (entry?.count === count) return entry;
+  entry = {count};
+  if (!count) {
+    entry.messages = [];
+  } else {
+    entry.request = readState(endpoint("transcript")+"?pair="+pair.number,auth).then(result => {
+      entry.messages = result.pairs[0]?.messages ?? [];
+      return entry.messages;
+    }).catch(error => {
+      if (transcriptCache.get(pair.number) === entry) transcriptCache.delete(pair.number);
+      throw error;
+    });
+  }
+  transcriptCache.set(pair.number,entry);
+  return entry;
+}
+
+async function stepProjectedCase(by) {
+  if (presentation.target !== "case") return;
+  const pair = state.pairs.find(p => p.number === presentation.number);
+  if (!pair) return;
+  try {
+    const entry = getTranscript(pair);
+    const messages = entry.messages ?? await entry.request;
+    if (presentation.target !== "case" || presentation.number !== pair.number) return;
+    const frames = screeningFrames(pair,messages);
+    const step = Math.max(0,Math.min(frames.length-1,presentation.step+by));
+    if (step !== presentation.step) publishPresentation({step});
+  } catch {
+    showNotice("Az üzeneteket nem sikerült betölteni. Próbáld újra a léptetést.");
+  }
 }
 
 function paintPairStories() {
@@ -576,32 +598,21 @@ function paintPairStories() {
     const number = Number(section.dataset.transcript);
     const pair = state.pairs.find(p => p.number === number);
     if (!pair) continue;
-    const count = pair.messageCount ?? 0;
-    if (!count || (projected && !selection.find(entry => entry.number === number)?.quotes.length)) {
-      renderPairStory(section,pair,[],projected);
-      continue;
-    }
-    let entry = transcriptCache.get(number);
-    if (entry?.count !== count) {
-      entry = { count, request:readState(endpoint("transcript")+"?pair="+number,auth) };
-      transcriptCache.set(number,entry);
-    }
+    const entry = getTranscript(pair);
+    const count = String(entry.count);
     if (entry.messages) {
-      if (section.dataset.loaded !== String(count)) renderPairStory(section,pair,entry.messages,projected);
-      section.dataset.loaded = String(count);
+      if (section.dataset.loaded !== count) renderPairStory(section,pair,entry.messages,projected);
+      section.dataset.loaded = count;
       continue;
     }
-    if (section.dataset.loading === String(count)) continue;
-    section.dataset.loading = String(count);
+    if (section.dataset.loading === count) continue;
+    section.dataset.loading = count;
     renderPairStory(section,pair,[],projected,true);
-    const current = entry;
-    void current.request.then(result => {
-      current.messages = result.pairs[0]?.messages ?? [];
-      if (!section.isConnected || transcriptCache.get(number) !== current) return;
-      renderPairStory(section,pair,current.messages,projected);
-      section.dataset.loaded = String(count);
+    void entry.request.then(messages => {
+      if (!section.isConnected || transcriptCache.get(number) !== entry) return;
+      renderPairStory(section,pair,messages,projected);
+      section.dataset.loaded = count;
     }, () => {
-      if (transcriptCache.get(number) === current) transcriptCache.delete(number);
       if (!section.isConnected) return;
       delete section.dataset.loading;
       section.querySelector("[data-transcript-body]").insertAdjacentHTML("afterbegin",
@@ -763,6 +774,7 @@ screen.addEventListener("submit", event => {
     projectionPicker = projectionChoice = undefined;
     if (target === "case") selectStory(number);
     else if (target === "person") publishPresentation({target,person:number,scope:filter,page:0},true);
+    screen.querySelector("#projection-shortcut-"+target)?.focus({preventScroll:true});
     return;
   }
   if (event.target.id === "room-form") {
@@ -844,10 +856,7 @@ screen.addEventListener("click", event => {
     publishPresentation({target:button.dataset.target,scope:filter,page:0},true);
   }
   else if(action === "projection-page") publishPresentation({page:Math.max(0,presentation.page+Number(button.dataset.by))});
-  else if(action === "project-step") {
-    const pair=state.pairs.find(p=>p.number===presentation.number);
-    if(pair){const frames=screeningFrames(pair,transcriptCache.get(pair.number)?.messages??[],presentation.quotes);publishPresentation({step:Math.max(0,Math.min(frames.length-1,presentation.step+Number(button.dataset.by)))});}
-  }
+  else if (action === "project-step") void stepProjectedCase(Number(button.dataset.by));
   else if (action === "report-case") {
     reportPair = Number(button.dataset.number);
     selectedTab = "report";
@@ -862,7 +871,6 @@ screen.addEventListener("click", event => {
     publishPresentation({scope:filter,page:0});
     window.scrollTo(0,scrollTop);
   } else if (action === "project-pair") selectStory(Number(button.dataset.number));
-  else if (action === "project-quote") selectStory(Number(button.dataset.number),Number(button.dataset.quote));
   else if (action === "project-pairings") publishPresentation({names:!presentation.names});
 });
 screen.addEventListener("change", event => {

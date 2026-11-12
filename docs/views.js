@@ -1,5 +1,5 @@
-import { analyse, outcomeReport, learningPeople, learningDetail, learningPatterns, learningGuide, learningProjection, presentationView } from "./learning.js?v=23";
-import { carPositions, pairGroups, legacyPoints } from "./story.js?v=15";
+import { analyse, outcomeReport, learningPeople, learningDetail, learningPatterns, learningGuide, learningProjection, presentationView } from "./learning.js?v=24";
+import { carPositions, pairGroups, legacyPoints } from "./story.js?v=24";
 import { nightRoad } from "./live-race.js?v=15";
 
 export const moves = { go: "Halad", yield: "Kitér" };

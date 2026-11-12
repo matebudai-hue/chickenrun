@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { personalReport, player, projector, time } from "../docs/views.js";
-import { carPositions, changeSelection, nextReveal, pairGroups, pairStory, screeningFrames } from "../docs/story.js";
+import { carPositions, nextReveal, pairGroups, pairStory, screeningFrames } from "../docs/story.js";
 
 test("both cars move inward at each distance, meet at impact and leave the lane when yielding", () => {
   const distances = [1000,800,600,400,200,100,50,10,0];
@@ -18,7 +18,7 @@ test("both cars move inward at each distance, meet at impact and leave the lane 
   assert.equal(nextReveal({number:1,history:[{}]},{number:1,history:[{}]}),null);
 });
 
-test("story places chat between the actual submissions and shows only chosen quotes on the projector", () => {
+test("story places chat between submissions and includes all messages in projection", () => {
   const pair = {history:[
     {distance:1000,at:300,submitted:[100,300],choices:["go","go"]},
     {distance:800,at:500,submitted:[400,500],choices:["yield","go"]},
@@ -27,30 +27,20 @@ test("story places chat between the actual submissions and shows only chosen quo
   const story = pairStory(pair,messages);
   assert.deepEqual(story.map(event=>event.kind),["choice","message","choice","reveal","message","choice","choice","reveal"]);
   assert.deepEqual(story.map(event=>event.at),[100,200,300,300,320,400,500,500]);
-  const publicStory = pairStory(pair,messages,[0]);
-  assert.deepEqual(publicStory.map(event=>event.kind),["message","reveal","reveal"]);
-  assert.deepEqual(publicStory.filter(event=>event.text).map(event=>event.text),["selected"]);
-  assert.ok(pairStory(pair,messages,[]).every(event=>event.kind==="reveal"));
+  const frames = screeningFrames(pair,messages);
+  assert.deepEqual(frames.map(event=>event.kind),["start","message","reveal","message","reveal"]);
+  assert.deepEqual(frames.filter(event=>event.kind==="message").map(event=>event.text),messages.map(message=>message.text));
 });
 
-test("screening starts before the outcome and only offers explicitly selected quotes", () => {
+test("timed screening begins at the start and replays every message in order", () => {
   const pair = {timed:true,result:"both",turns:[null,null],history:[{distance:50,at:800,choices:["yield","yield"]}]};
   const chat = [{distance:400,at:200,seat:0,text:"selected"},{distance:100,at:500,seat:1,text:"private"}];
-  const frames = screeningFrames(pair,chat,[0]);
-  assert.deepEqual(frames.map(frame=>frame.kind),["start","message","reveal"]);
+  const frames = screeningFrames(pair,chat);
+  assert.deepEqual(frames.map(frame=>frame.kind),["start","message","message","reveal"]);
   assert.equal(frames[0].distance,1500);
-  assert.deepEqual(frames.filter(frame=>frame.text).map(frame=>frame.text),["selected"]);
+  assert.deepEqual(frames.filter(frame=>frame.text).map(frame=>frame.text),["selected","private"]);
 });
 
-test("trainer selects at most two cases and dropping a case drops its quotes", () => {
-  const first = changeSelection([],1);
-  const quoted = changeSelection(first,1,0);
-  const two = changeSelection(quoted,2);
-  assert.deepEqual(two,[{number:1,quotes:[0]},{number:2,quotes:[]}]);
-  assert.strictEqual(changeSelection(two,3),two);
-  const dropped = changeSelection(two,1);
-  assert.deepEqual(changeSelection(dropped,1),[{number:2,quotes:[]},{number:1,quotes:[]}]);
-});
 
 test("only finished human pairs contribute to human result counts", () => {
   const human = {result:"crash",bot:false};
@@ -85,7 +75,7 @@ test("continuous replay shows a message, the turn request and the actual exit in
   ]};
   const messages = [{at:105,distance:96,seat:1,text:"Ide figyelj"}];
   assert.deepEqual(pairStory(pair,messages).map(event=>event.kind),["message","turn","reveal"]);
-  assert.deepEqual(pairStory(pair,messages,[]).map(event=>event.kind),["turn","reveal"]);
+  assert.deepEqual(screeningFrames(pair,messages).map(event=>event.kind),["start","message","turn","reveal"]);
 });
 test("participant-facing views keep the rematch and test opponent neutral", () => {
   const report = [{number:1,outcome:"both",bot:true,history:[]}];
