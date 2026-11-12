@@ -1,3 +1,5 @@
+import { injuryCard } from "./injuries.js?v=1";
+
 // Trainer-only analytics. Outcomes describe a race, never a personality.
 export const MEDALS = {win:'Győztes',lose:'Vesztes',crash:'Kórház',both:'Döntetlen'};
 const SHORT = {win:'GY',lose:'V',crash:'K',both:'D'};
@@ -9,19 +11,20 @@ const counts = () => ({win:0,lose:0,crash:0,both:0});
 export function analyse(pairs,roster=[],scope='human') {
   const ordered = pairs.slice().sort((a,b)=>a.number-b.number);
   const races = ordered.filter(p=>completed(p)&&admitted(p,scope));
-  const people = new Map(roster.map(p=>[p.number,{number:p.number,name:p.name,events:[],medals:counts(),transitions:[]} ]));
+  const people = new Map(roster.map(p=>[p.number,{number:p.number,name:p.name,events:[],medals:counts(),injuries:0,transitions:[]} ]));
   let unlinked=0;
   for (const p of ordered) {
     if (!p.result) continue;
     if (!p.playerNumbers) { if (completed(p)&&admitted(p,scope)) unlinked++; continue; }
     p.playerNumbers.forEach((id,seat)=>{
       if (!id) return;
-      if (!people.has(id)) people.set(id,{number:id,name:p.names[seat],events:[],medals:counts(),transitions:[]});
+      if (!people.has(id)) people.set(id,{number:id,name:p.names[seat],events:[],medals:counts(),injuries:0,transitions:[]});
       const person=people.get(id);
       const row=p.history?.at(-1);
       const event={pair:p,seat,medal:medalFor(p.result,seat),distance:p.result==='crash'?0:row?.distance,
         included:completed(p)&&admitted(p,scope),move:row?.choices?.[seat],gap:!!p.connectionGap?.some(Boolean)};
       person.events.push(event);
+      if (event.medal === "crash") person.injuries++;
       if(event.included) person.medals[event.medal]++;
     });
   }
@@ -68,6 +71,12 @@ function personalOutcomes(person) {
   const items = Object.entries(MEDALS).map(([key,label]) => ['medal-'+key,label,person.medals[key]]);
   return outcomeChart(items, items.map(([,label,count]) => count+' '+label).join(', '));
 }
+function personalInjuries(person) {
+  return injuryCard(person.injuries,{fullSession:person.injuries !== person.medals.crash});
+}
+function personalSummary(person) {
+  return '<div class="personal-result-summary">'+personalOutcomes(person)+personalInjuries(person)+'</div>';
+}
 export function outcomeReport(data, selected) {
   const players = data.players.filter(player => player.events.some(event => event.included) || player.number === selected);
   const person = players.find(player => player.number === selected);
@@ -75,7 +84,7 @@ export function outcomeReport(data, selected) {
   return '<section class="compact-outcomes"><div class="outcome-toolbar"><h2>Ki engedett, mi lett belőle?</h2>'+
     '<label for="outcome-player">Eredmények</label><select id="outcome-player"><option value="">Csoport</option>'+options+'</select>'+
     '<button class="button secondary small" data-do="project-learning" data-player="'+(person?.number ?? 'group')+'">'+(person ? 'Játékos eredményeinek kivetítése' : 'Csoportkép kivetítése')+'</button></div>'+
-    (person ? personalOutcomes(person) : outcomeStrip(data))+'</section>';
+    (person ? personalSummary(person) : outcomeStrip(data))+'</section>';
 }
 export function learningOverview(data,projected=false){
   return '<header class="debrief-hero"><div><p class="eyebrow">PADLÓGÁZ / '+(projected?'KÖZÖS VISSZANÉZÉS':'DÖNTÉSEK NYOMÁBAN')+'</p><h2>Ki engedett.<br>Mi lett belőle.</h2><p>A győzelemhez valakinek ki kellett térnie.</p></div><div class="hero-number"><strong>'+data.races.length+'</strong><span>lezárt futam</span></div></header>'+
@@ -103,7 +112,7 @@ function learningDetail(data,selected){
   const events=p.events.filter(e=>e.included);
   const turn=events.filter(e=>e.move==='yield');
   const afterCrash=p.transitions.filter(t=>t.prev.medal==='crash');
-  return '<section class="learning-person" id="learning-person"><div class="row between"><div><p class="eyebrow">R'+String(p.number).padStart(2,'0')+' / EGYÉNI TÖRTÉNET</p><h3>'+esc(p.name)+'</h3></div><button class="button secondary small" data-do="project-learning" data-player="'+p.number+'">Történet kivetítése</button></div><p>'+turn.length+' saját kitérés a kijelölt '+events.length+' futamban. Ütközés után '+afterCrash.length+' összevethető következő futam.</p><p class="trainer-question">Melyik futamban változott meg, amit a másiktól vártál? Mi történt előtte?</p><div class="table-wrap"><table><thead><tr><th>Saját futam</th><th>Partner</th><th>Medál</th><th>Lezárás</th><th>Visszanézés</th></tr></thead><tbody>'+events.map((e,i)=>'<tr><td>'+ (i+1)+'</td><td>'+esc(e.pair.names[1-e.seat])+'</td><td>'+MEDALS[e.medal]+'</td><td>'+distanceLabel(e)+(e.gap?' · kapcsolati jel hiányzott':'')+'</td><td><button class="text-link" data-do="report-case" data-number="'+e.pair.number+'">#'+e.pair.number+' megnyitása</button></td></tr>').join('')+'</tbody></table></div></section>';
+  return '<section class="learning-person" id="learning-person"><div class="row between"><div><p class="eyebrow">R'+String(p.number).padStart(2,'0')+' / EGYÉNI TÖRTÉNET</p><h3>'+esc(p.name)+'</h3></div><button class="button secondary small" data-do="project-learning" data-player="'+p.number+'">Történet kivetítése</button></div>'+personalInjuries(p)+'<p>'+turn.length+' saját kitérés a kijelölt '+events.length+' futamban. Ütközés után '+afterCrash.length+' összevethető következő futam.</p><p class="trainer-question">Melyik futamban változott meg, amit a másiktól vártál? Mi történt előtte?</p><div class="table-wrap"><table><thead><tr><th>Saját futam</th><th>Partner</th><th>Medál</th><th>Lezárás</th><th>Visszanézés</th></tr></thead><tbody>'+events.map((e,i)=>'<tr><td>'+ (i+1)+'</td><td>'+esc(e.pair.names[1-e.seat])+'</td><td>'+MEDALS[e.medal]+'</td><td>'+distanceLabel(e)+(e.gap?' · kapcsolati jel hiányzott':'')+'</td><td><button class="text-link" data-do="report-case" data-number="'+e.pair.number+'">#'+e.pair.number+' megnyitása</button></td></tr>').join('')+'</tbody></table></div></section>';
 }
 export function learningPatterns(data, selected = 0){
   const person = data.players.find(player => player.number === selected);
@@ -139,7 +148,7 @@ export function learningProjection(state,target='group'){
   if(target!=='group'&&!p) return '<section class="learning-screen"><h1>A történet még nem érhető el.</h1></section>';
   if(p){
     const events=p.events.filter(e=>e.included);
-    return '<section class="learning-screen"><p class="eyebrow">PADLÓGÁZ / EGY JÁTÉKOS TÖRTÉNETE</p><h1>Egy ember.<br>'+events.length+' döntési helyzet.</h1><div class="projection-medals">'+Object.keys(MEDALS).map(k=>tag(k,p.medals[k])).join('')+'</div><div class="race-ribbon projected-ribbon">'+events.map((e,i)=>raceButton(e,i,true)).join('')+'</div><p class="screen-question">Mikor változott meg,<br>amit a másiktól vártál?</p><p class="small-text">GY · Győztes / V · Vesztes / K · Kórház / D · Döntetlen · A távolság a futam lezárásának mérési pontja. ! · Hiányzó kapcsolati jel.</p></section>';
+    return '<section class="learning-screen"><p class="eyebrow">PADLÓGÁZ / EGY JÁTÉKOS TÖRTÉNETE</p><h1>Egy ember.<br>'+events.length+' döntési helyzet.</h1><div class="projection-medals">'+Object.keys(MEDALS).map(k=>tag(k,p.medals[k])).join('')+'</div>'+personalInjuries(p)+'<div class="race-ribbon projected-ribbon">'+events.map((e,i)=>raceButton(e,i,true)).join('')+'</div><p class="screen-question">Mikor változott meg,<br>amit a másiktól vártál?</p><p class="small-text">GY · Győztes / V · Vesztes / K · Kórház / D · Döntetlen · A távolság a futam lezárásának mérési pontja. ! · Hiányzó kapcsolati jel.</p></section>';
   }
   return '<section class="learning-screen">'+learningOverview(data,true)+'<p class="screen-question">Ki teremtette meg a győzelem feltételét?<br>És ő mit kapott érte?</p><p class="small-text">Egy futam egy közös kimenetel. Az egyoldalú kitérés egyik résztvevőnek Győztes, a másiknak Vesztes medált jelent.</p></section>';
 }
@@ -165,7 +174,7 @@ export function presentationView(state,p) {
   if(!person)body='<h1>A játékos története még nem érhető el.</h1>';
   else {
    const events=person.events.filter(e=>e.included);pages=Math.max(1,Math.ceil(events.length/12));page=Math.min(page,pages-1);
-   body='<h1>'+label(person)+'</h1>'+personalOutcomes(person)+'<div class="race-ribbon projected-ribbon">'+events.slice(page*12,page*12+12).map((e,i)=>raceButton(e,page*12+i,true)).join('')+'</div><p class="screen-question">Mikor változott meg, amit a másiktól vártál?</p>';
+   body='<h1>'+label(person)+'</h1>'+personalSummary(person)+'<div class="race-ribbon projected-ribbon">'+events.slice(page*12,page*12+12).map((e,i)=>raceButton(e,page*12+i,true)).join('')+'</div><p class="screen-question">Mikor változott meg, amit a másiktól vártál?</p>';
   }
  }
  if(p.target==='people') {

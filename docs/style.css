@@ -741,3 +741,42 @@ button.race-stamp{cursor:pointer}button.race-stamp:hover{background:#303c30;tran
   #case-section #report-events{max-height:none}
   .case-lanes{gap:4px}
 }
+
+/* Personal collision history, shared by the cockpit and individual results. */
+.injury-card{
+  --injury-accent:#f2b761;--injury-icon:42px;--injury-number:1.65rem;
+  display:grid;grid-template-columns:var(--injury-icon) minmax(0,1fr);align-items:center;
+  gap:.65rem;min-width:0;padding:3px 10px 3px 6px;border-block:1px solid #605540;
+  color:#f5efe1;background:#212421
+}
+.injury-card.marked,.injury-card.worn{border-top-color:var(--injury-accent)}
+.injury-card.worn{--injury-accent:#ff9c78}
+.injury-figure{display:block;width:100%;height:auto;overflow:visible}
+.injury-suit{fill:#333831;stroke:#a6a28d;stroke-width:1.15;stroke-linejoin:bevel}
+.injury-seams{fill:none;stroke:#868978;stroke-width:.85}
+.injury-mark{fill:none;stroke:var(--injury-accent);stroke-width:1.65;stroke-linecap:round}
+.injury-mark.fresh{stroke-width:2}
+.injury-mark circle{stroke-width:.85}
+.injury-copy{border-left:1px solid #615746;padding-left:.65rem}
+.injury-heading{display:flex;align-items:center;justify-content:space-between;gap:.55rem}
+.injury-heading span{font:700 .68rem/1.2 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#d5cfbd}
+.injury-heading strong{font:800 italic var(--injury-number)/1 var(--display);font-variant-numeric:tabular-nums}
+.injury-card.marked strong,.injury-card.worn strong,.injury-update{color:var(--injury-accent)}
+.injury-update,.injury-scope{display:block;margin-top:3px;font:700 .69rem/1.3 var(--mono)}
+.injury-scope{color:#d5cfbd}
+.night-playing .night-console .injury-card{border-bottom:0}
+.night-playing .injury-card+.night-drive-controls{border-top:0;padding-top:0}
+body[data-keyboard="true"] .night-playing .injury-card{--injury-icon:27px;--injury-number:1.3rem}
+.personal-result-summary{
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(12rem,22%);align-items:center;gap:.8rem
+}
+.learning-person>.injury-card{max-width:22rem}
+.learning-screen .injury-card{
+  --injury-icon:clamp(45px,8vh,88px);--injury-number:clamp(2rem,6vh,4.5rem);
+  padding:.3rem .7rem
+}
+.learning-screen .injury-heading span{font-size:clamp(.68rem,1.8vh,1.05rem)}
+.learning-screen .injury-scope{font-size:clamp(.67rem,1.55vh,.95rem)}
+@media(max-width:560px){
+  .personal-result-summary{grid-template-columns:minmax(0,1fr)}
+}

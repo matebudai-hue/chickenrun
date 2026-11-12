@@ -100,3 +100,30 @@ test('individual transition projection counts only the chosen player and respect
  assert.match(presentationView(state,{...p,names:true}),/Azonos &lt;név&gt;/);
  assert.match(presentationView(state,{...p,person:0}),/4 megfigyelt eredményátmenet/);
 });
+
+test('the selected report and its projection show the same cumulative injuries as the player',async()=>{
+ const {presentationView}=await import('../docs/learning.js');
+ const {player}=await import('../docs/views.js');
+ const pairs=[
+   ...Array.from({length:15},(_,i)=>race(i+1,'crash',{bot:i===3,playerNumbers:i===3?[1,null]:[1,2]})),
+   race(16,'stopped'),
+ ];
+ const report=pairs.map((pair)=>({number:pair.number,outcome:pair.result,history:[]}));
+ const context={room:'ABCDEFGH',tab:'report',opened:new Set(),roomLink:()=>'/test',selection:[],filter:'human',outcomePlayer:1};
+ const state={phase:'finished',pairs,roster,count:2,queue:[]};
+ const cockpit=player({phase:'running',number:15,result:'crash',outcome:'crash',history:[{distance:0}],messages:[],report},context);
+ assert.match(cockpit,/Sérülések<\/span><strong>15<\/strong>/);
+ assert.match(cockpit,/\+1 sérülés ebben a futamban/);
+ assert.match(cockpit,/data-do="requeue"/);
+ const running=player({phase:'running',number:16,step:0,distance:1000,messages:[],report},context);
+ assert.match(running,/Sérülések<\/span><strong>15<\/strong>.*data-do="yield"/);
+ assert.doesNotMatch(running,/\+1 sérülés ebben a futamban/);
+ const summary=trainer(state,context);
+ assert.match(summary,/Sérülések<\/span><strong>15<\/strong>.*A szoba összes futama/);
+ assert.match(summary,/0 Győztes, 0 Vesztes, 14 Kórház, 0 Döntetlen/);
+ const projected=presentationView(state,{target:'person',person:1,scope:'human',names:false,page:0});
+ assert.match(projected,/Játékos 01/);
+ assert.doesNotMatch(projected,/Azonos/);
+ assert.match(projected,/Sérülések<\/span><strong>15<\/strong>.*A szoba összes futama/);
+ assert.doesNotMatch(presentationView(state,{target:'group',scope:'human',names:false,page:0}),/injury-card/);
+});

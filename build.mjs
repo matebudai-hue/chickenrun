@@ -9,6 +9,7 @@ const files = {
   "/presentation.js": "text/javascript; charset=utf-8",
   "/learning.js": "text/javascript; charset=utf-8",
   "/views.js": "text/javascript; charset=utf-8",
+  "/injuries.js": "text/javascript; charset=utf-8",
   "/display-latin.woff2": "font/woff2",
   "/display-latin-ext.woff2": "font/woff2",
   "/FONT-LICENSE.txt": "text/plain; charset=utf-8",

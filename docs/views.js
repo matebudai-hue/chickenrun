@@ -1,4 +1,5 @@
-import { analyse, outcomeReport, learningPeople, learningPatterns, learningGuide, learningProjection, presentationView } from "./learning.js?v=31";
+import { injuryCard } from "./injuries.js?v=1";
+import { analyse, outcomeReport, learningPeople, learningPatterns, learningGuide, learningProjection, presentationView } from "./learning.js?v=32";
 import { carPositions, pairGroups, legacyPoints } from "./story.js?v=27";
 import { nightRoad } from "./live-race.js?v=15";
 
@@ -357,11 +358,15 @@ function stepControls(s, pendingDecision, reveal) {
   return '<div class="night-actions steps">'+action("go","Haladok","secondary",Boolean(reveal))+
     action("yield",'Kitérek <span aria-hidden="true">↗</span>',"primary",Boolean(reveal))+'</div>';
 }
-function medalCollection(report, medalFilter) {
+function medalCounts(report) {
   const counts = { other:0, own:0, crash:0, both:0 };
   for (const match of report ?? []) {
     if (Object.hasOwn(counts,match.outcome)) counts[match.outcome]++;
   }
+  return counts;
+}
+
+function medalCollection(counts, medalFilter) {
   return '<div class="night-medals" role="group" aria-label="Saját medáljaid">'+Object.entries(medals).map(([outcome,label]) =>
     '<button type="button" class="night-medal" data-do="filter-player-report" data-medal="'+outcome+
     '" aria-controls="night-report" aria-pressed="'+(medalFilter===outcome)+'"><span>'+label+'</span><strong>'+
@@ -379,10 +384,11 @@ function raceResult(s) {
 }
 function nightPlayer(s, {room,opened,turnPending,pendingDecision,reveal,medalFilter}) {
   const finished = Boolean(s.result);
+  const counts = medalCounts(s.report);
   const timeLabel = finished ? "Vége" : s.race ? s.race.startsAt === null ? "Rajt előtt" : "Rajt…"
     : (s.step+1)+" / "+(s.totalSteps ?? legacyPoints.length)+". pont";
   const finishControls = finished ? reveal ? '<p class="night-status" role="status">Futam vége</p>'
-    : raceResult(s)+medalCollection(s.report,medalFilter)+'<div class="stack rematch">'+rematch(s)+'</div>' : "";
+    : raceResult(s)+injuryCard(counts.crash,{fresh:s.outcome === "crash"})+medalCollection(counts,medalFilter)+'<div class="stack rematch">'+rematch(s)+'</div>' : "";
   const report = finished && !reveal && s.report?.length
     ? '<details id="night-report"'+(opened.has("night-report") ? " open" : "")+
       '><summary>Saját döntési riport</summary>'+personalReport(s,opened,medalFilter)+'</details>' : "";
@@ -393,7 +399,7 @@ function nightPlayer(s, {room,opened,turnPending,pendingDecision,reveal,medalFil
     (!finished ? conversation(opened,false) : "")+
     nightRoad(s.distance,timeLabel,s.race || finished ? "" : s.distance+" M",Boolean(s.race && !finished))+
     '<div class="night-console">'+(finished && !reveal && s.messages.length ? conversation(opened,true) : "")+
-    (finished ? finishControls : '<div class="night-drive-controls">'+
+    (finished ? finishControls : injuryCard(counts.crash)+'<div class="night-drive-controls">'+
       (s.race ? timedControls(s,turnPending) : stepControls(s,pendingDecision,reveal))+'</div>')+
     '</div>'+report+'</section>';
 }
