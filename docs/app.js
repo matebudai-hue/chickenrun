@@ -3,7 +3,7 @@ import { normalizePresentation, changePresentation } from "./presentation.js?v=2
 import { animateRace } from "./live-race.js?v=15";
 import { nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=27";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=29";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=30";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -47,6 +47,7 @@ try {
 let selection = presentation.target === "case" ? [{number:presentation.number}] : [];
 filter = presentation.scope;
 let projectorWindow, projectionPicker, projectionChoice;
+let caseQuery = "";
 const projectionChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(presentationKey) : null;
 function adoptPresentation(value) {
  const next = normalizePresentation(value);
@@ -514,6 +515,51 @@ function paintScreening(target, pair, frames, index, loading) {
   target.querySelector(".screening-progress span").textContent = (index+1)+" / "+frames.length;
 }
 
+function renderCaseTimeline(pair, events, loading) {
+  const names = pair.names.map(escape);
+  let previousDistance;
+  const rows = events.map((event,index) => {
+    const distance = event.distance;
+    const marker = index === 0 || distance !== previousDistance
+      ? '<div class="case-distance">'+(Number.isFinite(distance) ? distance+" m" : "Rajt előtti üzenetek")+'</div>' : "";
+    previousDistance = distance;
+    const clock = '<span class="case-clock">'+time(event.at)+'</span>';
+    if (event.kind === "reveal") {
+      const cells = event.choices.map((choice,seat) =>
+        '<div class="case-choice case-side-'+(seat===0?'a':'b')+'">'+(moves[choice] ?? "–")+'</div>').join("");
+      return '<li>'+marker+'<div class="case-lanes case-reveal">'+clock+cells+
+        '<p>'+revealTitle(pair,event,names)+'</p></div></li>';
+    }
+    const kind = event.kind === "message" ? "Üzenet" : event.kind === "choice" ? "Döntés beküldve" : "Kitérés kérése";
+    const content = event.kind === "message" ? '<blockquote>'+escape(event.text)+'</blockquote>'
+      : event.kind === "choice" ? '<strong>'+moves[event.choice]+'</strong>' : '<strong>'+event.target+' m</strong>';
+    const side = event.seat === 0 ? "a" : "b";
+    return '<li>'+marker+'<div class="case-lanes">'+clock+'<div class="case-event case-side-'+side+
+      '" aria-label="'+names[event.seat]+' · '+kind+'"><small>'+kind+'</small>'+content+'</div></div></li>';
+  }).join("");
+  return (loading ? '<p class="muted" role="status">Üzenetek betöltése…</p>' : "")+
+    (rows ? '<ol class="case-timeline" aria-label="A futam eseményei">'+rows+'</ol>'
+      : loading ? "" : '<p class="muted">Ehhez a futamhoz még nincs esemény.</p>');
+}
+
+function paintCaseSearch() {
+  const input = screen.querySelector("#case-search");
+  if (!input) return;
+  const fold = text => text.toLocaleLowerCase("hu-HU").normalize("NFD").replace(/\p{Diacritic}/gu,"");
+  const query = fold(caseQuery.trim());
+  if (input.value !== caseQuery) input.value = caseQuery;
+  let count = 0;
+  const items = screen.querySelectorAll("#report-cases [data-case-search]");
+  for (const item of items) {
+    item.hidden = !fold(item.dataset.caseSearch).includes(query);
+    if (!item.hidden) count++;
+  }
+  const countLabel = screen.querySelector("#case-count");
+  const text = count+" futam";
+  if (countLabel.textContent !== text) countLabel.textContent = text;
+  screen.querySelector("#case-no-results").hidden = !items.length || count > 0;
+}
+
 function renderPairStory(section, pair, messages, projected, loading = false) {
   if (projected) {
     const frames = screeningFrames(pair,messages);
@@ -522,8 +568,17 @@ function renderPairStory(section, pair, messages, projected, loading = false) {
     paintScreening(section.querySelector("[data-transcript-body]"),pair,frames,index,loading);
     return;
   }
-  const names = pair.names.map(escape);
   const events = pairStory(pair,messages);
+  const transcript = section.hasAttribute("data-report-story") ? renderCaseTimeline(pair,events,loading) : renderInlineStory(pair,events,loading);
+  section.querySelector("[data-transcript-body]").innerHTML = transcript+
+    (pair.result === "stopped" ? '<p class="muted">'+(pair.reason === "ready-timeout"
+      ? "A rajthoz nem érkezett meg mindkét játékos kapcsolati jelzése." : "A tréner lezárta a játékot.")+'</p>' : "")+
+    (pair.connectionGap?.some(Boolean) ? '<p class="muted">A futam végén hiányzott a kapcsolati jel · '+
+      pair.names.filter((_, seat) => pair.connectionGap[seat]).map(escape).join(", ")+'</p>' : "");
+}
+
+function renderInlineStory(pair, events, loading) {
+  const names = pair.names.map(escape);
   let distance;
   const rows = events.map(event => {
     const showDistance = distance !== event.distance;
@@ -544,13 +599,8 @@ function renderPairStory(section, pair, messages, projected, loading = false) {
     return '<li class="story-event event-'+event.kind+'">'+marker+'<div class="story-body">'+
       '<span class="story-time">'+time(event.at)+'</span><div>'+content+'</div></div></li>';
   }).join("");
-  const target = section.querySelector("[data-transcript-body]");
-  target.innerHTML = (loading ? '<p class="muted">Üzenetek betöltése…</p>' : "")+
-    (rows ? '<ol class="story-events">'+rows+'</ol>' : loading ? "" : '<p class="muted">Ehhez a játékhoz még nincs megjeleníthető esemény.</p>')+
-    (pair.result === "stopped" ? '<p class="muted">'+(pair.reason === "ready-timeout"
-      ? "A rajthoz nem érkezett meg mindkét játékos kapcsolati jelzése." : "A tréner lezárta a játékot.")+'</p>' : "")+
-    (pair.connectionGap?.some(Boolean) ? '<p class="muted">A futam végén hiányzott a kapcsolati jel · '+
-      pair.names.filter((_, seat) => pair.connectionGap[seat]).map(escape).join(", ")+'</p>' : "");
+  return (loading ? '<p class="muted">Üzenetek betöltése…</p>' : "")+
+    (rows ? '<ol class="story-events">'+rows+'</ol>' : loading ? "" : '<p class="muted">Ehhez a játékhoz még nincs megjeleníthető esemény.</p>');
 }
 
 function stepScreening(by) {
@@ -694,7 +744,7 @@ function render() {
   const active = document.activeElement;
   const focusId = screen.contains(active) ? active.id : "";
   const keepChatFocus = active.matches("#night-chat > summary");
-  const caret = focusId === "message-input" ? [active.selectionStart,active.selectionEnd] : null;
+  const caret = ["message-input","case-search"].includes(focusId) ? [active.selectionStart,active.selectionEnd] : null;
   stopAnimation?.();
   const log = document.querySelector("#messages");
   const oldScroll = log?.scrollTop ?? 0;
@@ -726,12 +776,23 @@ function render() {
     projectorFit?.observe(screen.firstElementChild);
   } else if (isTrainer) {
     screen.innerHTML = trainer(state,context);
+    paintCaseSearch();
     paintPairStories();
     screen.querySelectorAll(".race-ribbon").forEach((el,i)=>{el.scrollLeft=ribbonScrolls[i]??0;});
     const cases = screen.querySelector("#report-cases");
     const story = screen.querySelector("[data-report-story]");
     if (story) reportPair = Number(story.dataset.transcript);
     if (cases && caseScroll) cases.scrollTop = caseScroll;
+    if (cases && story?.dataset.transcript !== storyNumber) {
+      const selected = cases.querySelector('[aria-pressed="true"]:not([hidden])');
+      if (selected) {
+        const bounds = cases.getBoundingClientRect();
+        const item = selected.getBoundingClientRect();
+        if (item.top < bounds.top || item.bottom > bounds.bottom) {
+          cases.scrollTop += item.top - bounds.top;
+        }
+      }
+    }
     if (story && story.dataset.transcript === storyNumber && storyScroll) {
       story.querySelector("#report-events").scrollTop = storyScroll;
     }
@@ -770,6 +831,10 @@ screen.addEventListener("change", event => {
 });
 screen.addEventListener("input", event => {
   if (event.target.id === "message-input") draft = event.target.value;
+  if (event.target.id === "case-search") {
+    caseQuery = event.target.value;
+    paintCaseSearch();
+  }
 });
 screen.addEventListener("submit", event => {
   event.preventDefault();
@@ -782,6 +847,7 @@ screen.addEventListener("submit", event => {
     projectionPicker = projectionChoice = undefined;
     if (target === "case") {
       reportPair = number;
+      caseQuery = "";
       const pair = state.pairs.find(pair => pair.number === number);
       if (!pair?.messageCount) onlyMessages = false;
       selectStory(number);
@@ -890,6 +956,10 @@ screen.addEventListener("click", event => {
   else if (action === "project-step") void stepProjectedCase(Number(button.dataset.by));
   else if (action === "report-case") {
     reportPair = Number(button.dataset.number);
+    if (!button.closest("#report-cases")) {
+      caseQuery = "";
+      if (!state.pairs.find(pair => pair.number === reportPair)?.messageCount) onlyMessages = false;
+    }
     selectedTab = "report";
     render();
     scrollToReportSection("case-section");

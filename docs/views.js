@@ -172,20 +172,35 @@ function reportTotals(groups) {
     (groups.test.length ? group("Tesztjátékosos",groups.test) : "")+
     (groups.stopped.length ? '<span>Félbemaradt · '+groups.stopped.length+'</span>' : "")+'</div>';
 }
-function reportWorkspace(cases, chosen, selection) {
+function reportWorkspace(cases, chosen, selection, onlyMessages) {
   const ordered = cases.slice().reverse();
   const current = ordered.find(pair => pair.number === chosen) ?? ordered[0];
-  if (!current) return empty("Itt nincs lezárt játék", "A befejezett esetek a megfelelő csoportban jelennek meg.");
   const selected = pair => selection.some(entry => entry.number === pair.number);
-  const items = ordered.map(pair =>
-    '<button type="button" id="report-case-'+pair.number+'" data-do="report-case" data-number="'+pair.number+
-    '" aria-pressed="'+(current === pair)+'"><small>#'+pair.number+'</small><strong>'+pair.names.map(escape).join(" ↔ ")+'</strong>'+
-    '<span>'+pairStatus(pair)+badge((pair.messageCount??0)+' üzenet',pair.messageCount?'warm':'')+(pair.bot ? badge("Tesztjátékos") : "")+(selected(pair) ? badge("Kivetítőn","good") : "")+
-    (pair.connectionGap?.some(Boolean) ? badge("Kapcsolati jel hiányzott","warm") : "")+'</span></button>').join("");
-  return '<div class="report-workspace"><nav id="report-cases" class="report-cases" aria-label="Lezárt párok">'+items+'</nav>'+
-    '<section class="report-detail" data-transcript="'+current.number+'" data-report-story><div class="report-detail-head"><div><h3>'+
-    current.names.map(escape).join(" ↔ ")+'</h3><p class="small-text">A pár története · #'+current.number+'</p></div>'+
-    projectionButton(current,selected(current))+'</div><div id="report-events" data-transcript-body></div></section></div>';
+  const items = ordered.map(pair => {
+    const names = escape(pair.names.join(" ↔ "));
+    const messages = pair.messageCount ?? 0;
+    return '<button type="button" id="report-case-'+pair.number+'" data-do="report-case" data-number="'+pair.number+
+      '" data-case-search="'+escape(pair.number+" #"+pair.number+" "+pair.names.join(" "))+'" aria-pressed="'+(current === pair)+'">'+
+      '<small>#'+pair.number+'</small><strong>'+names+'</strong><span>'+pairStatus(pair)+
+      (messages ? badge(messages+" üzenet","warm") : '')+(pair.bot ? badge("Tesztjátékos") : "")+
+      (selected(pair) ? badge("Kivetítőn","good") : "")+'</span></button>';
+  }).join("");
+  const list = '<div class="case-browser"><div class="case-browser-tools"><label for="case-search">Futam keresése</label>'+
+    '<input id="case-search" type="search" placeholder="Név vagy futamszám" autocomplete="off" aria-controls="report-cases">'+
+    '<div class="case-browser-filters"><button id="case-message-filter" class="button secondary small" type="button" data-do="report-messages" aria-pressed="'+
+    !!onlyMessages+'">Csak üzenetes futamok</button><span id="case-count" role="status">'+ordered.length+' futam</span></div></div>'+
+    '<nav id="report-cases" class="report-cases" aria-label="Lezárt futamok">'+items+'</nav>'+
+    '<p id="case-no-results" class="muted" hidden>Nincs találat erre a keresésre.</p></div>';
+  if (!current) return '<div class="report-workspace">'+list+
+    empty("Itt nincs lezárt futam",onlyMessages ? "Kapcsold ki az üzenetszűrőt a többi futamhoz." : "Válts a fejlécben futamszűrőt.")+'</div>';
+  const [a,b] = current.names.map(escape);
+  const detail = '<section class="report-detail" data-transcript="'+current.number+'" data-report-story aria-label="A kiválasztott futam">'+
+    '<div class="report-detail-head"><div><h3>Futam #'+current.number+'</h3><div class="case-result">'+pairStatus(current)+
+    '<span>'+(current.messageCount ?? 0)+' üzenet</span>'+(current.bot ? '<span>Tesztjátékos</span>' : '')+'</div></div>'+
+    projectionButton(current,selected(current))+'</div>'+
+    '<div class="case-timeline-head case-lanes"><span>Időpont</span><strong class="case-side-a">'+a+'</strong><strong class="case-side-b">'+b+'</strong></div>'+
+    '<div id="report-events" data-transcript-body></div></section>';
+  return '<div class="report-workspace">'+list+detail+'</div>';
 }
 export function trainer(s, context) {
   const { room, tab, opened, roomLink, selection, filter, selectedGameMode, reportPair, reportPlayer, outcomePlayer, transitionPerson, onlyMessages, projectionPicker, projectionChoice, presentation = {target:"group",names:false,scope:"human",page:0} } = context;
@@ -237,11 +252,9 @@ export function trainer(s, context) {
       projectSection("people","Futamsorok kivetítése")+'</div>'+timelineHelp+learningPeople(data,reportPlayer)+'</section>'+
       learningPatterns(data,transitionPerson)+
       '<section class="debrief-section report-panel" id="case-section" tabindex="-1"><div class="report-section-head">'+
-      '<h3>Egy futam két oldala</h3><div class="row">'+
-      '<button class="button secondary small" data-do="report-messages" aria-pressed="'+!!onlyMessages+'">'+
-      (onlyMessages?"Minden eset mutatása":"Csak üzenetváltással")+'</button>'+
+      '<h3>Egy futam két oldala</h3>'+
       action("download-host","Döntések és üzenetek · CSV","small secondary",!s.pairs.some(p=>p.result))+
-      '</div></div>'+reportWorkspace(cases,reportPair,selection)+
+      '</div>'+reportWorkspace(cases,reportPair,selection,onlyMessages)+
       '<p class="trainer-question">Mire számítottál ezen a ponton, és miért? Mit tudtál akkor a másik szándékáról?</p></section>'+
       learningGuide(opened)+'</div>';
   } else if (lobby) {
