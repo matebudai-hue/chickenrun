@@ -254,7 +254,6 @@ export function trainer(s, context) {
       '<section class="debrief-section report-panel" id="case-section" tabindex="-1"><div class="report-section-head">'+
       '<h3>Egy futam két oldala</h3><div class="row">'+
       action("download-host","Döntések és üzenetek · CSV","small secondary",!s.pairs.some(p=>p.result))+
-      action("download-diagnostics","Hibakeresési riport · JSON","small secondary",!s.pairs.length)+
       '</div></div>'+reportWorkspace(cases,reportPair,selection,onlyMessages)+
       '<p class="trainer-question">Mire számítottál ezen a ponton, és miért? Mit tudtál akkor a másik szándékáról?</p></section>'+
       learningGuide(opened)+'</div>';
@@ -264,7 +263,8 @@ export function trainer(s, context) {
       action("copy","Belépőlink másolása","secondary")+'<p class="muted">Ha megvan a létszám, indítsd a játékot. A rendszer véletlenszerűen párosít.</p>',"invite")+'</div>';
   } else {
     body = queueOverview(s)+connectionsCard(s)+card("Párok és döntések",
-      pairList([...active,...s.pairs.filter(p=>p.result).slice().reverse()],opened,selection,true));
+      pairList([...active,...s.pairs.filter(p=>p.result).slice().reverse()],opened,selection,true))+
+      '<footer>'+action("download-diagnostics","Hibakeresési riport · JSON","small secondary",!s.pairs.length)+'</footer>';
   }
   return '<div class="cockpit"><header class="trainer-sticky">'+toolbar+projectionControls(s,filter,presentation,projectionPicker,projectionChoice,{reportPair,reportPlayer,outcomePlayer,transitionPerson})+'</header><div class="trainer-content">'+(tab === "report" && !lobby ? '' : '<div class="control-overview">'+metrics+chooser+'</div>')+body+'</div></div>';
 }
