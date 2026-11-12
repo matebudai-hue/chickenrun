@@ -8,6 +8,14 @@ const keyPattern = /^[a-f0-9]{32}$/;
 const digest = async key => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key))), n => n.toString(16).padStart(2,"0")).join("");
 const archivePrefix = auth => "xy-archive:"+auth+":";
 const archiveExpiry = Date.UTC(9999,0,1);
+async function updateArchive(store, id, update) {
+  for (let attempt=0;attempt<12;attempt++) {
+    const row=await store.get(id);
+    const state=JSON.stringify(update(row ? JSON.parse(row.state) : null));
+    if (row ? await store.put(id,row.revision,state) : await store.create(id,archiveExpiry,state)) return;
+  }
+  fail(503,"A mentés most nem sikerült. Próbáld újra.");
+}
 const clean = (s, max) => typeof s === "string" ? s.trim().slice(0,max) : "";
 const choice = x => x === "X" || x === "Y";
 const current = s => s.rounds[s.index];
@@ -215,7 +223,10 @@ export async function xyApi(req, store) {
     const auth = await digest(key);
     const archive = /^\/api\/xy\/archive(?:\/([a-f0-9]{64}))?$/.exec(path);
     if (archive && req.method === "GET") {
-      if (!archive[1]) return reply(await store.listArchive(archivePrefix(auth)));
+      if (!archive[1]) {
+        const list=await store.get(archivePrefix(auth)+"index");
+        return reply(list ? JSON.parse(list.state) : []);
+      }
       const entry = await store.get(archivePrefix(auth)+archive[1]);
       if (!entry) fail(404,"A mentett játék nem található.");
       return reply(JSON.parse(entry.state));
@@ -236,14 +247,12 @@ export async function xyApi(req, store) {
         if (!company || !reason || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !keyPattern.test(b.archiveKey || ""))
           fail(400,"Add meg a dátumot, a céget és a mentés okát.");
         const archiveId=await digest("xy-archive:"+code+":"+auth);
-        const archiveCode=archivePrefix(await digest(b.archiveKey))+archiveId;
+        const prefix=archivePrefix(await digest(b.archiveKey));
         const report=resultReport(s);
         const entry={id:archiveId,code,date,company,reason,rounds:report.rounds.filter(r=>r.scores).length};
-        const snapshot=JSON.stringify({...entry,report});
-        const existing=await store.get(archiveCode);
-        if (existing ? await store.put(archiveCode,existing.revision,snapshot) : await store.create(archiveCode,archiveExpiry,snapshot))
-          return reply(entry);
-        continue;
+        await updateArchive(store,prefix+archiveId,()=>({...entry,report}));
+        await updateArchive(store,prefix+"index",entries=>[entry,...(entries || []).filter(item=>item.id!==entry.id)]);
+        return reply(entry);
       }
       if (act==="report") {
         check(s.phase==="finished","A PDF a játék lezárása után érhető el.");
