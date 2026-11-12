@@ -51,11 +51,31 @@ function raceButton(e,index,projected=false){
   const title=(index+1)+'. saját futam · #'+e.pair.number+' · '+(MEDALS[e.medal]??'Félbemaradt')+' · '+distanceLabel(e);
   return '<'+(projected?'span':'button type="button" data-do="report-case" data-number="'+e.pair.number+'"')+' class="race-stamp medal-'+esc(e.medal)+'" '+(projected?'':'aria-label="'+esc(title)+'" ')+'title="'+esc(title)+'"><small>'+String(index+1).padStart(2,'0')+'</small><b>'+ (SHORT[e.medal]??'—')+'</b><span>'+distanceLabel(e)+'</span>'+(e.pair.bot&&!projected?'<i>T</i>':'')+(e.gap?'<i>!</i>':'')+'</'+(projected?'span':'button')+'>';
 }
-function outcomeStrip(data){
-  const n=data.races.length;
-  return '<div class="outcome-strip" role="img" aria-label="'+n+' futam: '+data.total.single+' egyoldalú kitérés, '+data.total.both+' kölcsönös kitérés, '+data.total.crash+' ütközés">'+
-    [['single','Egyik kitért'],['both','Mindketten kitértek'],['crash','Ütközés']].map(([key,label])=>
-      '<div class="strip-'+key+'" style="flex:'+Math.max(data.total[key],.15)+'"><b>'+data.total[key]+'</b><span>'+label+'</span></div>').join('')+'</div>';
+function outcomeChart(items, description) {
+  const bar = items.filter(([,,count]) => count > 0).map(([color,,count]) =>
+    '<span class="'+color+'" style="flex-grow:'+count+'"></span>').join('');
+  const legend = items.map(([color,label,count]) =>
+    '<div><i class="'+color+'"></i><b>'+count+'</b><span>'+label+'</span></div>').join('');
+  return '<div class="outcome-chart" role="img" aria-label="'+esc(description)+'">'+
+    '<div class="outcome-bar" aria-hidden="true">'+bar+'</div><div class="outcome-legend" aria-hidden="true">'+legend+'</div></div>';
+}
+function outcomeStrip(data) {
+  const {single,both,crash} = data.total;
+  return outcomeChart([['strip-single','Egyik kitért',single],['strip-both','Mindketten kitértek',both],['strip-crash','Ütközés',crash]],
+    data.races.length+' futam: '+single+' egyoldalú kitérés, '+both+' kölcsönös kitérés, '+crash+' ütközés');
+}
+function personalOutcomes(person) {
+  const items = Object.entries(MEDALS).map(([key,label]) => ['medal-'+key,label,person.medals[key]]);
+  return outcomeChart(items, items.map(([,label,count]) => count+' '+label).join(', '));
+}
+export function outcomeReport(data, selected) {
+  const players = data.players.filter(player => player.events.some(event => event.included) || player.number === selected);
+  const person = players.find(player => player.number === selected);
+  const options = players.map(player => '<option value="'+player.number+'"'+(player === person ? ' selected' : '')+'>'+esc(player.name)+' · R'+String(player.number).padStart(2,'0')+'</option>').join('');
+  return '<section class="compact-outcomes"><div class="outcome-toolbar"><h2>Ki engedett, mi lett belőle?</h2>'+
+    '<label for="outcome-player">Eredmények</label><select id="outcome-player"><option value="">Csoport</option>'+options+'</select>'+
+    '<button class="button secondary small" data-do="project-learning" data-player="'+(person?.number ?? 'group')+'">'+(person ? 'Játékos eredményeinek kivetítése' : 'Csoportkép kivetítése')+'</button></div>'+
+    (person ? personalOutcomes(person) : outcomeStrip(data))+'</section>';
 }
 export function learningOverview(data,projected=false){
   return '<header class="debrief-hero"><div><p class="eyebrow">CHICKEN RUN / '+(projected?'KÖZÖS VISSZANÉZÉS':'DÖNTÉSEK NYOMÁBAN')+'</p><h2>Ki engedett.<br>Mi lett belőle.</h2><p>A győzelemhez valakinek ki kellett térnie.</p></div><div class="hero-number"><strong>'+data.races.length+'</strong><span>lezárt futam</span></div></header>'+
@@ -137,7 +157,7 @@ export function presentationView(state,p) {
   if(!person)body='<h1>A játékos története még nem érhető el.</h1>';
   else {
    const events=person.events.filter(e=>e.included);pages=Math.max(1,Math.ceil(events.length/12));page=Math.min(page,pages-1);
-   body='<h1>'+label(person)+'</h1><div class="outcome-strip personal-strip">'+Object.keys(MEDALS).map(k=>'<div class="medal-'+k+'"><b>'+person.medals[k]+'</b><span>'+MEDALS[k]+'</span></div>').join('')+'</div><div class="race-ribbon projected-ribbon">'+events.slice(page*12,page*12+12).map((e,i)=>raceButton(e,page*12+i,true)).join('')+'</div><p class="screen-question">Mikor változott meg, amit a másiktól vártál?</p>';
+   body='<h1>'+label(person)+'</h1>'+personalOutcomes(person)+'<div class="race-ribbon projected-ribbon">'+events.slice(page*12,page*12+12).map((e,i)=>raceButton(e,page*12+i,true)).join('')+'</div><p class="screen-question">Mikor változott meg, amit a másiktól vártál?</p>';
   }
  }
  if(p.target==='people') {
@@ -154,7 +174,7 @@ export function presentationView(state,p) {
   const slides=[['Egy konkrét döntés','Mit akartál elérni? Mire számítottál a másiktól, és mire alapoztad ezt?'],['A győzelem másik oldala','A másik kitérése mit tett lehetővé neked? Aki Vesztest kapott, mit védett meg?'],['Mit hittél el?','Miből következtettél arra, hogy a másik engedni fog?'],['Ki viseli az engedés terhét?','Hol várjuk újra és újra ugyanattól az embertől, hogy engedjen?'],['Építsetek lámpát.','Milyen szabályt fogadnál el akkor is, ha legközelebb te kapnál pirosat?'],['Próbáljátok ki.','Kivel, mikor próbálod ki a szabályt, és miből látjátok majd, hogy működik?']];
   pages=slides.length;page=Math.min(page,pages-1);body='<p class="hero-number"><strong>0'+(page+1)+'</strong></p><h1>'+slides[page][0]+'</h1><p class="screen-question">'+slides[page][1]+'</p>';
  }
- return '<section class="learning-screen presentation-screen"><p class="eyebrow">'+scope+' / '+(p.names?'Nevekkel':'Név nélkül')+'</p>'+body+'<nav class="presentation-pager" aria-label="Kivetített oldalak"><button class="button secondary" data-do="projection-page" data-by="-1"'+(!page?' disabled':'')+'>← Előző</button><span>'+(page+1)+' / '+pages+'</span><button class="button secondary" data-do="projection-page" data-by="1"'+(page>=pages-1?' disabled':'')+'>Következő →</button></nav></section>';
+ return '<section class="learning-screen presentation-screen" data-slide="'+p.target+'"><p class="eyebrow">'+scope+' / '+(p.names?'Nevekkel':'Név nélkül')+'</p>'+body+(pages>1?'<nav class="presentation-pager" aria-label="Kivetített oldalak"><button class="button secondary" data-do="projection-page" data-by="-1"'+(!page?' disabled':'')+'>← Előző</button><span>'+(page+1)+' / '+pages+'</span><button class="button secondary" data-do="projection-page" data-by="1"'+(page>=pages-1?' disabled':'')+'>Következő →</button></nav>':'')+'</section>';
 }
 export function presentationPages(state,p) {
  const data=analyse(state.pairs,state.roster,p.scope);

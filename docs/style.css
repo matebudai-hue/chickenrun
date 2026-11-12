@@ -582,3 +582,68 @@ button.race-stamp{cursor:pointer}button.race-stamp:hover{background:#303c30;tran
 .presentation-screen:has(.projected-lanes){gap:.8rem;justify-content:flex-start}.presentation-screen:has(.projected-lanes) h1{font-size:clamp(2rem,4vw,3.4rem)}
 .transition-explanation{line-height:1.6;max-width:65rem}.presentation-screen .transition-table{font-size:1.1rem}.presentation-screen .transition-value{font-size:2.2rem}
 @media(max-width:700px){.projected-lanes article{grid-template-columns:90px minmax(0,1fr)}.projected-lanes h3{font-size:1.1rem}.projected-lanes .race-ribbon{overflow-x:auto}.projected-lanes .race-stamp{flex:0 0 50px}.projection-desk{gap:.5rem}}
+
+.trainer-sticky{position:sticky;top:0;z-index:4;background:var(--bg)}
+.trainer-sticky .control{position:static}
+.trainer-navigation{display:flex;justify-content:space-between;align-items:center;gap:4px 12px;flex-wrap:wrap;padding:3px 8px;border-bottom:1px solid var(--line)}
+.trainer-navigation .section-nav{border:0}
+.trainer-navigation .button,.trainer-sticky .projection-desk .button{min-height:32px;padding:3px 8px}
+.trainer-sticky .projection-desk{margin:0;padding:3px 8px;gap:4px 10px;border-inline:0;border-top:0}
+.trainer-sticky .projection-desk>div:first-child{display:flex;align-items:baseline;gap:.6rem}
+.trainer-sticky .projection-desk strong{font-size:1rem}
+.debrief-section,.learning-person{scroll-margin-top:13rem}
+
+.compact-outcomes{display:grid;gap:.45rem;padding:.55rem .9rem;border-bottom:1px solid var(--line)}
+.outcome-toolbar{display:flex;align-items:center;gap:.35rem .7rem;flex-wrap:wrap}
+.outcome-toolbar h2{font-size:1.18rem;margin-right:auto}
+.outcome-toolbar label{font-size:.8rem}
+.outcome-toolbar select{min-width:9rem;max-width:100%;min-height:32px;background:var(--paper);color:var(--ink);border:1px solid var(--rule);font:inherit;font-size:.85rem}
+.outcome-toolbar .button{min-height:32px;padding:3px 8px}
+.outcome-chart{display:grid;gap:.55rem}
+.outcome-bar{display:flex;height:.65rem;overflow:hidden;background:#28372c}
+.outcome-bar>span{flex-basis:0;min-width:0}
+.outcome-bar [class^="medal-"],.outcome-legend [class^="medal-"]{background:var(--medal)}
+.outcome-legend{display:flex;gap:.35rem 1.2rem;flex-wrap:wrap}
+.outcome-legend>div{display:flex;align-items:baseline;gap:.35rem}
+.outcome-legend i{width:.6em;height:.6em;align-self:center;flex-shrink:0}
+.outcome-legend b{font:800 1.1em/1 var(--display)}
+.compact-outcomes .outcome-legend{font-size:.8rem}
+.compact-outcomes .outcome-chart{gap:.3rem}
+
+[data-surface="projector"]{height:100dvh;min-height:0;overflow:clip}
+[data-surface="projector"] #app{height:100%;width:min(100% - 24px,1720px);padding:0 0 10px;display:grid;grid-template-rows:auto minmax(0,1fr);gap:6px}
+[data-surface="projector"] .mast{min-height:32px;margin:0}
+[data-surface="projector"] .brand{font-size:1rem}
+[data-surface="projector"] .brand img{width:20px;height:20px}
+[data-surface="projector"] .notice{position:fixed;z-index:5;bottom:1rem;left:1rem;right:1rem}
+[data-surface="projector"] #screen{min-height:0;overflow:clip}
+.projector-slide{transform:translateY(var(--slide-offset,0px)) scale(var(--slide-scale,1));transform-origin:top center;display:flow-root}
+.presentation-screen{min-height:0;padding:clamp(.8rem,3.4vh,2.5rem);gap:clamp(.55rem,2vh,1.5rem)}
+.presentation-screen .debrief-hero{min-height:0;align-items:center}
+.presentation-screen .debrief-hero h2,.presentation-screen>h1{font-size:clamp(2.1rem,min(6vw,10vh),6rem);overflow-wrap:anywhere}
+.presentation-screen .hero-number strong{font-size:clamp(3rem,12vh,8rem)}
+.presentation-screen .screen-question{font-size:clamp(1.25rem,4.4vh,3rem)}
+.presentation-screen .outcome-chart{gap:clamp(.5rem,2vh,1.2rem)}
+.presentation-screen .outcome-bar{height:clamp(1.5rem,8vh,5.5rem)}
+.presentation-screen .outcome-legend{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}
+.presentation-screen[data-slide="person"] .outcome-legend{grid-template-columns:repeat(4,minmax(0,1fr))}
+.presentation-screen .outcome-legend>div{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:.15rem .55rem}
+.presentation-screen .outcome-legend b{font-size:clamp(1.8rem,7vh,4.6rem)}
+.presentation-screen .outcome-legend span{grid-column:2;overflow-wrap:anywhere;font-size:clamp(.72rem,2.5vh,1.35rem)}
+.presentation-screen .outcome-legend i{width:.7em;height:.7em}
+.presentation-screen .race-ribbon{padding:2px 0;gap:clamp(2px,.45vw,.55rem);overflow:visible}
+.presentation-screen .race-stamp{flex:1 1 0;min-width:0;min-height:clamp(36px,8vh,68px);gap:2px}
+.presentation-screen .race-stamp b{font-size:clamp(.8rem,3vh,1.6rem)}
+.presentation-screen .race-stamp small,.presentation-screen .race-stamp span{font-size:clamp(.42rem,1.4vh,.78rem);overflow-wrap:anywhere}
+.presentation-screen .projected-ribbon{flex-wrap:nowrap}
+.presentation-screen .projected-lanes{gap:clamp(2px,.6vh,.5rem)}
+.presentation-screen .projected-lanes article{grid-template-columns:minmax(60px,13%) minmax(0,1fr);gap:.5rem}
+.presentation-screen .projected-lanes h3{font-size:clamp(.8rem,3vh,1.6rem)}
+.presentation-screen .transition-table{min-width:0;table-layout:fixed}
+.presentation-screen .transition-table th,.presentation-screen .transition-table td{padding:clamp(2px,.65vh,8px);overflow-wrap:anywhere}
+.presentation-screen .transition-value{font-size:clamp(1rem,4vh,2.2rem);padding:clamp(2px,.6vh,7px)}
+.presentation-screen .presentation-pager .button{min-height:32px;padding:3px 9px}
+[data-surface="projector"] .screening-story{min-height:0}
+[data-surface="projector"] .screening-head h1{overflow-wrap:anywhere;min-width:0}
+[data-surface="projector"] .projection .invite{min-width:0}
+[data-surface="projector"] #inline-qr canvas,[data-surface="projector"] #inline-qr svg{max-width:min(65vw,46vh);height:auto}

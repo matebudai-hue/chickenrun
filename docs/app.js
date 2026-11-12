@@ -1,9 +1,9 @@
-import { presentationPages } from "./learning.js?v=21";
-import { normalizePresentation, changePresentation } from "./presentation.js?v=21";
+import { presentationPages } from "./learning.js?v=22";
+import { normalizePresentation, changePresentation } from "./presentation.js?v=22";
 import { animateRace } from "./live-race.js?v=15";
 import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=15";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=21";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=22";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -29,7 +29,7 @@ const projectionModeKey = "cr:projection-mode:"+room;
 let auth = saved.get(roomKey);
 let state, signature, loadFailure, errorRetry, pollTimer;
 let busy = false, polling = false, generation = 0, lastPulse = 0;
-let selectedTab = "overview", filter = "human", reportPair, reportPlayer, onlyMessages = false, draft = "", messageRequest, confirmAction;
+let selectedTab = "overview", filter = "human", reportPair, reportPlayer, outcomePlayer, onlyMessages = false, draft = "", messageRequest, confirmAction;
 let reveal, revealTimer, finishRoadHeight, screeningCase, medalFilter;
 const screenPositions = new Map();
 let selectedGameMode = "steps";
@@ -42,6 +42,7 @@ const presentationKey = "cr:presentation:"+room;
 let presentation;
 try { presentation = normalizePresentation(JSON.parse(saved.get(presentationKey) || "{}")); } catch { presentation = normalizePresentation(); }
 selection = presentation.target === "case" ? [{number:presentation.number,quotes:presentation.quotes}] : [];
+filter = presentation.scope;
 let projectorWindow;
 const projectionChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(presentationKey) : null;
 function adoptPresentation(value) {
@@ -652,6 +653,19 @@ function paintChat() {
   paintChatControls();
 }
 
+// Scale the entire slide only when its natural layout exceeds the available area.
+const projectorFit = mode === "projector" && typeof ResizeObserver !== "undefined"
+  ? new ResizeObserver(fitProjector) : null;
+projectorFit?.observe(screen);
+
+function fitProjector() {
+  const slide = screen.firstElementChild;
+  if (!slide?.classList.contains("projector-slide")) return;
+  const scale = Math.min(1, screen.clientWidth / slide.scrollWidth, screen.clientHeight / slide.scrollHeight);
+  slide.style.setProperty("--slide-scale", String(scale));
+  slide.style.setProperty("--slide-offset", Math.max(0, (screen.clientHeight - slide.scrollHeight * scale) / 2)+"px");
+}
+
 function render() {
   for (const item of screen.querySelectorAll("details[id]")) {
     opened.seen.add(item.id);
@@ -670,7 +684,7 @@ function render() {
   const caseScroll = screen.querySelector("#report-cases")?.scrollTop;
   const storyScroll = screen.querySelector("#report-events")?.scrollTop;
   const storyNumber = screen.querySelector("[data-report-story]")?.dataset.transcript;
-  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reportPair, reportPlayer, reportTarget, presentation, onlyMessages, reveal, showPairings, selectedGameMode, turnPending, medalFilter };
+  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reportPair, reportPlayer, outcomePlayer, reportTarget, presentation, onlyMessages, reveal, showPairings, selectedGameMode, turnPending, medalFilter };
   if (!room) {
     const previous = saved.get("cr:last-host");
     screen.innerHTML = mode === "player" ? enterCode() : home(codeValid.test(previous ?? "") ? previous : null, roomLink);
@@ -685,8 +699,12 @@ function render() {
   } else if (!state) {
     screen.innerHTML = waitingPage(room,"Kapcsolódás…","A futam állását töltjük be.");
   } else if (mode === "projector") {
-    screen.innerHTML = projector(state,room,selection,false,screeningCase,undefined,presentation);
+    projectorFit?.disconnect();
+    screen.innerHTML = '<div class="projector-slide">'+projector(state,room,selection,false,screeningCase,undefined,presentation)+'</div>';
     paintPairStories();
+    fitProjector();
+    projectorFit?.observe(screen);
+    projectorFit?.observe(screen.firstElementChild);
   } else if (isTrainer) {
     screen.innerHTML = trainer(state,context);
     paintPairStories();
@@ -776,6 +794,7 @@ screen.addEventListener("click", event => {
   else if (action === "tab") {
     selectedTab = button.dataset.tab;
     render();
+    window.scrollTo(0,0);
     screen.querySelector('[data-tab="'+selectedTab+'"]').focus();
   } else if (action === "share") share();
   else if (action === "copy") void copyLink(button);
@@ -820,11 +839,18 @@ screen.addEventListener("click", event => {
     onlyMessages = !onlyMessages;
     render();
   } else if (action === "filter") {
+    const scrollTop = window.scrollY;
     filter = button.dataset.filter;
     publishPresentation({scope:filter,page:0});
+    window.scrollTo(0,scrollTop);
   } else if (action === "project-pair") selectStory(Number(button.dataset.number));
   else if (action === "project-quote") selectStory(Number(button.dataset.number),Number(button.dataset.quote));
   else if (action === "project-pairings") publishPresentation({names:!presentation.names});
+});
+screen.addEventListener("change", event => {
+  if (event.target.id !== "outcome-player") return;
+  outcomePlayer = Number(event.target.value) || undefined;
+  render();
 });
 screen.addEventListener("toggle", event => {
   if (event.target.id === "night-chat" && event.target.open) {

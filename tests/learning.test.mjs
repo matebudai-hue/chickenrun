@@ -45,6 +45,13 @@ test('dashboard renders populated and empty states with existing case projection
  const html=trainer(s,context);
  assert.match(html,/debrief-dashboard/);assert.match(html,/data-do="project-learning"/);
  assert.match(html,/data-do="project-pair"/);assert.match(html,/Játékelméleti háttér/);
+ assert.match(html,/id="outcome-player"/);
+ assert.match(trainer(s,{...context,outcomePlayer:1}),/0 Győztes, 1 Vesztes, 0 Kórház, 0 Döntetlen/);
+ for (const tab of ['overview','players']) {
+  const view = trainer(s,{...context,tab});
+  assert.doesNotMatch(view,/compact-outcomes/);
+  assert.match(view,/<header class="trainer-sticky">.*id="filter-human".*<\/header>/);
+ }
  assert.doesNotThrow(()=>trainer({...s,pairs:[]},context));
 });
 
