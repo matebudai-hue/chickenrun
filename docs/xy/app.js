@@ -105,11 +105,12 @@ function hostView() {
   if (["ready","negotiation","open"].includes(phase) || phase==="result" && state.index+1<state.rounds.length) action+=btn("Játék lezárása","finish");
   if (phase==="finished") {title="Feldolgozás";desc=`${state.reflections.filter(Boolean).length}/4 reflexió beérkezett${state.reportShared?" · PDF megosztva":""}`;action=btn("Végeredmény kivetítése","results","","primary")+btn("PDF letöltése","pdf")+btn(state.reportShared?"Megosztott PDF frissítése":"PDF megosztása a csapatokkal","share-pdf")+(state.reportShared?btn("Megosztás leállítása","unshare-pdf"):"");}
   const weight = ["lobby","ready","negotiation"].includes(phase) ? `<label class="quick-weight">Körszorzó<select id="quick-weight">${options.map(n=>`<option value="${n}" ${n===now.multiplier?"selected":""}>×${n}</option>`).join("")}</select></label>` : `<strong>×${now.multiplier}</strong>`;
+  if (phase==="finished") action+=btn("Új játék","new-game");
   if (state.canContinue) action=btn("Tovább játszom","continue","","primary")+action;
   return `<section class="hero board"><div><p class="kicker">Tréneri vezérlő · ${code}</p><h1>${title}</h1><p>${desc}</p></div><div class="weight"><span>${state.index+1} / ${state.rounds.length}. kör</span>${weight}</div><div class="actions">${action}</div></section>
   <div class="teams-panel ${phase==="lobby"?"with-qr":""}">${roster()}${phase==="lobby"?qrBlock():""}</div>
   <section class="paper tools"><div class="trainer-links"><a href="${screenUrl()}" target="_blank" rel="noopener">Kivetítő megnyitása ↗</a></div>
-  <div class="actions">${[[phase==="finished"?"Élő nézet":"Játéknézet · mátrix","live"],...(phase==="finished"?[["Pontozási mátrix","matrix"]]:[]),["QR-kód","join"],["Üres vászon","blank"]].map(([label,mode])=>btn(label,"screen",`data-mode="${mode}" aria-pressed="${state.mode===mode || phase!=="finished" && mode==="live" && state.mode==="matrix"}"`)).join("")}<a class="guide-button" href="./trainer-guide.html?v=3" target="_blank" rel="noopener" data-guide-window>Tréneri játékleírás</a></div></section>
+  <div class="actions">${[[phase==="finished"?"Élő nézet":"Játéknézet · mátrix","live"],...(phase==="finished"?[["Pontozási mátrix","matrix"]]:[]),["QR-kód","join"],["Üres vászon","blank"]].map(([label,mode])=>btn(label,"screen",`data-mode="${mode}" aria-pressed="${state.mode===mode || phase!=="finished" && mode==="live" && state.mode==="matrix"}"`)).join("")}<a class="guide-button" href="./trainer-guide.html?v=4" target="_blank" rel="noopener" data-guide-window>Tréneri játékleírás</a></div></section>
   <section class="paper report"><h2>Döntések és pontok</h2>${timeline()}
   ${phase==="finished"?`<label class="focus">Kiemelt forduló a vásznon<select id="focus"><option value="">Teljes döntéssor</option>${state.rounds.map((round,i)=>round.scored?`<option value="${i}" ${state.focus===i?"selected":""}>${i+1}. kör</option>`:"").join("")}</select></label>`:""}</section>
   ${phase==="finished"?`<section class="paper host-reflections"><h2>Csapatreflexiók</h2><div class="reflections">${state.reflections.map((t,i)=>`<article><h3>${esc(state.names[i])}</h3><p>${esc(t || "Várjuk a reflexiót.")}</p>${t?btn("Kivetítés név nélkül","reflect",`data-seat="${i}"`,"quiet")+btn("Névvel","reflect",`data-seat="${i}" data-named="1"`,"quiet"):""}</article>`).join("")}</div></section>`:schedule()}`;
@@ -248,6 +249,7 @@ screen.addEventListener("click",e=>{
   }
   const b=e.target.closest("button[data-act]"); if(!b||busy)return;
   const {act,seat,choice,mode,named}=b.dataset;
+  if(act==="new-game"){location.href="./";return;}
   if(act==="recover"){location.href="?room="+saved.get(last);return;}
   if(act==="pdf"){void downloadReport();return;}
   if(act==="share-pdf"){

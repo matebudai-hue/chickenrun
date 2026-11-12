@@ -78,6 +78,8 @@ export const trainerGuide = `
 
       <p>Ha a 10. kör előtt lezárod a játékot, például a 7. körben, a <strong>Tovább játszom</strong> gombbal folytathatod. Más körszámnál ugyanez érvényes, amíg van hátra pontozatlan kör. Ha már lepontoztad az utolsó lejátszott kört, a <strong>Következő kör</strong> gombbal lépsz tovább. Ha a kör még nyitva volt, ugyanaz a kör nyílik vissza a már leadott döntésekkel. A lezárt körök pontjai megmaradnak. Folytatáskor a korábban megosztott PDF letöltési lehetősége megszűnik. Az új végeredményt a következő lezárás után oszthatod meg.</p>
 
+      <p>A következő csoportnak a <strong>Feldolgozás</strong> panelen az <strong>Új játék</strong> gombbal indíthatsz külön szobát. A kezdőlapon állítsd be a fordulók számát, majd kattints az <strong>Új játék és QR-kód</strong> gombra. Az új szobához új kód tartozik, az előző játék eredménye megmarad a saját szobájában.</p>
+
       <h4>Kivetítés és kommentek a kivezetésben</h4>
       <p>A <strong>Kivetítő megnyitása</strong> külön böngészőfület nyit. Ezt a fület tedd a vászonra. Ha később akarod megmutatni a végeredményt, a játék lezárása előtt állítsd le a vászon megosztását vagy zárd be a kivetítőfület. A lezárás ugyanis automatikusan a végeredményre vált. Ha közben más képet szeretnél mutatni, még a kivetítő visszakapcsolása előtt válaszd a <strong>Pontozási mátrix</strong> vagy az <strong>Üres vászon</strong> nézetet.</p>
       <ul>
