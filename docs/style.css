@@ -659,3 +659,37 @@ button.race-stamp{cursor:pointer}button.race-stamp:hover{background:#303c30;tran
 .transition-subject{font:800 clamp(1.15rem,4vh,2.4rem) var(--display);color:var(--gold);overflow-wrap:anywhere}
 .transition-controls{display:flex;align-items:center;flex-wrap:wrap;gap:.4rem .75rem}
 .transition-controls select{min-height:32px;max-width:100%;border:1px solid var(--rule);background:var(--paper);color:var(--ink);font:inherit}
+
+/* Trainer content uses separate panels below the fixed set of controls. */
+.trainer-content{display:grid;gap:.8rem;min-width:0;padding-top:.55rem}
+.trainer-content .control-overview{margin-bottom:.1rem}
+.trainer-report-layout{display:grid;gap:.9rem;min-width:0;border:0;background:transparent;overflow:visible}
+.trainer-report-layout .report-panel{min-width:0;border:1px solid #3d4c43;border-radius:5px;background:#151d19}
+.trainer-report-layout .report-summary{background:#1c2720;border-top:2px solid var(--gold)}
+.report-summary .compact-outcomes{padding:.8rem clamp(.8rem,1.5vw,1.3rem) .65rem;gap:.6rem;border:0}
+.report-summary .outcome-toolbar h2{font-size:clamp(1.15rem,2vw,1.45rem)}
+.report-scope{display:flex;flex-wrap:wrap;align-items:center;gap:.2rem .75rem;padding:.45rem clamp(.8rem,1.5vw,1.3rem);border-top:1px solid #39473d;color:var(--muted);font-size:.76rem}
+.report-scope strong{color:var(--ink)}
+.report-scope span+span{border-left:1px solid #536054;padding-left:.75rem}
+.report-jumps{display:flex;flex-wrap:wrap;align-items:center;gap:.3rem .85rem;padding:.05rem .25rem;color:var(--muted);font-size:.78rem}
+.report-jumps .text-link{min-height:32px;color:var(--ink);text-underline-offset:.2em}
+.trainer-report-layout .debrief-section{padding:clamp(.8rem,1.5vw,1.3rem);gap:.65rem}
+.report-section-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem 1rem;flex-wrap:wrap}
+.report-section-head h3{font-size:clamp(1.22rem,2vw,1.65rem);line-height:1.12}
+.report-section-head p{color:var(--muted);font-size:.84rem;margin-top:.3rem}
+.report-section-head .section-project{padding:0}
+.report-section-head .button{min-height:32px;padding:.25rem .55rem}
+.report-help{justify-self:start;font-size:.78rem;color:var(--muted);background:transparent;border:0}
+.report-help summary{padding:.25rem 0}
+.report-help p{margin:.15rem 0 .4rem;max-width:52rem}
+.trainer-report-layout .driver-row{padding:.65rem 0}
+.trainer-report-layout .driver-row:has(.driver-name[aria-pressed="true"]){border-top-color:var(--gold)}
+.trainer-report-layout .driver-heading{margin-bottom:.4rem}
+.trainer-report-layout .driver-name strong{font-size:1.2rem}
+.trainer-report-layout .race-stamp{min-height:70px;gap:.15rem}
+.trainer-report-layout .race-stamp b{font-size:1.3rem}
+.trainer-report-layout .learning-person{margin-top:.35rem}
+.trainer-report-layout .report-workspace{margin-top:0}
+.trainer-report-layout .transition-explanation{font-size:.9rem}
+.trainer-report-layout .debrief-section{grid-template-columns:minmax(0,1fr)}
+.trainer-report-layout .driver-list,.trainer-report-layout .race-ribbon{min-width:0}

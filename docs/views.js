@@ -1,5 +1,5 @@
-import { analyse, outcomeReport, learningPeople, learningDetail, learningPatterns, learningGuide, learningProjection, presentationView } from "./learning.js?v=25";
-import { carPositions, pairGroups, legacyPoints } from "./story.js?v=25";
+import { analyse, outcomeReport, learningPeople, learningPatterns, learningGuide, learningProjection, presentationView } from "./learning.js?v=26";
+import { carPositions, pairGroups, legacyPoints } from "./story.js?v=26";
 import { nightRoad } from "./live-race.js?v=15";
 
 export const moves = { go: "Halad", yield: "Kitér" };
@@ -220,19 +220,42 @@ export function trainer(s, context) {
   if (tab === "report") {
     const data = analyse(s.pairs,s.roster,filter === "stopped" ? "human" : filter);
     const cases = reportCases(s.pairs,filter).filter(pair=>!onlyMessages||pair.messageCount>0);
-    body = '<div class="debrief-dashboard">'+outcomeReport(data,outcomePlayer)+
-      '<p class="scope-note">'+(filter === "all" ? "Ember–ember és tesztjátékosos futamok együtt. A T jel a tesztjátékosos futamokat külön jelöli." : filter === "test" ? "Tesztjátékosos futamok. Ezekből a csoport együttműködésére nem következtetünk." : "Ember–ember futamok. A tesztjátékosos eredmények külön szűrőn nézhetők meg.")+
-      " A kivetítés a kiválasztott szűrést követi."+
-      '</p><div class="data-notes">'+data.active+' folyamatban · '+data.stopped+' félbemaradt · '+data.test+' tesztjátékosos · '+data.gaps+' hiányzó kapcsolati jellel'+
-      (data.unlinked ? '<p>'+data.unlinked+' futamhoz még nincs résztvevő-azonosítás. Frissítsd az oldalt; név alapján nem vonunk össze játékosokat.</p>' : "")+'</div>'+
-      '<section class="debrief-section"><div class="section-kicker">01 / SZEMÉLYES FUTAMSOROK</div><h3>Ugyanaz az ember. Változó helyzetek.</h3><p class="muted">Névre kattintva egyéni történet, medálra kattintva konkrét futam nyílik. Balról jobbra a kiválasztott futamok sorrendje; az egyes sorok azonos sorszámai nem feltétlenül egyidejűek. GY · Győztes / V · Vesztes / K · Kórház / D · Döntetlen. A méter a futam lezárását mutatja, a ! hiányzó kapcsolati jelet.</p>'+
-      action("project-section","Futamsorok kivetítése","secondary") .replace('data-do="project-section"','data-do="project-section" data-target="people"')+learningPeople(data,reportPlayer)+learningDetail(data,reportPlayer)+'</section>'+learningPatterns(data,transitionPerson)+
-      '<section class="debrief-section" id="case-section"><div class="section-kicker">03 / EGY FUTAM KÉT OLDALA</div>'+card("Döntések és jelzések", '<div class="row between report-tools"><p class="small-text">Kivetítő · '+(presentation.names?'Nevekkel':'Név nélkül')+'</p><div class="row">'+
-      action("download-host","Döntések és üzenetek · CSV","small secondary",!s.pairs.some(p=>p.result))+'</div></div>'+
-      '<button class="button secondary small" data-do="report-messages" aria-pressed="'+!!onlyMessages+'">'+(onlyMessages?"Minden eset mutatása":"Csak üzenetváltással")+'</button>'+reportWorkspace(cases,reportPair,selection),"trainer-report")+'<p class="trainer-question">Mire számítottál ezen a ponton, és miért? Mit tudtál akkor a másik szándékáról?</p></section>'+projectSection('guide','Kivezetési kérdések kivetítése')+learningGuide(opened)+'</div>';
+    const scope = {all:"Minden futam",human:"Ember–ember",test:"Tesztjátékosos"}[filter] ?? "Ember–ember";
+    const details = [[data.active,"folyamatban"],[data.stopped,"félbemaradt"],[data.test,"tesztjátékosos"],
+      [data.gaps,"hiányzó kapcsolati jellel"],[data.unlinked,"résztvevő-azonosítás nélkül"]]
+      .filter(([count]) => count).map(([count,label]) => count+" "+label);
+    const reportSections = [
+      ["report-timelines","Futamsorok"],["report-transitions","Mi jött utána?"],
+      ["case-section","Egy futam két oldala"],["report-guide","Kivezetés"]
+    ];
+    const reportNav = '<nav class="report-jumps" aria-label="Ugrás a riportban"><span>Ugrás</span>'+reportSections.map(([id,label]) =>
+      '<button type="button" class="text-link" data-do="report-jump" data-section="'+id+'">'+label+'</button>').join("")+'</nav>';
+    const timelineHelp = '<details class="report-help" id="timeline-help"'+(opened.has("timeline-help")?' open':'')+'>'+
+      '<summary>Jelmagyarázat</summary><p>GY · Győztes / V · Vesztes / K · Kórház / D · Döntetlen. '+
+      'T · Tesztjátékosos futam. ! · Hiányzó kapcsolati jel. A méter a futam lezárását jelöli. '+
+      'A sorok a játékosok saját futamsorrendjét mutatják.</p></details>';
+    body = '<div class="debrief-dashboard trainer-report-layout">'+
+      '<section class="report-panel report-summary" aria-label="Eredmények">'+outcomeReport(data,outcomePlayer)+
+      '<div class="report-scope"><strong>'+scope+' · '+data.races.length+' lezárt futam összesen</strong>'+
+      details.map(item=>'<span>'+item+'</span>').join("")+'</div></section>'+reportNav+
+      '<section class="debrief-section report-panel" id="report-timelines" tabindex="-1">'+
+      '<div class="report-section-head"><div><h3>Személyes futamsorok</h3><p>A név az egyéni történetet, a medál a futamot nyitja meg.</p></div>'+
+      projectSection("people","Futamsorok kivetítése")+'</div>'+timelineHelp+learningPeople(data,reportPlayer)+'</section>'+
+      learningPatterns(data,transitionPerson)+
+      '<section class="debrief-section report-panel" id="case-section" tabindex="-1"><div class="report-section-head">'+
+      '<h3>Egy futam két oldala</h3><div class="row">'+
+      '<button class="button secondary small" data-do="report-messages" aria-pressed="'+!!onlyMessages+'">'+
+      (onlyMessages?"Minden eset mutatása":"Csak üzenetváltással")+'</button>'+
+      action("download-host","Döntések és üzenetek · CSV","small secondary",!s.pairs.some(p=>p.result))+
+      '</div></div>'+reportWorkspace(cases,reportPair,selection)+
+      '<p class="trainer-question">Mire számítottál ezen a ponton, és miért? Mit tudtál akkor a másik szándékáról?</p></section>'+
+      learningGuide(opened)+'</div>';
   } else if (tab === "players") {
     const data = analyse(s.pairs,s.roster,filter);
-    body = '<div class="debrief-dashboard">'+projectSection("people","Futamsorok kivetítése")+'<section class="debrief-section">'+learningPeople(data,reportPlayer)+learningDetail(data,reportPlayer)+'</section></div>'+card("Játékosok és kapcsolatok", '<p class="muted">A kapcsolat az utolsó bejelentkezések alapján frissül.</p>'+roster(s));
+    body = '<div class="debrief-dashboard trainer-report-layout"><section class="debrief-section report-panel">'+
+      '<div class="report-section-head"><h3>Személyes futamsorok</h3>'+projectSection("people","Futamsorok kivetítése")+
+      '</div>'+learningPeople(data,reportPlayer)+'</section></div>'+
+      card("Játékosok és kapcsolatok", '<p class="muted">A kapcsolat az utolsó bejelentkezések alapján frissül.</p>'+roster(s));
   } else if (lobby) {
     body = '<div class="trainer-grid">'+card("Játékosok a váróban",roster(s))+
       card("Belépés a futamba", '<div class="qr" id="inline-qr"></div><p class="qr-code">'+room+'</p>'+
@@ -241,7 +264,7 @@ export function trainer(s, context) {
     body = queueOverview(s)+card("Párok és döntések",
       pairList([...active,...s.pairs.filter(p=>p.result).slice().reverse()],opened,selection,true));
   }
-  return '<div class="cockpit"><header class="trainer-sticky">'+toolbar+'<div class="trainer-navigation">'+nav+raceFilters(filter)+'</div>'+projectionControls(s,filter,presentation,projectionPicker,projectionChoice,{reportPair,reportPlayer,outcomePlayer,transitionPerson})+'</header><div class="control-overview">'+metrics+chooser+'</div>'+body+'</div>';
+  return '<div class="cockpit"><header class="trainer-sticky">'+toolbar+'<div class="trainer-navigation">'+nav+raceFilters(filter)+'</div>'+projectionControls(s,filter,presentation,projectionPicker,projectionChoice,{reportPair,reportPlayer,outcomePlayer,transitionPerson})+'</header><div class="trainer-content">'+(tab === "report" && !lobby ? '' : '<div class="control-overview">'+metrics+chooser+'</div>')+body+'</div></div>';
 }
 
 function namedPairings(pairs) {

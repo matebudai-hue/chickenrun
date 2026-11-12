@@ -1,9 +1,9 @@
-import { presentationPages } from "./learning.js?v=25";
-import { normalizePresentation, changePresentation } from "./presentation.js?v=25";
+import { presentationPages } from "./learning.js?v=26";
+import { normalizePresentation, changePresentation } from "./presentation.js?v=26";
 import { animateRace } from "./live-race.js?v=15";
-import { nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=25";
+import { nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=26";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=25";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=26";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -863,7 +863,15 @@ screen.addEventListener("click", event => {
   }
   else if(action === "projection-page") publishPresentation({page:Math.max(0,presentation.page+Number(button.dataset.by))});
   else if (action === "project-step") void stepProjectedCase(Number(button.dataset.by));
-  else if (action === "report-case") {
+  else if (action === "report-jump") {
+    const section = document.getElementById(button.dataset.section);
+    if (section) {
+      const header = screen.querySelector(".trainer-sticky");
+      const top = section.getBoundingClientRect().top + window.scrollY - (header?.offsetHeight ?? 0) - 12;
+      window.scrollTo(0,top);
+      section.focus({preventScroll:true});
+    }
+  } else if (action === "report-case") {
     reportPair = Number(button.dataset.number);
     selectedTab = "report";
     render();
