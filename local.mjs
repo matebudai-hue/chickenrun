@@ -10,6 +10,12 @@ export function memoryStore() {
   const chat = new Map();
   const turns = new Map();
   return {
+    listArchive(prefix) {
+      return [...rooms].reverse().filter(([code]) => code.startsWith(prefix)).map(([, row]) => {
+        const {report, ...entry} = JSON.parse(row.state);
+        return entry;
+      });
+    },
     get(code) {
       const row = rooms.get(code);
       return row && { ...row, turns: JSON.stringify([...(turns.get(code)?.values() ?? [])]) };

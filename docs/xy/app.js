@@ -7,6 +7,8 @@ const url = new URL(location.href), projector = url.searchParams.has("screen");
 const pattern = /^[A-Z2-9]{6}$/;
 let code = (url.searchParams.get("room") || "").toUpperCase(), state, busy = false, signature = "", pending = false, revision = 0;
 const last = "xy:last";
+const archiveStorageKey = "xy:archive-key";
+const archivePath = "/api/xy/archive";
 const slot = () => "xy:"+code+":"+(projector ? "screen" : "player");
 const fragment = new URLSearchParams(url.hash.slice(1));
 const transfer = fragment.get("transfer");
@@ -105,12 +107,12 @@ function hostView() {
   if (["ready","negotiation","open"].includes(phase) || phase==="result" && state.index+1<state.rounds.length) action+=btn("Játék lezárása","finish");
   if (phase==="finished") {title="Feldolgozás";desc=`${state.reflections.filter(Boolean).length}/4 reflexió beérkezett${state.reportShared?" · PDF megosztva":""}`;action=btn("Végeredmény kivetítése","results","","primary")+btn("PDF letöltése","pdf")+btn(state.reportShared?"Megosztott PDF frissítése":"PDF megosztása a csapatokkal","share-pdf")+(state.reportShared?btn("Megosztás leállítása","unshare-pdf"):"");}
   const weight = ["lobby","ready","negotiation"].includes(phase) ? `<label class="quick-weight">Körszorzó<select id="quick-weight">${options.map(n=>`<option value="${n}" ${n===now.multiplier?"selected":""}>×${n}</option>`).join("")}</select></label>` : `<strong>×${now.multiplier}</strong>`;
-  if (phase==="finished") action+=btn("Új játék","new-game");
+  if (phase==="finished") action+=btn("Játék mentése","save-game")+btn("Új játék","new-game");
   if (state.canContinue) action=btn("Tovább játszom","continue","","primary")+action;
   return `<section class="hero board"><div><p class="kicker">Tréneri vezérlő · ${code}</p><h1>${title}</h1><p>${desc}</p></div><div class="weight"><span>${state.index+1} / ${state.rounds.length}. kör</span>${weight}</div><div class="actions">${action}</div></section>
   <div class="teams-panel ${phase==="lobby"?"with-qr":""}">${roster()}${phase==="lobby"?qrBlock():""}</div>
   <section class="paper tools"><div class="trainer-links"><a href="${screenUrl()}" target="_blank" rel="noopener">Kivetítő megnyitása ↗</a></div>
-  <div class="actions">${[[phase==="finished"?"Élő nézet":"Játéknézet · mátrix","live"],...(phase==="finished"?[["Pontozási mátrix","matrix"]]:[]),["QR-kód","join"],["Üres vászon","blank"]].map(([label,mode])=>btn(label,"screen",`data-mode="${mode}" aria-pressed="${state.mode===mode || phase!=="finished" && mode==="live" && state.mode==="matrix"}"`)).join("")}<a class="guide-button" href="./trainer-guide.html?v=4" target="_blank" rel="noopener" data-guide-window>Tréneri játékleírás</a></div></section>
+  <div class="actions">${[[phase==="finished"?"Élő nézet":"Játéknézet · mátrix","live"],...(phase==="finished"?[["Pontozási mátrix","matrix"]]:[]),["QR-kód","join"],["Üres vászon","blank"]].map(([label,mode])=>btn(label,"screen",`data-mode="${mode}" aria-pressed="${state.mode===mode || phase!=="finished" && mode==="live" && state.mode==="matrix"}"`)).join("")}<a class="guide-button" href="./trainer-guide.html?v=5" target="_blank" rel="noopener" data-guide-window>Tréneri játékleírás</a></div></section>
   <section class="paper report"><h2>Döntések és pontok</h2>${timeline()}
   ${phase==="finished"?`<label class="focus">Kiemelt forduló a vásznon<select id="focus"><option value="">Teljes döntéssor</option>${state.rounds.map((round,i)=>round.scored?`<option value="${i}" ${state.focus===i?"selected":""}>${i+1}. kör</option>`:"").join("")}</select></label>`:""}</section>
   ${phase==="finished"?`<section class="paper host-reflections"><h2>Csapatreflexiók</h2><div class="reflections">${state.reflections.map((t,i)=>`<article><h3>${esc(state.names[i])}</h3><p>${esc(t || "Várjuk a reflexiót.")}</p>${t?btn("Kivetítés név nélkül","reflect",`data-seat="${i}"`,"quiet")+btn("Névvel","reflect",`data-seat="${i}" data-named="1"`,"quiet"):""}</article>`).join("")}</div></section>`:schedule()}`;
@@ -162,7 +164,7 @@ function startView() {
     <form data-kind="join">${transfer?"":'<label>Csapatnév<input name="name" maxlength="40" autocomplete="off" required></label>'}<button class="primary">Csatlakozás</button></form></section>`;
   return `<section class="hero landing"><div><p class="kicker">Budai Máté · Játékelmélet</p><h1>Nagy X/Y</h1><p>Nyerjetek, amennyit csak tudtok!</p>
   <form data-kind="create"><label>Fordulók száma<input type="number" min="1" max="60" value="10" name="rounds" required></label><button class="primary">Új játék és QR-kód</button></form>
-  ${saved.get(last)?btn("Legutóbbi tréneri szoba","recover","","ghost"):""}</div><div class="poster" aria-hidden="true"><b>X</b><i></i><b>Y</b></div></section>
+  ${saved.get(last)?btn("Legutóbbi tréneri szoba","recover","","ghost"):""}${saved.get(archiveStorageKey)?btn("Mentett játékok","saved-games","","ghost"):""}</div><div class="poster" aria-hidden="true"><b>X</b><i></i><b>Y</b></div></section>
   <section class="paper join"><h2>Csatlakozás szobakóddal</h2><form data-kind="code"><label>Szobakód<input name="code" maxlength="6" pattern="[A-Za-z2-9]{6}" autocapitalize="characters" required></label><button>Belépek</button></form></section>`;
 }
 function render(force=false) {
@@ -224,18 +226,69 @@ function confirmBox(title,body,callback) {
   dialog.showModal();
   dialog.addEventListener("close",()=>{if(dialog.returnValue==="yes")callback();render();},{once:true});
 }
-async function downloadReport() {
+async function downloadReport(reportPath=endpoint("report"), reportKey=key, archived=false) {
   busy=true;revision++;setError("");signal.textContent="PDF készül…";
   try{
-    const report=await readState(endpoint("report"),key);
+    const data=await readState(reportPath,reportKey);
+    const report=archived?data.report:data;
     const href=URL.createObjectURL(await createReportPdf(report));
     const a=document.createElement("a");
-    a.href=href;a.download="nagy-xy-vegeredmeny-"+code+".pdf";
+    a.href=href;a.download="nagy-xy-vegeredmeny-"+report.code+".pdf";
     document.body.append(a);a.click();a.remove();
     setTimeout(()=>URL.revokeObjectURL(href),30000);
   }catch(e){setError(e.message);}
   finally{busy=false;signal.textContent="Kapcsolódva";}
 }
+function saveGameDialog() {
+  const today=new Intl.DateTimeFormat("sv-SE").format(new Date());
+  dialog.innerHTML=`<form id="save-game-form">
+    <h2>Játék mentése</h2>
+    <label>Dátum<input type="date" name="date" value="${today}" required></label>
+    <label>Cég<input name="company" maxlength="120" required></label>
+    <label>Miért érdekes ez a játék?<textarea name="reason" rows="4" maxlength="1600" required></textarea></label>
+    <p role="alert" data-archive-error></p>
+    <div class="actions"><button type="button" data-close-archive>Mégse</button><button class="primary">Mentés</button></div>
+  </form>`;
+  dialog.showModal();
+}
+async function savedGamesDialog() {
+  busy=true;setError("");
+  try {
+    const entries=await readState(archivePath,saved.get(archiveStorageKey));
+    dialog.innerHTML=`<div class="archive-list"><h2>Mentett játékok</h2>
+      ${entries.length?entries.map(entry=>`<article>
+        <h3>${esc(entry.company)}</h3>
+        <p><small>${esc(entry.date)} · ${entry.rounds} lezárt kör · ${esc(entry.code)}</small></p>
+        <p class="archive-reason">${esc(entry.reason)}</p>
+        <button type="button" data-archive-pdf="${esc(entry.id)}">Eredmény letöltése PDF-ben</button>
+      </article>`).join(""):"<p>Még nincs mentett játék.</p>"}
+      <p role="alert" data-archive-error></p><button type="button" data-close-archive>Bezárás</button>
+    </div>`;
+    dialog.showModal();
+  } catch(e) {setError(e.message);}
+  finally{busy=false;}
+}
+dialog.addEventListener("click",e=>{
+  if(e.target.closest("[data-close-archive]") && !busy) dialog.close();
+  const pdf=e.target.closest("[data-archive-pdf]");
+  if(pdf && !busy) void downloadReport(archivePath+"/"+pdf.dataset.archivePdf,saved.get(archiveStorageKey),true);
+});
+dialog.addEventListener("submit",async e=>{
+  if(e.target.id!=="save-game-form") return;
+  e.preventDefault();
+  if(busy) return;
+  busy=true;
+  const form=e.target, submit=form.querySelector('button.primary'), error=form.querySelector("[data-archive-error]");
+  submit.disabled=true;error.textContent="";
+  try {
+    const archiveKey=localStorage.getItem(archiveStorageKey) || secret();
+    localStorage.setItem(archiveStorageKey,archiveKey);
+    await command(endpoint("archive"),key,{...Object.fromEntries(new FormData(form)),archiveKey});
+    dialog.close();
+    signal.textContent="Játék elmentve";
+  } catch(e) {error.textContent=e.message;}
+  finally{busy=false;submit.disabled=false;}
+});
 screen.addEventListener("click",e=>{
   const guide=e.target.closest("[data-guide-window]");
   if (guide && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
@@ -250,6 +303,8 @@ screen.addEventListener("click",e=>{
   const b=e.target.closest("button[data-act]"); if(!b||busy)return;
   const {act,seat,choice,mode,named}=b.dataset;
   if(act==="new-game"){location.href="./";return;}
+  if(act==="save-game"){saveGameDialog();return;}
+  if(act==="saved-games"){void savedGamesDialog();return;}
   if(act==="recover"){location.href="?room="+saved.get(last);return;}
   if(act==="pdf"){void downloadReport();return;}
   if(act==="share-pdf"){

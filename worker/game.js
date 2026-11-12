@@ -392,6 +392,11 @@ async function change(store, roomCode, mutator) {
 
 export function d1Store(db) {
   return {
+    async listArchive(prefix) {
+      const {results} = await db.prepare("SELECT json_remove(state, '$.report') AS entry FROM rooms WHERE code LIKE ? ORDER BY rowid DESC")
+        .bind(prefix + "%").all();
+      return results.map(row => JSON.parse(row.entry));
+    },
     get: code => db.prepare(`
       SELECT revision, expires_at, state, (
         SELECT json_group_array(json_object('number', pair, 'seat', seat,

@@ -6,6 +6,8 @@ const fail = (status, message) => { throw { status, message }; };
 const check = (value, message = "Ez a művelet most nem végezhető el.") => { if (!value) fail(409, message); };
 const keyPattern = /^[a-f0-9]{32}$/;
 const digest = async key => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key))), n => n.toString(16).padStart(2,"0")).join("");
+const archivePrefix = auth => "xy-archive:"+auth+":";
+const archiveExpiry = Date.UTC(9999,0,1);
 const clean = (s, max) => typeof s === "string" ? s.trim().slice(0,max) : "";
 const choice = x => x === "X" || x === "Y";
 const current = s => s.rounds[s.index];
@@ -208,18 +210,41 @@ export async function xyApi(req, store) {
       }
       return reply(view(s,host),201);
     }
-    const match = /^\/api\/xy\/rooms\/([A-Z2-9]{6})(?:\/([a-z]+))?$/.exec(path);
-    if (!match || (req.method === "GET") !== (!match[2] || match[2]==="report")) fail(404,"Ismeretlen útvonal.");
-    const [,code,act] = match;
     const key = req.headers.get("Authorization")?.replace(/^Bearer /,"");
     if (!keyPattern.test(key || "")) fail(403,"Érvénytelen belépő.");
     const auth = await digest(key);
+    const archive = /^\/api\/xy\/archive(?:\/([a-f0-9]{64}))?$/.exec(path);
+    if (archive && req.method === "GET") {
+      if (!archive[1]) return reply(await store.listArchive(archivePrefix(auth)));
+      const entry = await store.get(archivePrefix(auth)+archive[1]);
+      if (!entry) fail(404,"A mentett játék nem található.");
+      return reply(JSON.parse(entry.state));
+    }
+    const match = /^\/api\/xy\/rooms\/([A-Z2-9]{6})(?:\/([a-z]+))?$/.exec(path);
+    if (!match || (req.method === "GET") !== (!match[2] || match[2]==="report")) fail(404,"Ismeretlen útvonal.");
+    const [,code,act] = match;
     const transfer = keyPattern.test(b.transfer || "") ? await digest(b.transfer) : null;
     const id = "xy:"+code;
     for (let i=0;i<12;i++) {
       const row = await store.get(id);
       if (!row || row.expires_at <= Date.now()) fail(404,"A szoba nem található vagy lejárt.");
       const s = JSON.parse(row.state);
+      if (act==="archive") {
+        if (s.host!==auth) fail(403,"Tréneri hozzáférés szükséges.");
+        check(s.phase==="finished","Csak lezárt játék menthető.");
+        const company=clean(b.company,120), reason=clean(b.reason,1600), date=clean(b.date,10);
+        if (!company || !reason || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !keyPattern.test(b.archiveKey || ""))
+          fail(400,"Add meg a dátumot, a céget és a mentés okát.");
+        const archiveId=await digest("xy-archive:"+code+":"+auth);
+        const archiveCode=archivePrefix(await digest(b.archiveKey))+archiveId;
+        const report=resultReport(s);
+        const entry={id:archiveId,code,date,company,reason,rounds:report.rounds.filter(r=>r.scores).length};
+        const snapshot=JSON.stringify({...entry,report});
+        const existing=await store.get(archiveCode);
+        if (existing ? await store.put(archiveCode,existing.revision,snapshot) : await store.create(archiveCode,archiveExpiry,snapshot))
+          return reply(entry);
+        continue;
+      }
       if (act==="report") {
         check(s.phase==="finished","A PDF a játék lezárása után érhető el.");
         if(s.host===auth) return reply(resultReport(s));

@@ -194,3 +194,7 @@ dialog{color:var(--ink);background:var(--paper);border:1px solid var(--line);bor
 .guide-body blockquote,.guide-body aside{margin:.6rem 0;padding:.45rem .7rem;background:#edf3fc;border-left:3px solid #1a53a3}
 .guide-signoff{margin:.8rem 0 .25rem;padding:.75rem .9rem;background:#f2efe8;border-radius:3px}
 .guide-signoff p:last-child{margin-bottom:0}
+#save-game-form{display:grid;gap:.55rem}
+#save-game-form label{width:100%}
+.archive-list article{padding:.7rem 0;border-top:1px solid var(--line)}
+.archive-reason{white-space:pre-wrap;overflow-wrap:anywhere}

@@ -169,4 +169,18 @@ test("four teams, negotiations, concurrent moves, recovery, projection and refle
   }
   assert.equal((await call("finish",host,{index:9})).canContinue,false);
   await call("continue",host,{index:9},409);
+  const archiveKey="a".repeat(32);
+  const details={archiveKey,date:"2026-11-12",company:"Próbacég",reason:"A csapatok a végén váltottak."};
+  await call("archive",b,details,403);
+  const archived=await call("archive",host,details);
+  assert.equal(archived.rounds,10);
+  const archiveRead=(key,id="")=>xyApi(new Request("https://example.test/api/xy/archive"+id,{headers:{authorization:"Bearer "+key}}),store);
+  assert.deepEqual(await (await archiveRead(archiveKey)).json(),[archived]);
+  assert.equal((await archiveRead(b,"/"+archived.id)).status,404);
+  const snapshot=await (await archiveRead(archiveKey,"/"+archived.id)).json();
+  assert.equal(snapshot.report.rounds.length,10);
+  await call("archive",host,{...details,reason:"Pontosított megjegyzés"});
+  const entries=await (await archiveRead(archiveKey)).json();
+  assert.equal(entries.length,1);
+  assert.equal(entries[0].reason,"Pontosított megjegyzés");
 });
