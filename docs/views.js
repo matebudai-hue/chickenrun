@@ -254,17 +254,20 @@ export function trainer(s, context) {
     const data = analyse(s.pairs,s.roster,filter);
     body = '<div class="debrief-dashboard trainer-report-layout"><section class="debrief-section report-panel">'+
       '<div class="report-section-head"><h3>Személyes futamsorok</h3>'+projectSection("people","Futamsorok kivetítése")+
-      '</div>'+learningPeople(data,reportPlayer)+'</section></div>'+
-      card("Játékosok és kapcsolatok", '<p class="muted">A kapcsolat az utolsó bejelentkezések alapján frissül.</p>'+roster(s));
+      '</div>'+learningPeople(data,reportPlayer)+'</section></div>';
   } else if (lobby) {
-    body = '<div class="trainer-grid">'+card("Játékosok a váróban",roster(s))+
+    body = '<div class="trainer-grid">'+connectionsCard(s)+
       card("Belépés a futamba", '<div class="qr" id="inline-qr"></div><p class="qr-code">'+room+'</p>'+
       action("copy","Belépőlink másolása","secondary")+'<p class="muted">Ha megvan a létszám, indítsd a játékot. A rendszer véletlenszerűen párosít.</p>',"invite")+'</div>';
   } else {
-    body = queueOverview(s)+card("Párok és döntések",
+    body = queueOverview(s)+connectionsCard(s)+card("Párok és döntések",
       pairList([...active,...s.pairs.filter(p=>p.result).slice().reverse()],opened,selection,true));
   }
   return '<div class="cockpit"><header class="trainer-sticky">'+toolbar+'<div class="trainer-navigation">'+nav+raceFilters(filter)+'</div>'+projectionControls(s,filter,presentation,projectionPicker,projectionChoice,{reportPair,reportPlayer,outcomePlayer,transitionPerson})+'</header><div class="trainer-content">'+(tab === "report" && !lobby ? '' : '<div class="control-overview">'+metrics+chooser+'</div>')+body+'</div></div>';
+}
+
+function connectionsCard(state) {
+  return card("Játékosok és kapcsolatok", '<p class="muted">A kapcsolat az utolsó bejelentkezések alapján frissül.</p>'+roster(state));
 }
 
 function namedPairings(pairs) {
