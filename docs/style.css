@@ -371,13 +371,15 @@ dialog::backdrop{background:#161b14cc}
 }
 .night-medal{
   display:grid;justify-items:center;gap:2px;padding:5px 2px;border:1px solid #635b47;
-  border-top:2px solid #a69d89;background:#222421;
+  border-top:2px solid #a69d89;background:#222421;cursor:pointer;
 }
+.night-medal:hover,.night-medal[aria-pressed="true"]{background:#3b3d32}
+.night-medal[aria-pressed="true"]{box-shadow:inset 0 0 0 1px #fff3dc}
 .night-medal[data-medal="other"]{border-top-color:var(--night-amber)}
 .night-medal[data-medal="crash"]{border-top-color:#ff9c78}
 .night-medal[data-medal="both"]{border-top-color:#9edbe0}
-.night-medal dt{font-size:clamp(.64rem,2.65vw,.8rem);color:var(--night-muted)}
-.night-medal dd{margin:0;font:700 1.05rem/1.2 var(--mono);color:#fff3dc}
+.night-medal span{font-size:clamp(.64rem,2.65vw,.8rem);color:var(--night-muted)}
+.night-medal strong{margin:0;font:700 1.05rem/1.2 var(--mono);color:#fff3dc}
 
 [data-night-crash] .night-result span{color:#ff9c78}
 [data-night-crash][data-night-reveal] .night-road::after{

@@ -109,9 +109,34 @@ test("the player sees the four medal totals and the current medal after the reve
   const context = {room:"ABCDEFGH",opened:new Set()};
   const html = player(state,context);
   assert.match(html,/<strong>Döntetlen<\/strong>/);
-  assert.match(html,/<dt>Győztes<\/dt><dd>2<\/dd>/);
+  assert.match(html,/<span>Győztes<\/span><strong>2<\/strong>/);
   for (const label of ["Vesztes","Kórház","Döntetlen"]) {
-    assert.ok(html.includes("<dt>"+label+"</dt><dd>1</dd>"));
+    assert.ok(html.includes("<span>"+label+"</span><strong>1</strong>"));
   }
   assert.doesNotMatch(player(state,{...context,reveal:{}}),/night-medals/);
+});
+
+test("medal filters show only matching races and the checkpoint where each race ended", () => {
+  const report = [
+    {number:1,outcome:"other",timed:true,history:[{distance:200,own:"go",other:"yield"}]},
+    {number:2,outcome:"own",history:[{distance:800,own:"go",other:"go"},{distance:100,own:"yield",other:"go"}]},
+    {number:3,outcome:"crash",history:[{distance:10,own:"go",other:"go"}]},
+    {number:4,outcome:"both",history:[{distance:50,own:"yield",other:"yield"}]},
+  ];
+  const expected = {other:"A másik autó tért ki · 200 m",own:"Te tértél ki · 100 m",crash:"Ütköztetek",both:"Mindketten kitértek · 50 m"};
+  for (const [index,match] of report.entries()) {
+    const filtered = personalReport({report},new Set(),match.outcome);
+    assert.ok(filtered.includes(expected[match.outcome]));
+    assert.match(filtered,/Összes futam/);
+    for (const [otherIndex,other] of report.entries()) {
+      assert.equal(filtered.includes('id="report-'+other.number+'"'),index===otherIndex);
+    }
+  }
+  assert.match(personalReport({report:report.slice(0,1)},new Set(),"both"),/Ehhez a medálhoz még nincs futamod/);
+  const state = {phase:"finished",number:4,result:"both",outcome:"both",distance:50,history:report[3].history,messages:[],report};
+  const html = player(state,{room:"ABCDEFGH",opened:new Set(["night-report"]),medalFilter:"other"});
+  assert.match(html,/data-medal="other" aria-controls="night-report" aria-pressed="true"/);
+  assert.match(html,/<details id="night-report" open>/);
+  assert.match(html,/A másik autó tért ki · 200 m/);
+  assert.doesNotMatch(html,/id="report-4"/);
 });

@@ -268,15 +268,27 @@ export function projector(s, room, selection, showPairings = false, screeningCas
       : showPairings ? namedPairings(s.pairs) : resultSummary(s.pairs)+
         '<p class="projection-status">'+active+' aktív pár</p>'))+'</div>';
 }
-export function personalReport(state, opened) {
+function personalResult(match) {
+  if (match.reason === "ready-timeout") return "A rajt elmaradt";
+  if (match.outcome === "crash") return "Ütköztetek";
+  const distance = match.history.at(-1)?.distance;
+  return outcomes[match.outcome] + (Number.isFinite(distance) && match.outcome !== "stopped" ? " · "+distance+" m" : "");
+}
+
+export function personalReport(state, opened, medalFilter) {
   if (!state.report?.length) return "";
-  const count = state.report.reduce((n, match)=>n+match.history.length,0);
-  return card("Saját döntési riport", '<div class="row between"><p class="muted">'+state.report.length+' játék · '+count+' döntés</p>'+
-    action("download-player","Letöltés · CSV","secondary small")+'</div><div class="pair-list">'+state.report.map((m,i) => {
+  const matches = medalFilter ? state.report.filter(match => match.outcome === medalFilter) : state.report;
+  const label = medalFilter ? medals[medalFilter] : "Összes futam";
+  const controls = '<div class="row between"><p class="muted" aria-live="polite">'+label+' · '+matches.length+' futam</p>'+
+    '<div class="row">'+(medalFilter ? action("all-player-results","Összes futam","secondary small") : "")+
+    action("download-player",medalFilter ? "Összes futam · CSV" : "Letöltés · CSV","secondary small")+'</div></div>';
+  if (!matches.length) return card("Saját döntési riport",controls+'<p class="muted">Ehhez a medálhoz még nincs futamod.</p>',"report");
+  return card("Saját döntési riport", controls+'<div class="pair-list">'+matches.map((m,i) => {
     const id = "report-"+m.number;
-    return '<details id="'+id+'"'+(opened.has(id) || !opened.seen?.has(id) && i===state.report.length-1 ? " open" : "")+
-      '><summary><span class="pair-name"><small>#'+m.number+'</small><strong>'+(m.reason === "ready-timeout" ? "Rajt elmaradt" : outcomes[m.outcome])+'</strong></span>'+
-      (m.timed ? badge("45 mp") : "")+'</summary><div class="detail-content">'+
+    return '<details id="'+id+'"'+(opened.has(id) || !medalFilter && !opened.seen?.has(id) && i===matches.length-1 ? " open" : "")+
+      '><summary><span class="pair-name"><small>#'+m.number+'</small><strong>'+personalResult(m)+'</strong></span>'+
+      '<span class="pair-meta">'+(medals[m.outcome] ? badge(medals[m.outcome]) : "")+(m.timed ? badge("45 mp") : "")+
+      '</span></summary><div class="detail-content">'+
       (m.reason === "ready-timeout" ? '<p class="muted">A rajt kapcsolati okból elmaradt.</p>' :
         m.timed && m.outcome !== "stopped" ? '<p class="muted">'+(m.target ? "Kért kitérés: "+m.target+" m." :
           m.connectionGap ? "A futam végén nem érkezett kapcsolati jel." : "Továbbhaladás kitérési kérés nélkül.")+'</p>' : "")+
@@ -313,14 +325,16 @@ function stepControls(s, pendingDecision, reveal) {
   return '<div class="night-actions steps">'+action("go","Haladok","secondary",Boolean(reveal))+
     action("yield",'Kitérek <span aria-hidden="true">↗</span>',"primary",Boolean(reveal))+'</div>';
 }
-function medalCollection(report) {
+function medalCollection(report, medalFilter) {
   const counts = { other:0, own:0, crash:0, both:0 };
   for (const match of report ?? []) {
     if (Object.hasOwn(counts,match.outcome)) counts[match.outcome]++;
   }
-  return '<dl class="night-medals" aria-label="Saját medáljaid">'+Object.entries(medals).map(([outcome,label]) =>
-    '<div class="night-medal" data-medal="'+outcome+'"><dt>'+label+'</dt><dd>'+counts[outcome]+'</dd></div>'
-  ).join("")+'</dl>';
+  return '<div class="night-medals" role="group" aria-label="Saját medáljaid">'+Object.entries(medals).map(([outcome,label]) =>
+    '<button type="button" class="night-medal" data-do="filter-player-report" data-medal="'+outcome+
+    '" aria-controls="night-report" aria-pressed="'+(medalFilter===outcome)+'"><span>'+label+'</span><strong>'+
+    counts[outcome]+'</strong></button>'
+  ).join("")+'</div>';
 }
 
 function raceResult(s) {
@@ -331,15 +345,15 @@ function raceResult(s) {
   return '<div class="night-result" role="status"><span>FUTAM VÉGE</span><strong>'+title+'</strong>'+
     (detail ? '<small>'+detail+'</small>' : "")+'</div>';
 }
-function nightPlayer(s, {room,opened,turnPending,pendingDecision,reveal}) {
+function nightPlayer(s, {room,opened,turnPending,pendingDecision,reveal,medalFilter}) {
   const finished = Boolean(s.result);
   const timeLabel = finished ? "Vége" : s.race ? s.race.startsAt === null ? "Rajt előtt" : "Rajt…"
     : (s.step+1)+" / "+(s.totalSteps ?? legacyPoints.length)+". pont";
   const finishControls = finished ? reveal ? '<p class="night-status" role="status">Futam vége</p>'
-    : raceResult(s)+medalCollection(s.report)+'<div class="stack rematch">'+rematch(s)+'</div>' : "";
+    : raceResult(s)+medalCollection(s.report,medalFilter)+'<div class="stack rematch">'+rematch(s)+'</div>' : "";
   const report = finished && !reveal && s.report?.length
     ? '<details id="night-report"'+(opened.has("night-report") ? " open" : "")+
-      '><summary>Saját döntési riport</summary>'+personalReport(s,opened)+'</details>' : "";
+      '><summary>Saját döntési riport</summary>'+personalReport(s,opened,medalFilter)+'</details>' : "";
   return '<section class="night-game'+(finished ? " night-finished" : " night-playing")+
     '" aria-label="Chicken Run · '+(s.race ? "Folyamatos futam" : "Döntési pontonként")+
     '"'+(s.race ? ' data-timed' : '')+(reveal ? ' data-night-reveal' : '')+(s.result === "crash" ? ' data-night-crash' : '')+'>'+

@@ -1,7 +1,7 @@
 import { animateRace } from "./live-race.js?v=15";
 import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=15";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=17";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=18";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -27,7 +27,7 @@ let auth = saved.get(roomKey);
 let state, signature, loadFailure, errorRetry, pollTimer;
 let busy = false, polling = false, generation = 0, lastPulse = 0;
 let selectedTab = "overview", filter = "all", reportPair, draft = "", messageRequest, confirmAction;
-let reveal, revealTimer, finishRoadHeight, screeningCase;
+let reveal, revealTimer, finishRoadHeight, screeningCase, medalFilter;
 const screenPositions = new Map();
 let selectedGameMode = "steps";
 let raceOffset = Date.now() - performance.now(), stopAnimation, turnPending = false;
@@ -106,6 +106,7 @@ function update(next, started = performance.now()) {
   if (previous?.number !== next.number) {
     finishRoadHeight = undefined;
     opened.delete("night-report");
+    medalFilter = undefined;
     turnAck = undefined;
     turnPending = false;
     chatNotice = "";
@@ -636,7 +637,7 @@ function render() {
   const caseScroll = screen.querySelector("#report-cases")?.scrollTop;
   const storyScroll = screen.querySelector("#report-events")?.scrollTop;
   const storyNumber = screen.querySelector("[data-report-story]")?.dataset.transcript;
-  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reportPair, reveal, showPairings, selectedGameMode, turnPending };
+  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reportPair, reveal, showPairings, selectedGameMode, turnPending, medalFilter };
   if (!room) {
     const previous = saved.get("cr:last-host");
     screen.innerHTML = mode === "player" ? enterCode() : home(codeValid.test(previous ?? "") ? previous : null, roomLink);
@@ -746,6 +747,16 @@ screen.addEventListener("click", event => {
   else if (action === "copy") void copyLink(button);
   else if (action === "download-host") void downloadTrainerReport(button);
   else if (action === "download-player") downloadPersonalReport();
+  else if (action === "filter-player-report" || action === "all-player-results") {
+    const report = screen.querySelector("#night-report");
+    if (!report) return;
+    medalFilter = button.dataset.medal;
+    report.open = true;
+    render();
+    const updated = screen.querySelector("#night-report");
+    updated.querySelector("summary").focus({preventScroll:true});
+    updated.scrollIntoView({block:"start"});
+  }
   else if (action === "retry-transcript") paintPairStories();
   else if (action === "screen-step") stepScreening(Number(button.dataset.by));
   else if (action === "screen-case") {
