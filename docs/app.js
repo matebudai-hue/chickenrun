@@ -1,9 +1,9 @@
-import { presentationPages } from "./learning.js?v=26";
-import { normalizePresentation, changePresentation } from "./presentation.js?v=26";
+import { presentationPages } from "./learning.js?v=27";
+import { normalizePresentation, changePresentation } from "./presentation.js?v=27";
 import { animateRace } from "./live-race.js?v=15";
-import { nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=26";
+import { nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=27";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=26";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=27";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -57,24 +57,19 @@ function adoptPresentation(value) {
  screenPositions.set(next.number,next.step);
  if (state) render();
 }
-function publishPresentation(patch,open = false) {
+function publishPresentation(patch) {
  presentation = changePresentation(presentation,patch);
  if(state) presentation.page=Math.min(presentation.page,presentationPages(state,presentation)-1);
  saved.set(presentationKey,JSON.stringify(presentation));
  projectionChannel?.postMessage(presentation);
  if(projectorWindow && !projectorWindow.closed) projectorWindow.postMessage({kind:presentationKey,value:presentation},location.origin);
  adoptPresentation(presentation);
- if(open) openProjector();
 }
 function openProjector() {
  if (projectorWindow && !projectorWindow.closed) return;
  projectorWindow = window.open(roomLink(room,"projector"),"chicken-projector-"+room);
  if(!projectorWindow) showNotice("A böngésző letiltotta a kivetítőablakot. Engedélyezd a felugró ablakot, majd kattints a Kivetítő megnyitása gombra.");
- else {
-  // The browser can activate a newly created window. Ask it to keep the trainer in front.
-  window.focus();
-  showNotice();
- }
+ else showNotice();
 }
 projectionChannel?.addEventListener("message",event=>adoptPresentation(event.data));
 window.addEventListener("message",event=>{
@@ -103,7 +98,7 @@ function roomLink(code, view) {
 
 function selectStory(number) {
   if (!state.pairs.some(pair => pair.number === number && pair.result)) return;
-  publishPresentation({target:"case",number,scope:filter,page:0,step:0},true);
+  publishPresentation({target:"case",number,scope:filter,page:0,step:0});
 }
 
 function endpoint(action) {
@@ -773,10 +768,10 @@ screen.addEventListener("submit", event => {
     const target = projectionPicker;
     projectionPicker = projectionChoice = undefined;
     if (target === "case") selectStory(number);
-    else if (target === "person") publishPresentation({target,person:number,scope:filter,page:0},true);
+    else if (target === "person") publishPresentation({target,person:number,scope:filter,page:0});
     else if (target === "transitions") {
       transitionPerson = number;
-      publishPresentation({target,person:number,scope:filter,page:0},true);
+      publishPresentation({target,person:number,scope:filter,page:0});
     }
     screen.querySelector("#projection-shortcut-"+target)?.focus({preventScroll:true});
     return;
@@ -846,9 +841,9 @@ screen.addEventListener("click", event => {
     screen.querySelector("#learning-person")?.scrollIntoView({block:"nearest"});
   } else if (action === "project-learning") {
     const value=button.dataset.player;
-    publishPresentation({target:value==='group'?'group':'person',person:Number(value)||0,scope:filter,page:0},true);
+    publishPresentation({target:value==='group'?'group':'person',person:Number(value)||0,scope:filter,page:0});
   } else if (action === "project-transitions") {
-    publishPresentation({target:"transitions",person:transitionPerson,scope:filter,page:0},true);
+    publishPresentation({target:"transitions",person:transitionPerson,scope:filter,page:0});
   } else if(action === "open-projector") openProjector();
   else if(action === "projection-names") publishPresentation({names:!presentation.names});
   else if (action === "projection-pick") {
@@ -859,7 +854,7 @@ screen.addEventListener("click", event => {
     if (projectionPicker) screen.querySelector("#projection-choice:not(:disabled)")?.focus({preventScroll:true});
   } else if (action === "project-section") {
     projectionPicker = projectionChoice = undefined;
-    publishPresentation({target:button.dataset.target,scope:filter,page:0},true);
+    publishPresentation({target:button.dataset.target,scope:filter,page:0});
   }
   else if(action === "projection-page") publishPresentation({page:Math.max(0,presentation.page+Number(button.dataset.by))});
   else if (action === "project-step") void stepProjectedCase(Number(button.dataset.by));
