@@ -6,6 +6,7 @@ export const outcomes = {
   own: "Te tértél ki", other: "A másik autó tért ki",
   both: "Mindketten kitértek", crash: "Ütközés", stopped: "Félbemaradt",
 };
+const medals = { other:"Győztes", own:"Vesztes", crash:"Kórház", both:"Döntetlen" };
 const statuses = {
   lobby: "A rajtra vár", pending: "Döntésre vár", ready: "Döntés leadva",
   queued: "Új partnerre vár", finished: "Befejezte", starting: "A rajtra vár", driving: "Futam folyamatban",
@@ -312,8 +313,18 @@ function stepControls(s, pendingDecision, reveal) {
   return '<div class="night-actions steps">'+action("go","Haladok","secondary",Boolean(reveal))+
     action("yield",'Kitérek <span aria-hidden="true">↗</span>',"primary",Boolean(reveal))+'</div>';
 }
+function medalCollection(report) {
+  const counts = { other:0, own:0, crash:0, both:0 };
+  for (const match of report ?? []) {
+    if (Object.hasOwn(counts,match.outcome)) counts[match.outcome]++;
+  }
+  return '<dl class="night-medals" aria-label="Saját medáljaid">'+Object.entries(medals).map(([outcome,label]) =>
+    '<div class="night-medal" data-medal="'+outcome+'"><dt>'+label+'</dt><dd>'+counts[outcome]+'</dd></div>'
+  ).join("")+'</dl>';
+}
+
 function raceResult(s) {
-  const title = s.reason === "ready-timeout" ? "A rajt elmaradt" : outcomes[s.outcome];
+  const title = s.reason === "ready-timeout" ? "A rajt elmaradt" : medals[s.outcome] ?? outcomes[s.outcome];
   const distance = s.history.at(-1)?.distance;
   const detail = s.reason === "ready-timeout" ? "A rajthoz hiányzott egy kapcsolati jelzés."
     : Number.isFinite(distance) ? distance+" m" : "";
@@ -325,7 +336,7 @@ function nightPlayer(s, {room,opened,turnPending,pendingDecision,reveal}) {
   const timeLabel = finished ? "Vége" : s.race ? s.race.startsAt === null ? "Rajt előtt" : "Rajt…"
     : (s.step+1)+" / "+(s.totalSteps ?? legacyPoints.length)+". pont";
   const finishControls = finished ? reveal ? '<p class="night-status" role="status">Futam vége</p>'
-    : raceResult(s)+'<div class="stack rematch">'+rematch(s)+'</div>' : "";
+    : raceResult(s)+medalCollection(s.report)+'<div class="stack rematch">'+rematch(s)+'</div>' : "";
   const report = finished && !reveal && s.report?.length
     ? '<details id="night-report"'+(opened.has("night-report") ? " open" : "")+
       '><summary>Saját döntési riport</summary>'+personalReport(s,opened)+'</details>' : "";

@@ -101,3 +101,17 @@ test("participant-facing views keep the rematch and test opponent neutral", () =
   assert.doesNotMatch(summary,/tesztjátékos|partnerre/i);
   assert.doesNotMatch(projector({phase:"finished",pairs},room,[],true),/tesztjátékos/i);
 });
+
+test("the player sees the four medal totals and the current medal after the reveal", () => {
+  const results = ["other","own","other","crash","both","stopped"];
+  const report = results.map((outcome,index) => ({number:index+1,outcome,history:[]}));
+  const state = {phase:"finished",number:5,result:"both",outcome:"both",distance:50,history:[{distance:50}],messages:[],report};
+  const context = {room:"ABCDEFGH",opened:new Set()};
+  const html = player(state,context);
+  assert.match(html,/<strong>Döntetlen<\/strong>/);
+  assert.match(html,/<dt>Győztes<\/dt><dd>2<\/dd>/);
+  for (const label of ["Vesztes","Kórház","Döntetlen"]) {
+    assert.ok(html.includes("<dt>"+label+"</dt><dd>1</dd>"));
+  }
+  assert.doesNotMatch(player(state,{...context,reveal:{}}),/night-medals/);
+});
