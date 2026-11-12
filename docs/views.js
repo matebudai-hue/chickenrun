@@ -195,10 +195,13 @@ export function trainer(s, context) {
   const stage = lobby ? "Váró" : closed ? "Lezárva" : active.length ? "Játék folyamatban" : "Minden pár végzett";
   const cta = lobby ? action("start", "Játék indítása", "primary", !s.count)
     : closed ? action("create", "Új tréningfutam", "primary") : action("stop", "Futam lezárása", "secondary danger");
+  const nav = '<nav class="section-nav" aria-label="Tréneri nézetek">'+
+    [["overview","Áttekintés"],["report","Riport"]].map(([id,label]) =>
+      '<button type="button" id="trainer-tab-'+id+'" class="section-tab" data-do="tab" data-tab="'+id+'" aria-pressed="'+(tab===id)+'">'+label+'</button>').join("")+'</nav>';
   const toolbar = '<section class="control"><div class="control-title"><h1>Tréneri pult</h1>'+
     '<span class="control-code" aria-label="Szobakód: '+room+'">'+room+'</span>'+
     badge(stage, lobby ? "warm" : "good")+(!lobby ? badge(s.mode === "timed" ? "45 mp" : "Lépésenként","warm") : "")+
-    '</div><div class="control-actions">'+cta+
+    '</div><div class="control-actions">'+cta+nav+
     action("share", "QR és belépés", "secondary")+
     action("open-projector","Kivetítő megnyitása","secondary")+'</div></section>';
   const stats = [["Résztvevő",s.count,hasPresence ? online+" online" : ""],
@@ -209,9 +212,6 @@ export function trainer(s, context) {
     : ["Leadott döntés",active.reduce((n,p) => n+p.ready,0)+" / "+active.length*2,""]);
   const metrics = '<dl class="control-stats">'+stats.map(([label,value,detail]) =>
     '<div><dt>'+label+'</dt><dd>'+value+(detail ? ' <small>· '+detail+'</small>' : "")+'</dd></div>').join("")+'</dl>';
-  const nav = '<nav class="section-nav" aria-label="Tréneri nézetek">'+
-    [["overview","Áttekintés"],["players","Játékosok"],["report","Riport"]].map(([id,label]) =>
-      '<button class="section-tab" data-do="tab" data-tab="'+id+'" aria-pressed="'+(tab===id)+'">'+label+'</button>').join("")+'</nav>';
   const chooser = lobby ? '<div class="race-modes" role="group" aria-label="Játékmód"><span>Játékmód</span>'+
     [["steps","Döntési pontonként"],["timed","Folyamatos · 45 mp"]].map(([id,title]) =>
       '<label><input id="mode-'+id+'" type="radio" name="game-mode" value="'+id+'"'+(selectedGameMode === id ? " checked" : "")+
@@ -224,20 +224,14 @@ export function trainer(s, context) {
     const details = [[data.active,"folyamatban"],[data.stopped,"félbemaradt"],[data.test,"tesztjátékosos"],
       [data.gaps,"hiányzó kapcsolati jellel"],[data.unlinked,"résztvevő-azonosítás nélkül"]]
       .filter(([count]) => count).map(([count,label]) => count+" "+label);
-    const reportSections = [
-      ["report-timelines","Futamsorok"],["report-transitions","Mi jött utána?"],
-      ["case-section","Egy futam két oldala"],["report-guide","Kivezetés"]
-    ];
-    const reportNav = '<nav class="report-jumps" aria-label="Ugrás a riportban"><span>Ugrás</span>'+reportSections.map(([id,label]) =>
-      '<button type="button" class="text-link" data-do="report-jump" data-section="'+id+'">'+label+'</button>').join("")+'</nav>';
     const timelineHelp = '<details class="report-help" id="timeline-help"'+(opened.has("timeline-help")?' open':'')+'>'+
       '<summary>Jelmagyarázat</summary><p>GY · Győztes / V · Vesztes / K · Kórház / D · Döntetlen. '+
       'T · Tesztjátékosos futam. ! · Hiányzó kapcsolati jel. A méter a futam lezárását jelöli. '+
       'A sorok a játékosok saját futamsorrendjét mutatják.</p></details>';
     body = '<div class="debrief-dashboard trainer-report-layout">'+
-      '<section class="report-panel report-summary" aria-label="Eredmények">'+outcomeReport(data,outcomePlayer)+
+      '<section class="report-panel report-summary" id="report-results" aria-label="Futameredmények" tabindex="-1">'+outcomeReport(data,outcomePlayer)+
       '<div class="report-scope"><strong>'+scope+' · '+data.races.length+' lezárt futam összesen</strong>'+
-      details.map(item=>'<span>'+item+'</span>').join("")+'</div></section>'+reportNav+
+      details.map(item=>'<span>'+item+'</span>').join("")+'</div></section>'+
       '<section class="debrief-section report-panel" id="report-timelines" tabindex="-1">'+
       '<div class="report-section-head"><div><h3>Személyes futamsorok</h3><p>A név az egyéni történetet, a medál a futamot nyitja meg.</p></div>'+
       projectSection("people","Futamsorok kivetítése")+'</div>'+timelineHelp+learningPeople(data,reportPlayer)+'</section>'+
@@ -250,11 +244,6 @@ export function trainer(s, context) {
       '</div></div>'+reportWorkspace(cases,reportPair,selection)+
       '<p class="trainer-question">Mire számítottál ezen a ponton, és miért? Mit tudtál akkor a másik szándékáról?</p></section>'+
       learningGuide(opened)+'</div>';
-  } else if (tab === "players") {
-    const data = analyse(s.pairs,s.roster,filter);
-    body = '<div class="debrief-dashboard trainer-report-layout"><section class="debrief-section report-panel">'+
-      '<div class="report-section-head"><h3>Személyes futamsorok</h3>'+projectSection("people","Futamsorok kivetítése")+
-      '</div>'+learningPeople(data,reportPlayer)+'</section></div>';
   } else if (lobby) {
     body = '<div class="trainer-grid">'+connectionsCard(s)+
       card("Belépés a futamba", '<div class="qr" id="inline-qr"></div><p class="qr-code">'+room+'</p>'+
@@ -263,7 +252,7 @@ export function trainer(s, context) {
     body = queueOverview(s)+connectionsCard(s)+card("Párok és döntések",
       pairList([...active,...s.pairs.filter(p=>p.result).slice().reverse()],opened,selection,true));
   }
-  return '<div class="cockpit"><header class="trainer-sticky">'+toolbar+'<div class="trainer-navigation">'+nav+raceFilters(filter)+'</div>'+projectionControls(s,filter,presentation,projectionPicker,projectionChoice,{reportPair,reportPlayer,outcomePlayer,transitionPerson})+'</header><div class="trainer-content">'+(tab === "report" && !lobby ? '' : '<div class="control-overview">'+metrics+chooser+'</div>')+body+'</div></div>';
+  return '<div class="cockpit"><header class="trainer-sticky">'+toolbar+projectionControls(s,filter,presentation,projectionPicker,projectionChoice,{reportPair,reportPlayer,outcomePlayer,transitionPerson})+'</header><div class="trainer-content">'+(tab === "report" && !lobby ? '' : '<div class="control-overview">'+metrics+chooser+'</div>')+body+'</div></div>';
 }
 
 function connectionsCard(state) {
@@ -443,8 +432,11 @@ function projectionControls(state,filter,p,picker,choice,report) {
       return '<button type="button" id="projection-shortcut-'+target+'" class="button secondary small" data-do="'+
         (opensPicker?'projection-pick':'project-section')+'" data-target="'+target+'"'+stateAttributes+'>'+label+'</button>';
     }).join('')+'</div>';
-  return '<section class="projection-desk" aria-label="Kivetítő vezérlése"><div><span class="eyebrow">Kivetítő</span><strong>'+
-    (state.phase === "lobby" ? "Belépés" : step ? "Futam #"+p.number : labels[p.target])+'</strong></div>'+
-    '<button class="button secondary small" data-do="projection-names" aria-pressed="'+p.names+'">'+(p.names?'Nevek látszanak · Elrejtem':'Név nélkül · Megmutatom a neveket')+'</button>'+
-    (state.phase === "lobby" ? '' : navigation+shortcuts+projectionSelection(state,filter,p,picker,choice,report))+'</section>';
+  return '<section class="projection-desk" aria-label="Kivetítő vezérlése"><div class="projection-settings">'+raceFilters(filter)+
+    '<button type="button" id="projection-names" class="button secondary small" data-do="projection-names" aria-pressed="'+p.names+'">'+
+    (p.names?'Nevek látszanak':'Név nélkül')+'</button>'+
+    '<div class="projection-status-line"><span class="eyebrow">Kivetítő</span><strong>'+
+    (state.phase === "lobby" ? "Belépés" : step ? "Futam #"+p.number : labels[p.target])+'</strong>'+
+    (state.phase === "lobby" ? '' : navigation)+'</div></div>'+
+    (state.phase === "lobby" ? '' : shortcuts+projectionSelection(state,filter,p,picker,choice,report))+'</section>';
 }

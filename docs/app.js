@@ -3,7 +3,7 @@ import { normalizePresentation, changePresentation } from "./presentation.js?v=2
 import { animateRace } from "./live-race.js?v=15";
 import { nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=27";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=28";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=29";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -94,6 +94,19 @@ function roomLink(code, view) {
   url.searchParams.set("room", code);
   if (view) url.searchParams.set("view", view);
   return url.href;
+}
+
+const projectionSections = {
+  group:"report-results", person:"report-results", people:"report-timelines",
+  transitions:"report-transitions", case:"case-section", guide:"report-guide"
+};
+
+function scrollToReportSection(id) {
+  const section = document.getElementById(id);
+  if (!section) return;
+  const header = screen.querySelector(".trainer-sticky");
+  const top = section.getBoundingClientRect().top + window.scrollY - (header?.offsetHeight ?? 0) - 12;
+  window.scrollTo(0,top);
 }
 
 function selectStory(number) {
@@ -767,12 +780,19 @@ screen.addEventListener("submit", event => {
     const number = Number(data.get("choice"));
     const target = projectionPicker;
     projectionPicker = projectionChoice = undefined;
-    if (target === "case") selectStory(number);
-    else if (target === "person") publishPresentation({target,person:number,scope:filter,page:0});
-    else if (target === "transitions") {
+    if (target === "case") {
+      reportPair = number;
+      const pair = state.pairs.find(pair => pair.number === number);
+      if (!pair?.messageCount) onlyMessages = false;
+      selectStory(number);
+    } else if (target === "person") {
+      outcomePlayer = number;
+      publishPresentation({target,person:number,scope:filter,page:0});
+    } else if (target === "transitions") {
       transitionPerson = number;
       publishPresentation({target,person:number,scope:filter,page:0});
     }
+    scrollToReportSection(projectionSections[target]);
     screen.querySelector("#projection-shortcut-"+target)?.focus({preventScroll:true});
     return;
   }
@@ -813,6 +833,7 @@ screen.addEventListener("click", event => {
   else if (action === "test-pair") void mutate("test-pair",{player:Number(button.dataset.player),number:Number(button.dataset.number)});
   else if (action === "tab") {
     selectedTab = button.dataset.tab;
+    projectionPicker = projectionChoice = undefined;
     render();
     window.scrollTo(0,0);
     screen.querySelector('[data-tab="'+selectedTab+'"]').focus();
@@ -850,27 +871,28 @@ screen.addEventListener("click", event => {
     const target = button.dataset.target;
     projectionPicker = projectionPicker === target ? undefined : target;
     projectionChoice = undefined;
+    selectedTab = "report";
     render();
+    scrollToReportSection(projectionSections[target]);
     if (projectionPicker) screen.querySelector("#projection-choice:not(:disabled)")?.focus({preventScroll:true});
   } else if (action === "project-section") {
     projectionPicker = projectionChoice = undefined;
-    publishPresentation({target:button.dataset.target,scope:filter,page:0});
+    const target = button.dataset.target;
+    const shortcut = button.id === "projection-shortcut-"+target;
+    if (shortcut) {
+      selectedTab = "report";
+      if (target === "group") outcomePlayer = undefined;
+    }
+    publishPresentation({target,scope:filter,page:0});
+    if (shortcut) scrollToReportSection(projectionSections[target]);
   }
   else if(action === "projection-page") publishPresentation({page:Math.max(0,presentation.page+Number(button.dataset.by))});
   else if (action === "project-step") void stepProjectedCase(Number(button.dataset.by));
-  else if (action === "report-jump") {
-    const section = document.getElementById(button.dataset.section);
-    if (section) {
-      const header = screen.querySelector(".trainer-sticky");
-      const top = section.getBoundingClientRect().top + window.scrollY - (header?.offsetHeight ?? 0) - 12;
-      window.scrollTo(0,top);
-      section.focus({preventScroll:true});
-    }
-  } else if (action === "report-case") {
+  else if (action === "report-case") {
     reportPair = Number(button.dataset.number);
     selectedTab = "report";
     render();
-    screen.querySelector("#case-section")?.scrollIntoView({block:"start"});
+    scrollToReportSection("case-section");
   } else if (action === "report-messages") {
     onlyMessages = !onlyMessages;
     render();
