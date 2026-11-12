@@ -1,9 +1,9 @@
-import { presentationPages } from "./learning.js?v=27";
+import { presentationPages } from "./learning.js?v=31";
 import { normalizePresentation, changePresentation } from "./presentation.js?v=27";
 import { animateRace } from "./live-race.js?v=15";
 import { nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=27";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=30";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=31";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -421,12 +421,30 @@ function downloadCsv(headings, rows, label) {
     return '"'+text.replaceAll('"','""')+'"';
   };
   const csv = [headings,...rows].map(row=>row.map(safe).join(";")).join("\r\n");
-  const url = URL.createObjectURL(new Blob(["\ufeff",csv],{type:"text/csv;charset=utf-8"}));
+  downloadFile(new Blob(["\ufeff",csv],{type:"text/csv;charset=utf-8"}), "padlogaz-"+room+"-"+label+".csv");
+}
+
+function downloadFile(blob, filename) {
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "chicken-run-"+room+"-"+label+".csv";
+  link.download = filename;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function downloadDiagnostics(button) {
+  button.disabled = true;
+  try {
+    const report = await readState(endpoint("diagnostics"),auth);
+    const file = new Blob([JSON.stringify(report,null,2)+"\n"],{type:"application/json"});
+    downloadFile(file,"padlogaz-"+room+"-hibakereses.json");
+    showNotice();
+  } catch {
+    showNotice("A hibakeresési riport letöltése nem sikerült.", () => void downloadDiagnostics(button));
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function downloadTrainerReport(button) {
@@ -905,6 +923,7 @@ screen.addEventListener("click", event => {
     screen.querySelector('[data-tab="'+selectedTab+'"]').focus();
   } else if (action === "share") share();
   else if (action === "copy") void copyLink(button);
+  else if (action === "download-diagnostics") void downloadDiagnostics(button);
   else if (action === "download-host") void downloadTrainerReport(button);
   else if (action === "filter-player-report") {
     const report = screen.querySelector("#night-report");

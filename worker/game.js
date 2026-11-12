@@ -182,7 +182,8 @@ function addPair(room, a, b) {
   room.pairs.push({
     players: [a, b], startedAt: race ? race.startsAt : now, distanceVersion: 2, step: 0, choices: [null, null], result: null, history: [],
     messages: [], sent: [0, 0],
-    ...(race ? { race } : b === null ? { botYieldAt: plan } : {}),
+    ...(race ? { race } : {}),
+    ...(b === null ? { botYieldAt: plan } : {}),
   });
   room.phase = "running";
 }
@@ -478,6 +479,57 @@ async function transcript(store, roomCode, room, number) {
   }));
 }
 
+function diagnosticBotPlan(pair) {
+  if (pair.players[1] !== null) return null;
+  if (pair.botYieldAt === null) return { action:"go", distance:null };
+  if (Number.isInteger(pair.botYieldAt)) {
+    const distance = distancesFor(pair)[pair.botYieldAt];
+    return Number.isFinite(distance) ? { action:"yield", distance } : { action:"unknown", distance:null };
+  }
+  if (pair.race) {
+    // Older timed races keep the originally drawn exit even if the human exited first.
+    const distance = pair.race.botDistance ?? pair.race.turns[1]?.target;
+    return Number.isFinite(distance) ? { action:"yield", distance } : { action:"go", distance:null };
+  }
+  return { action:"unknown", distance:null };
+}
+
+function diagnostics(roomCode, room, expiresAt) {
+  const playerNumbers = new Map(room.players.map((player,index) => [player.id,index+1]));
+  return {
+    game:"Padlógáz",
+    schemaVersion:1,
+    exportedAt:new Date().toISOString(),
+    room:{code:roomCode, phase:room.phase, mode:room.mode ?? "steps", readyGate:room.readyGate ?? false, expiresAt},
+    units:{timestamps:"Unix epoch milliseconds", offsets:"milliseconds from start", distances:"metres"},
+    races:room.pairs.map((pair,index) => {
+      const race = pair.race;
+      const last = pair.result && pair.result !== "stopped" ? pair.history.at(-1) : undefined;
+      return {
+        number:index+1,
+        mode:race ? "timed" : "steps",
+        playerNumbers:pair.players.map(id => playerNumbers.get(id) ?? null),
+        botPlan:diagnosticBotPlan(pair),
+        status:pair.result ? "finished" : race?.startsAt === null ? "awaiting-ready" : "running",
+        startedAt:race ? race.startsAt : pair.startedAt ?? null,
+        ready:race?.ready ?? null,
+        readyDeadlineAt:race?.readyUntil ?? null,
+        stoppedAt:race?.stoppedAt ?? null,
+        result:pair.result,
+        reason:pair.reason ?? null,
+        finishedAt:last?.at ?? race?.stoppedAt ?? null,
+        finishDistance:last?.distance ?? null,
+        connectionGap:race?.connectionGap ?? null,
+        turns:race?.turns ?? null,
+        history:pair.history,
+        pendingSubmissionsAt:pair.result ? null : pair.submitted ?? null,
+        pendingBotDecisionAt:pair.result ? null : pair.botDueAt ?? null,
+        messageCount:pair.messageCount ?? pair.messages.length,
+      };
+    }),
+  };
+}
+
 export async function api(request, store, defer) {
   try {
     const receivedAt = Date.now();
@@ -503,13 +555,18 @@ export async function api(request, store, defer) {
       }
       reject(503, "A szoba létrehozása nem sikerült. Próbáld újra.");
     }
-    const match = url.pathname.match(/^\/api\/rooms\/([23456789A-HJ-NP-Z]{8})\/(join|state|start|stop|decision|turn|message|requeue|cancel|stop-pair|test-pair|transcript)$/);
+    const match = url.pathname.match(/^\/api\/rooms\/([23456789A-HJ-NP-Z]{8})\/(join|state|start|stop|decision|turn|message|requeue|cancel|stop-pair|test-pair|transcript|diagnostics)$/);
     if (!match) reject(404, "Ismeretlen kérés.");
     const [, roomCode, action] = match;
-    if (request.method !== (["state", "transcript"].includes(action) ? "GET" : "POST")) reject(405, "Érvénytelen kérés.");
+    if (request.method !== (["state", "transcript", "diagnostics"].includes(action) ? "GET" : "POST")) reject(405, "Érvénytelen kérés.");
     const credential = request.headers.get("authorization")?.match(/^Bearer ([a-f0-9]{32})$/)?.[1];
     if (!credential) reject(403, "Hiányzó szobakulcs.");
     const auth = await digest(credential);
+    if (action === "diagnostics") {
+      const { row, room } = await getRoom(store, roomCode);
+      if (room.host !== auth) reject(403, "A hibakeresési riportot csak a tréner töltheti le.");
+      return json(diagnostics(roomCode, room, row.expires_at));
+    }
     if (action === "transcript") {
       const { room } = await getRoom(store, roomCode);
       if (room.host !== auth) reject(403, "Az üzenetváltást csak a tréner tekintheti meg.");
@@ -623,7 +680,7 @@ export async function api(request, store, defer) {
     return json(await stateView(store, roomCode, room, auth, action === "join", defer));
   } catch (error) {
     if (error instanceof GameError) return json({ error: error.message }, error.status);
-    console.error("Chicken Run: request failed", error?.name);
+    console.error("Padlógáz: request failed", error?.name);
     return json({ error: "Kapcsolati hiba. Próbáld újra." }, 500);
   }
 }

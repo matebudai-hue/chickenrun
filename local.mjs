@@ -83,6 +83,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   await import("./build.mjs");
   const { default: assets } = await import("./dist/server/index.js");
   const port = Number(process.env.PORT || 8080);
-  localServer(assets).listen(port, "127.0.0.1", () => console.log("Chicken Run: http://localhost:"+port));
+  localServer(assets).listen(port, "127.0.0.1", () => console.log("Padlógáz: http://localhost:"+port));
 }
 

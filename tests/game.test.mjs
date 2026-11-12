@@ -418,3 +418,49 @@ test("stable roster numbers link trainer history without exposing participant id
   assert.equal(playerState.playerNumbers,undefined);
   assert.ok((playerState.report??[]).every(p=>p.playerNumbers===undefined));
 });
+
+test("only the trainer can export a timed bot plan and its actual result", async t => {
+  t.mock.timers.enable({apis:["Date"],now:1_800_000_000_000});
+  let draw = .99;
+  t.mock.method(Math,"random",() => draw);
+  const {room,host,players:[player]} = await create(1,memoryStore(),"timed",true);
+  assert.equal((await room("diagnostics",player)).status,403);
+  assert.equal((await room("diagnostics",null)).status,403);
+  const ready = (await room("state?ready=1",player)).body;
+  assert.ok(ready.race.startsAt);
+  t.mock.timers.tick(49_000);
+  assert.equal((await room("state",player)).body.result,"crash");
+
+  draw = .01;
+  await room("requeue",player,{number:1});
+  await room("test-pair",host.token,{player:1,number:1});
+  await room("state?ready=2",player);
+  t.mock.timers.tick(3_001);
+  await room("turn",player,{number:2});
+  t.mock.timers.tick(13_000);
+  assert.equal((await room("state",player)).body.result,"a");
+
+  const {status,body} = await room("diagnostics",host.token);
+  assert.equal(status,200);
+  assert.equal(body.game,"Padlógáz");
+  assert.equal(body.schemaVersion,1);
+  assert.deepEqual(body.races.map(({botPlan,result,finishDistance})=>({botPlan,result,finishDistance})),[
+    {botPlan:{action:"go",distance:null},result:"crash",finishDistance:0},
+    {botPlan:{action:"yield",distance:200},result:"a",finishDistance:1000},
+  ]);
+  assert.deepEqual(body.races[0].history[0].choices,["go","go"]);
+  assert.deepEqual(body.races[1].playerNumbers,[1,null]);
+  assert.doesNotMatch(JSON.stringify(body),/Tesztelő|authorization|token|messages"/i);
+});
+
+test("older timed races retain their bot plan in the export", async t => {
+  t.mock.method(Math,"random",() => 0);
+  const store = memoryStore();
+  const {room,host} = await create(1,store,"timed");
+  const saved = store.get(host.room);
+  const state = JSON.parse(saved.state);
+  delete state.pairs[0].botYieldAt;
+  assert.equal(store.put(host.room,saved.revision,JSON.stringify(state)),true);
+  const report = (await room("diagnostics",host.token)).body;
+  assert.deepEqual(report.races[0].botPlan,{action:"yield",distance:200});
+});

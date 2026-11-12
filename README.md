@@ -1,4 +1,4 @@
-# Chicken Run
+# Padlógáz
 
 Önálló, magyar nyelvű, többjátékos tréningjáték. A főoldal a tréneri vezérlőpult. Az Új futam és QR-kód gomb megnyitja a várót, a Játék indítása gomb sorsolja a párokat az addig csatlakozott játékosokból. A játékosok a QR-kóddal vagy a szobakóddal, fiók nélkül csatlakoznak. Az opcionális nevet vagy becenevet a tréner látja, és a párosítási listát névvel is kivetítheti. Egy szobában legfeljebb 40 résztvevő játszhat.
 
@@ -14,7 +14,7 @@ A tréner a váróban választ a döntési pontonkénti és a folyamatos játék
 
 ## Közzététel
 
-A játékos- és a tréneri felület címe: https://matebudai-hue.github.io/chickenrun/. A GitHub Pages a main ág docs mappáját szolgálja ki. A valós idejű játékállapotot a Chicken Run saját háttérszolgáltatása kezeli. A szobák nyolc óra után lejárnak. A tréneri hozzáférés a futamot indító böngészőben érhető el.
+A játékos- és a tréneri felület címe: https://matebudai-hue.github.io/chickenrun/. A GitHub Pages a main ág docs mappáját szolgálja ki. A valós idejű játékállapotot a Padlógáz saját háttérszolgáltatása kezeli. A szobák nyolc óra után lejárnak. A tréneri hozzáférés a futamot indító böngészőben érhető el.
 
 ## Helyi futtatás
 

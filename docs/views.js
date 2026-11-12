@@ -1,4 +1,4 @@
-import { analyse, outcomeReport, learningPeople, learningPatterns, learningGuide, learningProjection, presentationView } from "./learning.js?v=27";
+import { analyse, outcomeReport, learningPeople, learningPatterns, learningGuide, learningProjection, presentationView } from "./learning.js?v=31";
 import { carPositions, pairGroups, legacyPoints } from "./story.js?v=27";
 import { nightRoad } from "./live-race.js?v=15";
 
@@ -66,7 +66,7 @@ export function enterCode() {
     '<button class="button primary">Csatlakozás</button></form>');
 }
 export function waitingPage(room, title, description, actions = "") {
-  return '<section class="card centered"><p class="eyebrow">'+(room ? "SZOBA "+room : "CHICKEN RUN")+'</p><h1>'+
+  return '<section class="card centered"><p class="eyebrow">'+(room ? "SZOBA "+room : "PADLÓGÁZ")+'</p><h1>'+
     title+'</h1><p>'+description+'</p>'+actions+'</section>';
 }
 
@@ -252,9 +252,10 @@ export function trainer(s, context) {
       projectSection("people","Futamsorok kivetítése")+'</div>'+timelineHelp+learningPeople(data,reportPlayer)+'</section>'+
       learningPatterns(data,transitionPerson)+
       '<section class="debrief-section report-panel" id="case-section" tabindex="-1"><div class="report-section-head">'+
-      '<h3>Egy futam két oldala</h3>'+
+      '<h3>Egy futam két oldala</h3><div class="row">'+
       action("download-host","Döntések és üzenetek · CSV","small secondary",!s.pairs.some(p=>p.result))+
-      '</div>'+reportWorkspace(cases,reportPair,selection,onlyMessages)+
+      action("download-diagnostics","Hibakeresési riport · JSON","small secondary",!s.pairs.length)+
+      '</div></div>'+reportWorkspace(cases,reportPair,selection,onlyMessages)+
       '<p class="trainer-question">Mire számítottál ezen a ponton, és miért? Mit tudtál akkor a másik szándékáról?</p></section>'+
       learningGuide(opened)+'</div>';
   } else if (lobby) {
@@ -386,9 +387,9 @@ function nightPlayer(s, {room,opened,turnPending,pendingDecision,reveal,medalFil
     ? '<details id="night-report"'+(opened.has("night-report") ? " open" : "")+
       '><summary>Saját döntési riport</summary>'+personalReport(s,opened,medalFilter)+'</details>' : "";
   return '<section class="night-game'+(finished ? " night-finished" : " night-playing")+
-    '" aria-label="Chicken Run · '+(s.race ? "Folyamatos futam" : "Döntési pontonként")+
+    '" aria-label="Padlógáz · '+(s.race ? "Folyamatos futam" : "Döntési pontonként")+
     '"'+(s.race ? ' data-timed' : '')+(reveal ? ' data-night-reveal' : '')+(s.result === "crash" ? ' data-night-crash' : '')+'>'+
-    '<div class="night-id"><span>FUTAM / '+String(s.number).padStart(2,"0")+'</span></div>'+
+    '<div class="night-id"><span>PADLÓGÁZ · FUTAM / '+String(s.number).padStart(2,"0")+'</span></div>'+
     (!finished ? conversation(opened,false) : "")+
     nightRoad(s.distance,timeLabel,s.race || finished ? "" : s.distance+" M",Boolean(s.race && !finished))+
     '<div class="night-console">'+(finished && !reveal && s.messages.length ? conversation(opened,true) : "")+

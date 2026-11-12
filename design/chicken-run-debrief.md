@@ -1,4 +1,4 @@
-# Chicken Run – a döntésekből vezetői tanulás
+# Padlógáz – a döntésekből vezetői tanulás
 
 2026. november 12. A riport szakmai és terméktervezési alapja.
 
@@ -12,7 +12,7 @@
 
 Munkaprompt:
 
-„A Chicken Run tényleges döntéseiből, üzeneteiből és következményeiből tervezz tapasztalati tanulást. Olvasd el Budai Máté együttműködés-fejlesztési kézikönyvét és tréneri forgatókönyvét, ellenőrizd az elméleti állításokat, majd fogalmazz meg teljesíthető tanulási célokat. Minden dashboard-elemhez kapcsolj döntést vagy feldolgozó kérdést. Válaszd külön a mért eseményt, a résztvevő magyarázatát és a tréner hipotézisét. Ne gyárts személyiségprofilt, együttműködési pontszámot, szándékot vagy okozati következtetést a medálokból. A változó, névtelen partnereket, a tesztjátékosokat, a félbemaradt futamokat és a technikai bizonytalanságot kezeld pontosan. A kivezetés a közös szabályalkotásig és annak munkahelyi kipróbálásáig jusson el. A grafika a kliens éjszakai versenyvilágából épüljön.”
+„A Padlógáz tényleges döntéseiből, üzeneteiből és következményeiből tervezz tapasztalati tanulást. Olvasd el Budai Máté együttműködés-fejlesztési kézikönyvét és tréneri forgatókönyvét, ellenőrizd az elméleti állításokat, majd fogalmazz meg teljesíthető tanulási célokat. Minden dashboard-elemhez kapcsolj döntést vagy feldolgozó kérdést. Válaszd külön a mért eseményt, a résztvevő magyarázatát és a tréner hipotézisét. Ne gyárts személyiségprofilt, együttműködési pontszámot, szándékot vagy okozati következtetést a medálokból. A változó, névtelen partnereket, a tesztjátékosokat, a félbemaradt futamokat és a technikai bizonytalanságot kezeld pontosan. A kivezetés a közös szabályalkotásig és annak munkahelyi kipróbálásáig jusson el. A grafika a kliens éjszakai versenyvilágából épüljön.”
 
 ## A saját anyagokkal való összevetés
 

@@ -78,7 +78,7 @@ export function outcomeReport(data, selected) {
     (person ? personalOutcomes(person) : outcomeStrip(data))+'</section>';
 }
 export function learningOverview(data,projected=false){
-  return '<header class="debrief-hero"><div><p class="eyebrow">CHICKEN RUN / '+(projected?'KÖZÖS VISSZANÉZÉS':'DÖNTÉSEK NYOMÁBAN')+'</p><h2>Ki engedett.<br>Mi lett belőle.</h2><p>A győzelemhez valakinek ki kellett térnie.</p></div><div class="hero-number"><strong>'+data.races.length+'</strong><span>lezárt futam</span></div></header>'+
+  return '<header class="debrief-hero"><div><p class="eyebrow">PADLÓGÁZ / '+(projected?'KÖZÖS VISSZANÉZÉS':'DÖNTÉSEK NYOMÁBAN')+'</p><h2>Ki engedett.<br>Mi lett belőle.</h2><p>A győzelemhez valakinek ki kellett térnie.</p></div><div class="hero-number"><strong>'+data.races.length+'</strong><span>lezárt futam</span></div></header>'+
     outcomeStrip(data)+(data.races.length?'':'<p class="report-empty">A lezárt futamokból itt rajzolódik ki a csoport története.</p>');
 }
 function transitionTable(data){
@@ -139,7 +139,7 @@ export function learningProjection(state,target='group'){
   if(target!=='group'&&!p) return '<section class="learning-screen"><h1>A történet még nem érhető el.</h1></section>';
   if(p){
     const events=p.events.filter(e=>e.included);
-    return '<section class="learning-screen"><p class="eyebrow">CHICKEN RUN / EGY JÁTÉKOS TÖRTÉNETE</p><h1>Egy ember.<br>'+events.length+' döntési helyzet.</h1><div class="projection-medals">'+Object.keys(MEDALS).map(k=>tag(k,p.medals[k])).join('')+'</div><div class="race-ribbon projected-ribbon">'+events.map((e,i)=>raceButton(e,i,true)).join('')+'</div><p class="screen-question">Mikor változott meg,<br>amit a másiktól vártál?</p><p class="small-text">GY · Győztes / V · Vesztes / K · Kórház / D · Döntetlen · A távolság a futam lezárásának mérési pontja. ! · Hiányzó kapcsolati jel.</p></section>';
+    return '<section class="learning-screen"><p class="eyebrow">PADLÓGÁZ / EGY JÁTÉKOS TÖRTÉNETE</p><h1>Egy ember.<br>'+events.length+' döntési helyzet.</h1><div class="projection-medals">'+Object.keys(MEDALS).map(k=>tag(k,p.medals[k])).join('')+'</div><div class="race-ribbon projected-ribbon">'+events.map((e,i)=>raceButton(e,i,true)).join('')+'</div><p class="screen-question">Mikor változott meg,<br>amit a másiktól vártál?</p><p class="small-text">GY · Győztes / V · Vesztes / K · Kórház / D · Döntetlen · A távolság a futam lezárásának mérési pontja. ! · Hiányzó kapcsolati jel.</p></section>';
   }
   return '<section class="learning-screen">'+learningOverview(data,true)+'<p class="screen-question">Ki teremtette meg a győzelem feltételét?<br>És ő mit kapott érte?</p><p class="small-text">Egy futam egy közös kimenetel. Az egyoldalú kitérés egyik résztvevőnek Győztes, a másiknak Vesztes medált jelent.</p></section>';
 }
