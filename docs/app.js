@@ -31,7 +31,7 @@ let busy = false, polling = false, generation = 0, lastPulse = 0;
 let selectedTab = "overview", filter = "human", reportPair, reportPlayer, outcomePlayer, transitionPerson = 0, onlyMessages = false, draft = "", messageRequest, confirmAction;
 let reveal, revealTimer, finishRoadHeight, screeningCase, medalFilter;
 const screenPositions = new Map();
-let selectedGameMode = "steps";
+let selectedGameMode = "timed";
 let raceOffset = Date.now() - performance.now(), stopAnimation, turnPending = false;
 let chatPending, chatNotice = "", turnAck;
 let showPairings = saved.get(projectionModeKey) === "pairings";
