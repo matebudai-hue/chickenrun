@@ -97,7 +97,7 @@ test("participant-facing views keep the rematch and test opponent neutral", () =
   assert.doesNotMatch(waiting,/partner|tesztjátékos|data-queue-until|játékosra vársz/i);
   assert.doesNotMatch(personalReport({report},new Set()),/tesztjátékos/i);
   const summary = projector({phase:"finished",pairs},room,[]);
-  assert.match(summary,/1 befejezett játék/);
+  assert.match(summary,/lezárt futam/);
   assert.doesNotMatch(summary,/tesztjátékos|partnerre/i);
   assert.doesNotMatch(projector({phase:"finished",pairs},room,[],true),/tesztjátékos/i);
 });
@@ -127,7 +127,7 @@ test("medal filters show only matching races and the checkpoint where each race 
   for (const [index,match] of report.entries()) {
     const filtered = personalReport({report},new Set(),match.outcome);
     assert.ok(filtered.includes(expected[match.outcome]));
-    assert.match(filtered,/Összes futam/);
+    assert.doesNotMatch(filtered,/Összes futam|CSV|download-player|all-player-results/);
     for (const [otherIndex,other] of report.entries()) {
       assert.equal(filtered.includes('id="report-'+other.number+'"'),index===otherIndex);
     }

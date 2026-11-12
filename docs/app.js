@@ -1,7 +1,7 @@
 import { animateRace } from "./live-race.js?v=15";
 import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=15";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=18";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=19";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -26,7 +26,7 @@ const projectionModeKey = "cr:projection-mode:"+room;
 let auth = saved.get(roomKey);
 let state, signature, loadFailure, errorRetry, pollTimer;
 let busy = false, polling = false, generation = 0, lastPulse = 0;
-let selectedTab = "overview", filter = "all", reportPair, draft = "", messageRequest, confirmAction;
+let selectedTab = "overview", filter = "human", reportPair, reportPlayer, draft = "", messageRequest, confirmAction;
 let reveal, revealTimer, finishRoadHeight, screeningCase, medalFilter;
 const screenPositions = new Map();
 let selectedGameMode = "steps";
@@ -34,6 +34,7 @@ let raceOffset = Date.now() - performance.now(), stopAnimation, turnPending = fa
 let chatPending, chatNotice = "", turnAck;
 let selection = readSelection();
 let showPairings = saved.get(projectionModeKey) === "pairings";
+let reportTarget = saved.get(projectionModeKey)?.startsWith("learning:") ? saved.get(projectionModeKey).slice(9) : undefined;
 let pendingDecision;
 try { pendingDecision = JSON.parse(saved.get(decisionKey)); } catch {}
 const transcriptCache = new Map();
@@ -64,6 +65,9 @@ function selectStory(number, quote) {
     return;
   }
   selection = next;
+  showPairings = false;
+  reportTarget = undefined;
+  saved.remove(projectionModeKey);
   saved.set(selectionKey,JSON.stringify(selection));
   showNotice();
   render();
@@ -383,16 +387,6 @@ function downloadCsv(headings, rows, label) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function downloadPersonalReport() {
-  const headings = ["Játék","Kimenetel","Távolság (m)","Időpont","Saját döntés","Partner","Partner döntése","Kapcsolati megjegyzés"];
-  const rows = state.report.flatMap(pair => (pair.history.length ? pair.history : [{}]).map(row => [
-    pair.number,outcomes[pair.outcome],row.distance,time(row.at),moves[row.own],
-    "A másik autó",moves[row.other],
-    pair.reason === "ready-timeout" ? "Rajt elmaradt" : pair.connectionGap ? "A futam végén hiányzott a kapcsolati jel" : "",
-  ]));
-  downloadCsv(headings,rows,"sajat");
-}
-
 async function downloadTrainerReport(button) {
   button.disabled = true;
   try {
@@ -634,10 +628,11 @@ function render() {
   const log = document.querySelector("#messages");
   const oldScroll = log?.scrollTop ?? 0;
   const stickToBottom = !log || log.scrollHeight-log.clientHeight-oldScroll < 36;
+  const ribbonScrolls = [...screen.querySelectorAll(".race-ribbon")].map(el=>el.scrollLeft);
   const caseScroll = screen.querySelector("#report-cases")?.scrollTop;
   const storyScroll = screen.querySelector("#report-events")?.scrollTop;
   const storyNumber = screen.querySelector("[data-report-story]")?.dataset.transcript;
-  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reportPair, reveal, showPairings, selectedGameMode, turnPending, medalFilter };
+  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reportPair, reportPlayer, reportTarget, reveal, showPairings, selectedGameMode, turnPending, medalFilter };
   if (!room) {
     const previous = saved.get("cr:last-host");
     screen.innerHTML = mode === "player" ? enterCode() : home(codeValid.test(previous ?? "") ? previous : null, roomLink);
@@ -652,11 +647,12 @@ function render() {
   } else if (!state) {
     screen.innerHTML = waitingPage(room,"Kapcsolódás…","A futam állását töltjük be.");
   } else if (mode === "projector") {
-    screen.innerHTML = projector(state,room,selection,showPairings,screeningCase);
+    screen.innerHTML = projector(state,room,selection,showPairings,screeningCase,reportTarget);
     paintPairStories();
   } else if (isTrainer) {
     screen.innerHTML = trainer(state,context);
     paintPairStories();
+    screen.querySelectorAll(".race-ribbon").forEach((el,i)=>{el.scrollLeft=ribbonScrolls[i]??0;});
     const cases = screen.querySelector("#report-cases");
     const story = screen.querySelector("[data-report-story]");
     if (story) reportPair = Number(story.dataset.transcript);
@@ -746,8 +742,7 @@ screen.addEventListener("click", event => {
   } else if (action === "share") share();
   else if (action === "copy") void copyLink(button);
   else if (action === "download-host") void downloadTrainerReport(button);
-  else if (action === "download-player") downloadPersonalReport();
-  else if (action === "filter-player-report" || action === "all-player-results") {
+  else if (action === "filter-player-report") {
     const report = screen.querySelector("#night-report");
     if (!report) return;
     medalFilter = button.dataset.medal;
@@ -763,15 +758,27 @@ screen.addEventListener("click", event => {
     screeningCase = Number(button.dataset.number);
     render();
   }
-  else if (action === "report-case") {
+  else if (action === "report-player") {
+    reportPlayer = Number(button.dataset.player);
+    render();
+    screen.querySelector("#learning-person")?.scrollIntoView({block:"nearest"});
+  } else if (action === "project-learning") {
+    reportTarget = button.dataset.player;
+    showPairings = false;
+    saved.set(projectionModeKey,"learning:"+reportTarget);
+    showNotice("A kiválasztott történet megjelent a kivetítőn, név nélkül.");
+    render();
+  } else if (action === "report-case") {
     reportPair = Number(button.dataset.number);
     render();
+    screen.querySelector("#case-section")?.scrollIntoView({block:"start"});
   } else if (action === "filter") {
     filter = button.dataset.filter;
     render();
   } else if (action === "project-pair") selectStory(Number(button.dataset.number));
   else if (action === "project-quote") selectStory(Number(button.dataset.number),Number(button.dataset.quote));
   else if (action === "project-pairings") {
+    reportTarget = undefined;
     showPairings = !showPairings;
     if (showPairings) saved.set(projectionModeKey,"pairings");
     else saved.remove(projectionModeKey);
@@ -801,7 +808,10 @@ window.addEventListener("storage", event => {
     selection = readSelection();
     screenPositions.clear();
   }
-  else if (event.key === projectionModeKey) showPairings = saved.get(projectionModeKey) === "pairings";
+  else if (event.key === projectionModeKey) {
+    showPairings = saved.get(projectionModeKey) === "pairings";
+    reportTarget = saved.get(projectionModeKey)?.startsWith("learning:") ? saved.get(projectionModeKey).slice(9) : undefined;
+  }
   else return;
   if (state) render();
 });

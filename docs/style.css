@@ -501,3 +501,71 @@ body[data-keyboard="true"] .night-playing{--vehicle-scale:.75}
 .screening-progress progress::-webkit-progress-value{background:var(--gold)}
 .screening-progress progress::-moz-progress-bar{background:var(--gold)}
 @media(prefers-reduced-motion:reduce){.screening-car{transition:none}}
+
+/* Debrief: a night-race editorial wall, with data as the main graphic. */
+body[data-surface="trainer"]:has(.debrief-dashboard){color-scheme:dark;--ink:#f4f1df;--muted:#aeb6aa;--accent:#f5c35c;--paper:#151c19;--bg:#0b110f;--line:#374239;--rule:#728274;--band:#243129;background:#0b110f}
+.debrief-dashboard,.learning-screen{--ink:#f4f1df;--muted:#aeb6aa;--accent:#f5c35c;--paper:#151c19;--line:#374239;--rule:#728274;--band:#243129;color:var(--ink);background:#101713;overflow:hidden}
+.debrief-dashboard{border:1px solid #374239}
+.debrief-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:2rem;min-height:290px;padding:2.5rem 2rem;background:linear-gradient(90deg,#101713 8%,#101713c9 55%,#10171360),url('./road.jpg') center 48%/cover;border-bottom:1px solid #48523d;position:relative}
+.debrief-hero:after{content:'';position:absolute;bottom:0;left:2rem;width:80px;height:5px;background:#f5c35c}
+.debrief-hero .eyebrow{color:#f5c35c;margin-bottom:1rem}
+.debrief-hero h2{font:800 italic clamp(2.7rem,5.9vw,5.5rem)/.91 var(--display);letter-spacing:-.025em;text-transform:uppercase}
+.debrief-hero p:last-child{margin-top:1rem;color:#dddcc9;max-width:33rem}
+.hero-number{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0}
+.hero-number strong{font:800 italic clamp(4rem,9vw,9rem)/.85 var(--display);color:#f5c35c;letter-spacing:-.05em}
+.hero-number span{font:.7rem var(--mono);text-transform:uppercase;letter-spacing:.12em;margin-top:.7rem}
+.outcome-strip{display:flex;min-height:95px;border-bottom:1px solid #374239}
+.outcome-strip>div{display:flex;flex-direction:column;justify-content:center;padding:1rem 1.4rem;min-width:0;border-right:1px solid #101713;gap:.1rem;transition:flex .25s}
+.outcome-strip b{font:800 2.4rem/.95 var(--display)}
+.outcome-strip span{font-size:.76rem;overflow-wrap:anywhere}
+.strip-single{background:#d4ae5a;color:#201c12}.strip-both{background:#a9c7c4;color:#112823}.strip-crash{background:#a34b3b;color:#fff1e8}
+.debrief-tools{padding:1.2rem 1.8rem .5rem;display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.debrief-tools [aria-pressed="true"]{background:#f5c35c!important;color:#201c12!important;border-color:#f5c35c}
+.scope-note,.data-notes{padding:.3rem 1.8rem;color:#adb8aa;font-size:.78rem;max-width:70rem}
+.data-notes{font:.72rem/1.6 var(--mono);padding-bottom:1.2rem;border-bottom:1px solid #374239}
+.debrief-section{padding:2rem 1.8rem;border-bottom:1px solid #374239;display:grid;gap:1rem;scroll-margin-top:1rem}
+.section-kicker{font:700 .69rem var(--mono);letter-spacing:.13em;color:#f5c35c}
+.debrief-section>h3{font:800 clamp(1.5rem,2.8vw,2.4rem)/1.05 var(--display);max-width:48rem}
+.debrief-section>.muted{max-width:65rem;line-height:1.6}
+.driver-row{border-top:1px solid #374239;padding:1rem 0 1.3rem;min-width:0}
+.driver-heading{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.8rem}
+.driver-name{display:flex;align-items:center;gap:.65rem;background:transparent;border:0;color:#f4f1df;cursor:pointer;padding:.2rem 0;text-align:left;min-width:160px}
+.driver-name small{font:.65rem var(--mono);color:#a5b4a3}
+.driver-name strong{font:800 1.5rem var(--display);overflow-wrap:anywhere}
+.driver-name[aria-pressed="true"] strong,.driver-name:hover strong{color:#f5c35c}
+.driver-medals{display:flex;gap:.7rem;flex-wrap:wrap}
+.medal-count{font-size:.72rem;color:var(--medal);white-space:nowrap}
+.medal-count b{font:800 1.1rem var(--display);margin-right:.15rem}
+.medal-win{--medal:#f5c35c}.medal-lose{--medal:#b5c4b7}.medal-crash{--medal:#ff8972}.medal-both{--medal:#a6e4ec}
+.race-ribbon{display:flex;gap:.5rem;overflow-x:auto;padding:3px 2px 12px;scrollbar-color:#697a67 #151c19}
+.race-stamp{flex:0 0 70px;min-height:94px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.24rem;color:var(--medal,#aeb6aa);border:1px solid #374239;border-top:3px solid var(--medal,#aeb6aa);background:linear-gradient(155deg,#27322966,#151c19);text-align:center;font:inherit}
+button.race-stamp{cursor:pointer}button.race-stamp:hover{background:#303c30;transform:translateY(-2px)}
+.race-stamp small{font:.6rem var(--mono);color:#aeb6aa}.race-stamp b{font:800 1.6rem var(--display)}.race-stamp span{font:.63rem var(--mono)}.race-stamp i{position:absolute;right:3px;top:2px;font:700 .6rem var(--mono)}
+.learning-person{border-left:3px solid #f5c35c;background:#1a241d;padding:1.2rem;display:grid;gap:1rem;scroll-margin-top:1rem}
+.learning-person h3{font-size:2rem;margin-top:.25rem}
+.trainer-question{border-left:2px solid #f5c35c;padding:.3rem 0 .3rem 1rem;color:#f0d495;font-size:1rem;line-height:1.55}
+.debrief-dashboard table{background:transparent;color:#f4f1df}.debrief-dashboard th{background:#263229;color:#d8dfce}
+.debrief-dashboard td,.debrief-dashboard th{border-color:#374239}.debrief-dashboard caption{caption-side:top;text-align:left;padding:.3rem 0 .7rem;color:#aeb6aa;font-size:.78rem}
+.transition-table{min-width:530px}.transition-table th small{font-weight:400;color:#aeb6aa}.transition-table td{text-align:center;width:17%}
+.transition-value{display:block;background:linear-gradient(to right,#a7c5ac22 var(--fill),transparent var(--fill));font:800 1.6rem var(--display);padding:.4rem}
+.turning-points{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.turning-points article{padding:1rem 0;border-top:1px solid #48543d;display:grid;gap:.7rem}.turning-points h4{font:800 1.3rem var(--display)}.turning-points p:last-child{font-size:.85rem;color:#bec9b8;line-height:1.55}
+.debrief-dashboard .trainer-report{border:0;background:transparent;padding:0;gap:1rem}
+.debrief-dashboard .trainer-report>h2{display:none}.debrief-dashboard .report-detail{background:#151c19}.debrief-dashboard .report-detail-head{background:#202c23}
+.debrief-dashboard .report-workspace{grid-template-columns:minmax(200px,.55fr) minmax(0,1.45fr)}
+.guide-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.7rem 2rem;margin:.5rem 0}
+.guide-grid article{display:grid;grid-template-columns:40px 1fr;gap:1rem;border-top:1px solid #374239;padding-top:1rem}
+.guide-number{font:800 italic 2.4rem var(--display);color:#6f8169}.guide-grid h4{font:800 1.3rem/1.15 var(--display);margin:.35rem 0 .7rem}.guide-grid .small-text{margin-top:.8rem;line-height:1.6}
+.guide details{background:transparent}.guide details .stack{padding:1rem;line-height:1.6;font-size:.88rem}.report-empty{padding:1.5rem;color:#aeb6aa}
+.learning-screen{min-height:calc(100vh - 125px);padding:clamp(1.3rem,3vw,3rem);background:linear-gradient(90deg,#0d1510f5,#101713dc),url('./road.jpg') center/cover;display:flex;flex-direction:column;justify-content:center;gap:1.8rem}
+.learning-screen>.debrief-hero{padding:0;background:none;border:0;min-height:260px}.learning-screen>.debrief-hero:after{display:none}
+.learning-screen .debrief-hero h2,.learning-screen>h1{font:800 italic clamp(3rem,6.4vw,6.6rem)/.92 var(--display);text-transform:uppercase;letter-spacing:-.025em}
+.learning-screen .outcome-strip{min-height:115px}.learning-screen .outcome-strip b{font-size:3.6rem}.learning-screen .outcome-strip span{font-size:clamp(.85rem,1.5vw,1.2rem)}
+.screen-question{font:800 clamp(1.7rem,3.2vw,3.1rem)/1.1 var(--display);color:#f5c35c;border-left:5px solid #f5c35c;padding:.3rem 0 .3rem 1.2rem;max-width:1000px}
+.projection-medals{display:flex;gap:2rem;flex-wrap:wrap}.projection-medals .medal-count{font-size:clamp(1rem,1.7vw,1.5rem)}.projection-medals b{font-size:2.7rem}
+.projected-ribbon{flex-wrap:wrap;overflow:visible}.projected-ribbon .race-stamp{flex:0 0 clamp(70px,7vw,105px);min-height:120px}.projected-ribbon .race-stamp b{font-size:2.4rem}.projected-ribbon .race-stamp small,.projected-ribbon .race-stamp span{font-size:.8rem}
+[data-surface="projector"]{background:#0b110f!important}[data-surface="projector"] .projection{background:linear-gradient(90deg,#0d1510ed,#101713c9),url('./road.jpg') center/cover;padding:clamp(.8rem,2vw,1.5rem);border:1px solid #374239}
+[data-surface="projector"] .screening-head h1{font-style:italic;font-size:clamp(1.8rem,3vw,3rem)}
+[data-surface="projector"] .screening-story{background:transparent;border-top:1px solid #4a573e;min-height:160px}
+@media(max-width:760px){.debrief-hero{padding:1.6rem 1.2rem;min-height:240px;gap:1rem}.hero-number strong{font-size:4rem}.debrief-section{padding:1.5rem 1rem}.debrief-tools{padding:1rem}.scope-note,.data-notes{padding-left:1rem;padding-right:1rem}.turning-points,.guide-grid{grid-template-columns:1fr}.debrief-dashboard .report-workspace{grid-template-columns:1fr}.driver-heading{gap:.5rem}.driver-medals{gap:.5rem}.outcome-strip>div{padding:.8rem}.learning-screen .debrief-hero{min-height:200px}.projection-medals{gap:1rem}.learning-screen{gap:1.2rem}}
+@media(prefers-reduced-motion:reduce){.outcome-strip>div{transition:none}button.race-stamp:hover{transform:none}}

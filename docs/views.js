@@ -1,3 +1,4 @@
+import { analyse, learningOverview, learningPeople, learningDetail, learningPatterns, learningGuide, learningProjection } from "./learning.js?v=19";
 import { carPositions, pairGroups, legacyPoints } from "./story.js?v=15";
 import { nightRoad } from "./live-race.js?v=15";
 
@@ -187,7 +188,7 @@ function reportWorkspace(cases, chosen, selection) {
     projectionButton(current,selected(current))+'</div><div id="report-events" data-transcript-body></div></section></div>';
 }
 export function trainer(s, context) {
-  const { room, tab, opened, roomLink, selection, filter, showPairings, selectedGameMode, reportPair } = context;
+  const { room, tab, opened, roomLink, selection, filter, showPairings, selectedGameMode, reportPair, reportPlayer, reportTarget } = context;
   const lobby = s.phase === "lobby", closed = s.phase === "closed", active = s.pairs.filter(p => !p.result);
   const online = s.roster?.filter(p => p.online).length ?? 0;
   const hasPresence = s.roster?.some(p => p.online !== undefined);
@@ -218,18 +219,26 @@ export function trainer(s, context) {
   let body;
   if (tab === "report") {
     const groups = pairGroups(s.pairs);
+    const data = analyse(s.pairs,s.roster,filter === "stopped" ? "human" : filter);
     const cases = filter === "all" ? s.pairs.filter(pair => pair.result) : groups[filter];
     const filters = '<div class="row story-filters" aria-label="Esetek szűrése">'+
-      [["all","Mind"],["human","Ember–ember"],["test","Tesztjátékosos"],["stopped","Félbemaradt"]].map(([key,label]) =>
+      [["all","Mind"],["human","Ember–ember"],["test","Tesztjátékosos"]].map(([key,label]) =>
         '<button id="filter-'+key+'" class="button small secondary" data-do="filter" data-filter="'+key+
         '" aria-pressed="'+(filter === key)+'">'+label+'</button>').join("")+'</div>';
-    const projectionLabel = showPairings ? "Párosítások nevekkel" : selection.length+" / 2 név nélküli eset";
+    const projectionLabel = reportTarget ? (reportTarget === "group" ? "Csoportkép" : "Név nélküli egyéni történet") : showPairings ? "Párosítások nevekkel" : selection.length+" / 2 név nélküli eset";
     const showNames = '<button id="project-pairings" type="button" class="button small secondary" data-do="project-pairings"'+
       ' aria-pressed="'+showPairings+'"'+(s.pairs.length ? "" : " disabled")+'>'+
       (showPairings ? "Vissza a név nélküli nézetre" : "Párosítások kivetítése nevekkel")+'</button>';
-    body = card("Futamriport", '<div class="row between report-tools"><p class="small-text">Kivetítő · '+projectionLabel+'</p><div class="row">'+
+    body = '<div class="debrief-dashboard">'+learningOverview(data)+'<div class="debrief-tools">'+filters+'<button class="button secondary small" data-do="project-learning" data-player="group">Csoportkép kivetítése</button></div>'+
+      '<p class="scope-note">'+(filter === "all" ? "Ember–ember és tesztjátékosos futamok együtt. A T jel a tesztjátékosos futamokat külön jelöli." : filter === "test" ? "Tesztjátékosos futamok. Ezekből a csoport együttműködésére nem következtetünk." : "Ember–ember futamok. A tesztjátékosos eredmények külön szűrőn nézhetők meg.")+
+      " A kivetített csoportkép és egyéni medálsor mindig csak az ember–ember futamokat mutatja."+
+      '</p><div class="data-notes">'+data.active+' folyamatban · '+data.stopped+' félbemaradt · '+data.test+' tesztjátékosos · '+data.gaps+' hiányzó kapcsolati jellel'+
+      (data.unlinked ? '<p>'+data.unlinked+' futamhoz még nincs résztvevő-azonosítás. Frissítsd az oldalt; név alapján nem vonunk össze játékosokat.</p>' : "")+'</div>'+
+      '<section class="debrief-section"><div class="section-kicker">01 / SZEMÉLYES FUTAMSOROK</div><h3>Ugyanaz az ember. Változó helyzetek.</h3><p class="muted">Névre kattintva egyéni történet, medálra kattintva konkrét futam nyílik. Balról jobbra a kiválasztott futamok sorrendje; az egyes sorok azonos sorszámai nem feltétlenül egyidejűek. GY · Győztes / V · Vesztes / K · Kórház / D · Döntetlen. A méter a futam lezárását mutatja, a ! hiányzó kapcsolati jelet.</p>'+
+      learningPeople(data,reportPlayer)+learningDetail(data,reportPlayer)+'</section>'+learningPatterns(data)+
+      '<section class="debrief-section" id="case-section"><div class="section-kicker">03 / EGY FUTAM KÉT OLDALA</div>'+card("Döntések és jelzések", '<div class="row between report-tools"><p class="small-text">Kivetítő · '+projectionLabel+'</p><div class="row">'+
       showNames+action("download-host","Döntések és üzenetek · CSV","small secondary",!s.pairs.some(p=>p.result))+'</div></div>'+
-      reportTotals(groups)+filters+reportWorkspace(cases,reportPair,selection),"trainer-report");
+      reportWorkspace(cases,reportPair,selection),"trainer-report")+'<p class="trainer-question">Mire számítottál ezen a ponton, és miért? Mit tudtál akkor a másik szándékáról?</p></section>'+learningGuide(opened)+'</div>';
   } else if (tab === "players") {
     body = card("Játékosok és kapcsolatok", '<p class="muted">A kapcsolat az utolsó bejelentkezések alapján frissül.</p>'+roster(s));
   } else if (lobby) {
@@ -252,7 +261,8 @@ function namedPairings(pairs) {
     '<th scope="col">Egyik játékos</th><th scope="col">Másik játékos</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 
-export function projector(s, room, selection, showPairings = false, screeningCase) {
+export function projector(s, room, selection, showPairings = false, screeningCase, reportTarget) {
+  if (reportTarget && s.phase !== "lobby") return learningProjection(s,reportTarget);
   const lobby = s.phase === "lobby", active = s.pairs.filter(p=>!p.result).length;
   const cases = selection.map(entry => s.pairs.find(pair => pair.number === entry.number && pair.result)).filter(Boolean);
   const chosen = cases.find(pair => pair.number === screeningCase) ?? cases[0];
@@ -265,7 +275,7 @@ export function projector(s, room, selection, showPairings = false, screeningCas
   return '<div class="projection">'+(!lobby && !showPairings && chosen ? story :
     '<div class="screening-head"><h1>'+title+'</h1></div>'+
     (lobby ? card("Csatlakozás",'<div class="qr" id="inline-qr"></div><p class="qr-code">'+room+'</p><p>'+s.count+' résztvevő csatlakozott</p>',"invite")
-      : showPairings ? namedPairings(s.pairs) : resultSummary(s.pairs)+
+      : showPairings ? namedPairings(s.pairs) : learningProjection(s,"group")+
         '<p class="projection-status">'+active+' aktív pár</p>'))+'</div>';
 }
 function personalResult(match) {
@@ -278,10 +288,7 @@ function personalResult(match) {
 export function personalReport(state, opened, medalFilter) {
   if (!state.report?.length) return "";
   const matches = medalFilter ? state.report.filter(match => match.outcome === medalFilter) : state.report;
-  const label = medalFilter ? medals[medalFilter] : "Összes futam";
-  const controls = '<div class="row between"><p class="muted" aria-live="polite">'+label+' · '+matches.length+' futam</p>'+
-    '<div class="row">'+(medalFilter ? action("all-player-results","Összes futam","secondary small") : "")+
-    action("download-player",medalFilter ? "Összes futam · CSV" : "Letöltés · CSV","secondary small")+'</div></div>';
+  const controls = '<p class="muted" aria-live="polite">'+(medalFilter ? medals[medalFilter]+' · ' : '')+matches.length+' futam</p>';
   if (!matches.length) return card("Saját döntési riport",controls+'<p class="muted">Ehhez a medálhoz még nincs futamod.</p>',"report");
   return card("Saját döntési riport", controls+'<div class="pair-list">'+matches.map((m,i) => {
     const id = "report-"+m.number;

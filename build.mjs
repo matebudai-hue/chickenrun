@@ -6,6 +6,7 @@ const files = {
   "/connection.js": "text/javascript; charset=utf-8",
   "/live-race.js": "text/javascript; charset=utf-8",
   "/story.js": "text/javascript; charset=utf-8",
+  "/learning.js": "text/javascript; charset=utf-8",
   "/views.js": "text/javascript; charset=utf-8",
   "/display-latin.woff2": "font/woff2",
   "/display-latin-ext.woff2": "font/woff2",

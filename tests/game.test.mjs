@@ -408,3 +408,13 @@ test("a player who never reports ready does not get an apparent crash", async t 
   assert.equal((await room("state",host.token)).body.results.crash,0);
   assert.equal((await room("requeue",a,{number:1})).body.queued,true);
 });
+
+test("stable roster numbers link trainer history without exposing participant identities to players", async () => {
+  const {room,host,players}=await create(3);
+  const hostState=(await room('state',host.token)).body;
+  assert.deepEqual(hostState.pairs.flatMap(p=>p.playerNumbers).filter(Boolean).sort(),[1,2,3]);
+  assert.ok(hostState.pairs.find(p=>p.bot).playerNumbers.includes(null));
+  const playerState=(await room('state',players[0])).body;
+  assert.equal(playerState.playerNumbers,undefined);
+  assert.ok((playerState.report??[]).every(p=>p.playerNumbers===undefined));
+});

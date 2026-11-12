@@ -105,6 +105,7 @@ function view(room, auth, online) {
           connectionGap: pair.race.connectionGap,
           turns: pair.result ? pair.race.turns.map(turn => turn && turn.at < (pair.race.stoppedAt ?? raceEnd(pair.race)[1]) ? turn : null) : undefined,
         } : {}),
+        playerNumbers: pair.players.map(id => id === null ? null : room.players.findIndex(player => player.id === id) + 1),
         names: pair.players.map(id => playerName(room, id)), history: pair.history, bot: pair.players.includes(null),
         reason: pair.reason,
         messageCount: pair.messageCount ?? pair.messages.length,
