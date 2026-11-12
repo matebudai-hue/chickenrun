@@ -17,6 +17,8 @@ const files = {
   "/road.jpg": "image/jpeg",
   "/QR-LICENSE.txt": "text/plain; charset=utf-8",
   "/xy/index.html": "text/html; charset=utf-8",
+  "/xy/activity.html": "text/html; charset=utf-8",
+  "/xy/activity.js": "text/javascript; charset=utf-8",
   "/xy/app.js": "text/javascript; charset=utf-8",
   "/xy/report-pdf.js": "text/javascript; charset=utf-8",
   "/xy/trainer-guide.js": "text/javascript; charset=utf-8",

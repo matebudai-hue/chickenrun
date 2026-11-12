@@ -21,7 +21,7 @@ async function handleApi(request, env, ctx) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   const response = env.DB
     ? new URL(request.url).pathname.startsWith("/api/xy/")
-      ? await xyApi(request, d1Store(env.DB))
+      ? await xyApi(request, d1Store(env.DB), env.XY_ACTIVITY_OWNER_DIGEST)
       : await api(request, d1Store(env.DB), promise => ctx.waitUntil(promise))
     : Response.json({ error: "Az adatbázis nem elérhető." }, { status: 503 });
   for (const [key, value] of cors) response.headers.set(key, value);

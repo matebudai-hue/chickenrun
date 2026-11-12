@@ -8,13 +8,26 @@ const keyPattern = /^[a-f0-9]{32}$/;
 const digest = async key => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key))), n => n.toString(16).padStart(2,"0")).join("");
 const archivePrefix = auth => "xy-archive:"+auth+":";
 const archiveExpiry = Date.UTC(9999,0,1);
-async function updateArchive(store, id, update) {
+const dayMs = 86_400_000;
+const activityDays = 30;
+const weekMs = 7*dayMs;
+const activityActions = new Set(["start","open","close","next","negotiation","resume","finish","continue"]);
+async function updateRecord(store, id, expires, update) {
   for (let attempt=0;attempt<12;attempt++) {
     const row=await store.get(id);
     const state=JSON.stringify(update(row ? JSON.parse(row.state) : null));
-    if (row ? await store.put(id,row.revision,state) : await store.create(id,archiveExpiry,state)) return;
+    if (row ? await store.put(id,row.revision,state) : await store.create(id,expires,state)) return;
   }
   fail(503,"A mentés most nem sikerült. Próbáld újra.");
+}
+async function recordActivity(store, s, revision, now) {
+  const week=Math.floor(s.startedAt/weekMs);
+  const activity={code:s.code,startedAt:s.startedAt,updatedAt:now,phase:s.phase,round:s.index+1,rounds:s.rounds.length,revision};
+  await updateRecord(store,"xy-activity:"+week,(week+1)*weekMs+activityDays*dayMs,entries=>{
+    const current=entries || [];
+    if (current.some(entry=>entry.code===s.code && entry.startedAt===s.startedAt && entry.revision>=revision)) return current;
+    return [activity,...current.filter(entry=>entry.code!==s.code || entry.startedAt!==s.startedAt)];
+  });
 }
 const clean = (s, max) => typeof s === "string" ? s.trim().slice(0,max) : "";
 const choice = x => x === "X" || x === "Y";
@@ -191,7 +204,7 @@ function action(s, auth, act, b, transfer) {
     s.mode = "live";
   } else fail(404,"Ismeretlen művelet.");
 }
-export async function xyApi(req, store) {
+export async function xyApi(req, store, ownerDigest) {
   const reply = (data,status=200) => Response.json(data,{status,headers:{"Cache-Control":"no-store"}});
   try {
     const url = new URL(req.url);
@@ -221,6 +234,14 @@ export async function xyApi(req, store) {
     const key = req.headers.get("Authorization")?.replace(/^Bearer /,"");
     if (!keyPattern.test(key || "")) fail(403,"Érvénytelen belépő.");
     const auth = await digest(key);
+    if (path==="/api/xy/activity" && req.method==="GET") {
+      if (!ownerDigest || auth!==ownerDigest) fail(403,"Tulajdonosi hozzáférés szükséges.");
+      const now=Date.now(), oldest=now-activityDays*dayMs;
+      const week=Math.floor(now/weekMs), firstWeek=Math.floor(oldest/weekMs);
+      const groups=await Promise.all(Array.from({length:week-firstWeek+1},(_,i)=>store.get("xy-activity:"+(week-i))));
+      const entries=groups.flatMap(row=>row ? JSON.parse(row.state) : []).filter(entry=>entry.startedAt>=oldest);
+      return reply({now,entries:entries.sort((a,b)=>b.startedAt-a.startedAt).map(({revision,...entry})=>entry)});
+    }
     const archive = /^\/api\/xy\/archive(?:\/([a-f0-9]{64}))?$/.exec(path);
     if (archive && req.method === "GET") {
       if (!archive[1]) {
@@ -250,8 +271,8 @@ export async function xyApi(req, store) {
         const prefix=archivePrefix(await digest(b.archiveKey));
         const report=resultReport(s);
         const entry={id:archiveId,code,date,company,reason,rounds:report.rounds.filter(r=>r.scores).length};
-        await updateArchive(store,prefix+archiveId,()=>({...entry,report}));
-        await updateArchive(store,prefix+"index",entries=>[entry,...(entries || []).filter(item=>item.id!==entry.id)]);
+        await updateRecord(store,prefix+archiveId,archiveExpiry,()=>({...entry,report}));
+        await updateRecord(store,prefix+"index",archiveExpiry,entries=>[entry,...(entries || []).filter(item=>item.id!==entry.id)]);
         return reply(entry);
       }
       if (act==="report") {
@@ -262,8 +283,12 @@ export async function xyApi(req, store) {
       }
       if (!act || action(s,auth,act,b,transfer) === false)
         return reply(await presentView(s,auth,store,id,act === "join" || (!act && !url.searchParams.has("idle"))));
-      if (await store.put(id,row.revision,JSON.stringify(s)))
+      const now=Date.now(), track=!!ownerDigest && activityActions.has(act);
+      if (track && !s.startedAt && act==="start") s.startedAt=now;
+      if (await store.put(id,row.revision,JSON.stringify(s))) {
+        if (track && s.startedAt) await recordActivity(store,s,row.revision+1,now).catch(err=>console.error("XY activity write failed",err.message));
         return reply(await presentView(s,auth,store,id,true));
+      }
     }
     return reply({error:"Több döntés érkezett egyszerre. Próbáld újra."},503);
   } catch (err) {

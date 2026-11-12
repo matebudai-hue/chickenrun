@@ -198,3 +198,4 @@ dialog{color:var(--ink);background:var(--paper);border:1px solid var(--line);bor
 #save-game-form label{width:100%}
 .archive-list article{padding:.7rem 0;border-top:1px solid var(--line)}
 .archive-reason{white-space:pre-wrap;overflow-wrap:anywhere}
+#activity-auth[hidden]{display:none}

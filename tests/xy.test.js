@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { memoryStore } from "../local.mjs";
 import { points, multipliers, xyApi } from "../worker/xy.js";
 
@@ -20,11 +21,14 @@ test("four teams, negotiations, concurrent moves, recovery, projection and refle
   const [host,projector,a,b,c,d,replacement,invite,outsider]=Array.from({length:9},(_,i)=>String(i+1).repeat(32));
   const code="ABC234";
   const teams=[a,b,c,d];
+  const ownerKey="f".repeat(32);
+  const ownerDigest=createHash("sha256").update(ownerKey).digest("hex");
+  const activity=key=>xyApi(new Request("https://example.test/api/xy/activity",{headers:{authorization:"Bearer "+key}}),store,ownerDigest);
   const call=async(act,key,body,status=200)=>{
     const path=act==="create"?"/api/xy/rooms":"/api/xy/rooms/"+code+(act==="idle"?"?idle=1":act?"/"+act:"");
     const response=await xyApi(new Request("https://example.test"+path,{
       method:act&&act!=="idle"&&act!=="report"?"POST":"GET",headers:key?{authorization:"Bearer "+key}:{},body:act&&act!=="idle"&&act!=="report"?JSON.stringify(body||{}):undefined
-    }),store);
+    }),store,ownerDigest);
     const data=await response.json();
     assert.equal(response.status,status,JSON.stringify(data));
     return data;
@@ -183,4 +187,12 @@ test("four teams, negotiations, concurrent moves, recovery, projection and refle
   const entries=await (await archiveRead(archiveKey)).json();
   assert.equal(entries.length,1);
   assert.equal(entries[0].reason,"Pontosított megjegyzés");
+  assert.equal((await activity(host)).status,403);
+  const history=(await (await activity(ownerKey)).json()).entries;
+  assert.equal(history.length,1);
+  assert.equal(history[0].code,code);
+  assert.equal(history[0].phase,"finished");
+  assert.equal(history[0].round,10);
+  assert.ok(history[0].updatedAt>=history[0].startedAt);
+  assert.deepEqual(Object.keys(history[0]).sort(),["code","phase","round","rounds","startedAt","updatedAt"]);
 });

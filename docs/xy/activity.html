@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Játékaktivitás · Nagy X/Y</title>
+  <link rel="stylesheet" href="./style.css?v=16">
+  <script type="module" src="./activity.js?v=1"></script>
+</head>
+<body class="xy-page">
+  <header class="mast"><a class="brand" href="./">Nagy <b>X<span>/</span>Y</b></a></header>
+  <main id="screen">
+    <section class="paper">
+      <h1>Játékaktivitás</h1>
+      <p>Az elmúlt 30 nap játékindításai. Az időpontok magyar idő szerint jelennek meg.</p>
+      <form id="activity-auth" hidden>
+        <label>Hozzáférési kulcs<input name="key" type="password" required pattern="[a-f0-9]{32}"></label>
+        <button type="submit">Megnyitás</button>
+      </form>
+      <div class="actions">
+        <button type="button" id="activity-refresh" hidden>Frissítés</button>
+        <button type="button" id="activity-signout" hidden>Kilépés</button>
+      </div>
+      <p id="activity-status" role="status"></p>
+      <div class="scroll" id="activity-results"></div>
+    </section>
+  </main>
+</body>
+</html>
