@@ -647,3 +647,10 @@ button.race-stamp{cursor:pointer}button.race-stamp:hover{background:#303c30;tran
 [data-surface="projector"] .screening-head h1{overflow-wrap:anywhere;min-width:0}
 [data-surface="projector"] .projection .invite{min-width:0}
 [data-surface="projector"] #inline-qr canvas,[data-surface="projector"] #inline-qr svg{max-width:min(65vw,46vh);height:auto}
+
+.projection-shortcuts,.projection-picker{display:flex;flex:0 0 100%;align-items:center;flex-wrap:wrap;gap:4px}
+.projection-shortcuts .button[aria-expanded="true"]{background:var(--gold);color:#231a0e}
+.projection-picker{gap:5px 8px}
+.projection-picker label{font-size:.8rem}
+.projection-picker select{min-width:0;max-width:min(100%,34rem);min-height:32px;border:1px solid var(--rule);background:var(--paper);color:var(--ink);font:inherit;font-size:.85rem}
+.debrief-section,.learning-person{scroll-margin-top:16rem}

@@ -1,9 +1,9 @@
-import { presentationPages } from "./learning.js?v=22";
-import { normalizePresentation, changePresentation } from "./presentation.js?v=22";
+import { presentationPages } from "./learning.js?v=23";
+import { normalizePresentation, changePresentation } from "./presentation.js?v=23";
 import { animateRace } from "./live-race.js?v=15";
 import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=15";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=22";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=23";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -43,7 +43,7 @@ let presentation;
 try { presentation = normalizePresentation(JSON.parse(saved.get(presentationKey) || "{}")); } catch { presentation = normalizePresentation(); }
 selection = presentation.target === "case" ? [{number:presentation.number,quotes:presentation.quotes}] : [];
 filter = presentation.scope;
-let projectorWindow;
+let projectorWindow, projectionPicker, projectionChoice;
 const projectionChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(presentationKey) : null;
 function adoptPresentation(value) {
  const next = normalizePresentation(value);
@@ -684,7 +684,7 @@ function render() {
   const caseScroll = screen.querySelector("#report-cases")?.scrollTop;
   const storyScroll = screen.querySelector("#report-events")?.scrollTop;
   const storyNumber = screen.querySelector("[data-report-story]")?.dataset.transcript;
-  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reportPair, reportPlayer, outcomePlayer, reportTarget, presentation, onlyMessages, reveal, showPairings, selectedGameMode, turnPending, medalFilter };
+  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reportPair, reportPlayer, outcomePlayer, reportTarget, presentation, projectionPicker, projectionChoice, onlyMessages, reveal, showPairings, selectedGameMode, turnPending, medalFilter };
   if (!room) {
     const previous = saved.get("cr:last-host");
     screen.innerHTML = mode === "player" ? enterCode() : home(codeValid.test(previous ?? "") ? previous : null, roomLink);
@@ -756,6 +756,15 @@ screen.addEventListener("submit", event => {
   event.preventDefault();
   if (busy) return;
   const data = new FormData(event.target);
+  if (event.target.id === "projection-picker") {
+    const number = Number(data.get("choice"));
+    if (!number) return;
+    const target = projectionPicker;
+    projectionPicker = projectionChoice = undefined;
+    if (target === "case") selectStory(number);
+    else if (target === "person") publishPresentation({target,person:number,scope:filter,page:0},true);
+    return;
+  }
   if (event.target.id === "room-form") {
     const code = String(data.get("room-code")).trim().toUpperCase();
     if (!codeValid.test(code)) return showNotice("Nyolckarakteres szobakódot adj meg.");
@@ -824,7 +833,16 @@ screen.addEventListener("click", event => {
     publishPresentation({target:value==='group'?'group':'person',person:Number(value)||0,scope:filter,page:0},true);
   } else if(action === "open-projector") openProjector();
   else if(action === "projection-names") publishPresentation({names:!presentation.names});
-  else if(action === "project-section") publishPresentation({target:button.dataset.target,scope:filter,page:0},true);
+  else if (action === "projection-pick") {
+    const target = button.dataset.target;
+    projectionPicker = projectionPicker === target ? undefined : target;
+    projectionChoice = undefined;
+    render();
+    if (projectionPicker) screen.querySelector("#projection-choice:not(:disabled)")?.focus({preventScroll:true});
+  } else if (action === "project-section") {
+    projectionPicker = projectionChoice = undefined;
+    publishPresentation({target:button.dataset.target,scope:filter,page:0},true);
+  }
   else if(action === "projection-page") publishPresentation({page:Math.max(0,presentation.page+Number(button.dataset.by))});
   else if(action === "project-step") {
     const pair=state.pairs.find(p=>p.number===presentation.number);
@@ -848,6 +866,7 @@ screen.addEventListener("click", event => {
   else if (action === "project-pairings") publishPresentation({names:!presentation.names});
 });
 screen.addEventListener("change", event => {
+  if (event.target.id === "projection-choice") projectionChoice = Number(event.target.value);
   if (event.target.id !== "outcome-player") return;
   outcomePlayer = Number(event.target.value) || undefined;
   render();

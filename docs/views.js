@@ -1,4 +1,4 @@
-import { analyse, outcomeReport, learningPeople, learningDetail, learningPatterns, learningGuide, learningProjection, presentationView } from "./learning.js?v=22";
+import { analyse, outcomeReport, learningPeople, learningDetail, learningPatterns, learningGuide, learningProjection, presentationView } from "./learning.js?v=23";
 import { carPositions, pairGroups, legacyPoints } from "./story.js?v=15";
 import { nightRoad } from "./live-race.js?v=15";
 
@@ -188,7 +188,7 @@ function reportWorkspace(cases, chosen, selection) {
     projectionButton(current,selected(current))+'</div><div id="report-events" data-transcript-body></div></section></div>';
 }
 export function trainer(s, context) {
-  const { room, tab, opened, roomLink, selection, filter, selectedGameMode, reportPair, reportPlayer, outcomePlayer, onlyMessages, presentation = {target:"group",names:false,scope:"human",page:0} } = context;
+  const { room, tab, opened, roomLink, selection, filter, selectedGameMode, reportPair, reportPlayer, outcomePlayer, onlyMessages, projectionPicker, projectionChoice, presentation = {target:"group",names:false,scope:"human",page:0} } = context;
   const lobby = s.phase === "lobby", closed = s.phase === "closed", active = s.pairs.filter(p => !p.result);
   const online = s.roster?.filter(p => p.online).length ?? 0;
   const hasPresence = s.roster?.some(p => p.online !== undefined);
@@ -218,9 +218,8 @@ export function trainer(s, context) {
       '>'+title+'</label>').join("")+'</div>' : "";
   let body;
   if (tab === "report") {
-    const groups = pairGroups(s.pairs);
     const data = analyse(s.pairs,s.roster,filter === "stopped" ? "human" : filter);
-    const cases = (filter === "all" ? s.pairs.filter(pair => pair.result) : groups[filter]).filter(pair=>!onlyMessages||pair.messageCount>0);
+    const cases = reportCases(s.pairs,filter).filter(pair=>!onlyMessages||pair.messageCount>0);
     body = '<div class="debrief-dashboard">'+outcomeReport(data,outcomePlayer)+
       '<p class="scope-note">'+(filter === "all" ? "Ember–ember és tesztjátékosos futamok együtt. A T jel a tesztjátékosos futamokat külön jelöli." : filter === "test" ? "Tesztjátékosos futamok. Ezekből a csoport együttműködésére nem következtetünk." : "Ember–ember futamok. A tesztjátékosos eredmények külön szűrőn nézhetők meg.")+
       " A kivetítés a kiválasztott szűrést követi."+
@@ -242,7 +241,7 @@ export function trainer(s, context) {
     body = queueOverview(s)+card("Párok és döntések",
       pairList([...active,...s.pairs.filter(p=>p.result).slice().reverse()],opened,selection,true));
   }
-  return '<div class="cockpit"><header class="trainer-sticky">'+toolbar+'<div class="trainer-navigation">'+nav+raceFilters(filter)+'</div>'+projectionControls(presentation)+'</header><div class="control-overview">'+metrics+chooser+'</div>'+body+'</div>';
+  return '<div class="cockpit"><header class="trainer-sticky">'+toolbar+'<div class="trainer-navigation">'+nav+raceFilters(filter)+'</div>'+projectionControls(s,filter,presentation,projectionPicker,projectionChoice,{reportPair,reportPlayer,outcomePlayer})+'</header><div class="control-overview">'+metrics+chooser+'</div>'+body+'</div>';
 }
 
 function namedPairings(pairs) {
@@ -384,12 +383,39 @@ function raceFilters(filter) {
   return '<div class="row story-filters" role="group" aria-label="Futamok szűrése">'+options.map(([key,label]) =>
     '<button id="filter-'+key+'" class="button secondary small" data-do="filter" data-filter="'+key+'" aria-pressed="'+(filter===key)+'">'+label+'</button>').join('')+'</div>';
 }
-function projectionControls(p) {
-  const labels = {group:'Csoportkép',people:'Személyes futamsorok',person:'Egyéni eredmények',transitions:'Mi jött utána?',guide:'Kivezetési kérdések',case:'Futam #'+p.number};
+function reportCases(pairs, filter) {
+  return filter === "all" ? pairs.filter(pair => pair.result) : pairGroups(pairs)[filter] ?? [];
+}
+function projectionSelection(state, filter, p, picker, choice, report) {
+  if (!picker) return "";
+  const individual = picker === "person";
+  const items = individual
+    ? analyse(state.pairs,state.roster,filter).players.filter(player => player.events.some(event => event.included))
+        .map(player => [player.number, player.name+" · R"+String(player.number).padStart(2,"0")])
+    : reportCases(state.pairs,filter).slice().reverse().map(pair =>
+        [pair.number,"#"+pair.number+" · "+pair.names.join(" ↔ ")+(pair.messageCount ? " · "+pair.messageCount+" üzenet" : "")]);
+  const selected = choice ?? (individual ? report.outcomePlayer ?? report.reportPlayer ?? p.person : report.reportPair ?? p.number);
+  const options = items.map(([number,label]) => '<option value="'+number+'"'+(number === selected ? ' selected' : '')+'>'+escape(label)+'</option>').join("");
+  return '<form id="projection-picker" class="projection-picker"><label for="projection-choice">'+(individual?"Játékos":"Futam")+'</label>'+
+    '<select id="projection-choice" name="choice"'+(items.length?'':' disabled')+'>'+
+    (options || '<option>'+(individual?"Ebben a szűrésben még nincs egyéni eredmény.":"Ebben a szűrésben még nincs lezárt futam.")+'</option>')+
+    '</select><button class="button secondary small" type="submit"'+(items.length?'':' disabled')+'>Kivetítem</button></form>';
+}
+function projectionControls(state,filter,p,picker,choice,report) {
+  const labels = {group:'Csoportkép',person:'Egyéni eredmények',people:'Személyes futamsorok',transitions:'Mi jött utána?',case:'Egy futam két oldala',guide:'Kivezetési kérdések'};
   const step = p.target === 'case';
   const paged = ['guide','person','people'].includes(p.target);
   const navigation = step || paged ? '<div class="row"><button class="button secondary small" data-do="'+(step?'project-step':'projection-page')+'" data-by="-1">'+(step?'← Pillanat':'← Oldal')+'</button>'+
     (step?'':'<span>'+(p.page+1)+'. oldal</span>')+'<button class="button secondary small" data-do="'+(step?'project-step':'projection-page')+'" data-by="1">'+(step?'Pillanat →':'Oldal →')+'</button></div>' : '';
-  return '<section class="projection-desk"><div><span class="eyebrow">Kivetítő</span><strong>'+labels[p.target]+'</strong></div>'+
-    '<button class="button secondary small" data-do="projection-names" aria-pressed="'+p.names+'">'+(p.names?'Nevek látszanak · Elrejtem':'Név nélkül · Megmutatom a neveket')+'</button>'+navigation+'</section>';
+  const shortcuts = state.phase === "lobby" ? '' : '<div class="projection-shortcuts" role="group" aria-label="Kivetíthető nézetek">'+
+    Object.entries(labels).map(([target,label]) => {
+      const opensPicker = target === "person" || target === "case";
+      const stateAttributes = opensPicker ? ' aria-expanded="'+(picker===target)+'"' : ' aria-pressed="'+(p.target===target)+'"';
+      return '<button type="button" id="projection-shortcut-'+target+'" class="button secondary small" data-do="'+
+        (opensPicker?'projection-pick':'project-section')+'" data-target="'+target+'"'+stateAttributes+'>'+label+'</button>';
+    }).join('')+'</div>';
+  return '<section class="projection-desk" aria-label="Kivetítő vezérlése"><div><span class="eyebrow">Kivetítő</span><strong>'+
+    (state.phase === "lobby" ? "Belépés" : step ? "Futam #"+p.number : labels[p.target])+'</strong></div>'+
+    '<button class="button secondary small" data-do="projection-names" aria-pressed="'+p.names+'">'+(p.names?'Nevek látszanak · Elrejtem':'Név nélkül · Megmutatom a neveket')+'</button>'+
+    (state.phase === "lobby" ? '' : navigation+shortcuts+projectionSelection(state,filter,p,picker,choice,report))+'</section>';
 }
