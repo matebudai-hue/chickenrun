@@ -83,7 +83,7 @@ export function learningDetail(data,selected){
   const events=p.events.filter(e=>e.included);
   const turn=events.filter(e=>e.move==='yield');
   const afterCrash=p.transitions.filter(t=>t.prev.medal==='crash');
-  return '<section class="learning-person" id="learning-person"><div class="row between"><div><p class="eyebrow">R'+String(p.number).padStart(2,'0')+' / EGYÉNI TÖRTÉNET</p><h3>'+esc(p.name)+'</h3></div><button class="button secondary small" data-do="project-learning" data-player="'+p.number+'">Történet kivetítése név nélkül</button></div><p>'+turn.length+' saját kitérés a kijelölt '+events.length+' futamban. Ütközés után '+afterCrash.length+' összevethető következő futam.</p><p class="trainer-question">Melyik futamban változott meg, amit a másiktól vártál? Mi történt előtte?</p><div class="table-wrap"><table><thead><tr><th>Saját futam</th><th>Partner</th><th>Medál</th><th>Lezárás</th><th>Visszanézés</th></tr></thead><tbody>'+events.map((e,i)=>'<tr><td>'+ (i+1)+'</td><td>'+esc(e.pair.names[1-e.seat])+'</td><td>'+MEDALS[e.medal]+'</td><td>'+distanceLabel(e)+(e.gap?' · kapcsolati jel hiányzott':'')+'</td><td><button class="text-link" data-do="report-case" data-number="'+e.pair.number+'">#'+e.pair.number+' megnyitása</button></td></tr>').join('')+'</tbody></table></div></section>';
+  return '<section class="learning-person" id="learning-person"><div class="row between"><div><p class="eyebrow">R'+String(p.number).padStart(2,'0')+' / EGYÉNI TÖRTÉNET</p><h3>'+esc(p.name)+'</h3></div><button class="button secondary small" data-do="project-learning" data-player="'+p.number+'">Történet kivetítése</button></div><p>'+turn.length+' saját kitérés a kijelölt '+events.length+' futamban. Ütközés után '+afterCrash.length+' összevethető következő futam.</p><p class="trainer-question">Melyik futamban változott meg, amit a másiktól vártál? Mi történt előtte?</p><div class="table-wrap"><table><thead><tr><th>Saját futam</th><th>Partner</th><th>Medál</th><th>Lezárás</th><th>Visszanézés</th></tr></thead><tbody>'+events.map((e,i)=>'<tr><td>'+ (i+1)+'</td><td>'+esc(e.pair.names[1-e.seat])+'</td><td>'+MEDALS[e.medal]+'</td><td>'+distanceLabel(e)+(e.gap?' · kapcsolati jel hiányzott':'')+'</td><td><button class="text-link" data-do="report-case" data-number="'+e.pair.number+'">#'+e.pair.number+' megnyitása</button></td></tr>').join('')+'</tbody></table></div></section>';
 }
 export function learningPatterns(data){
   const stories=[];
@@ -94,7 +94,7 @@ export function learningPatterns(data){
     if(c) stories.push({p,t:c,title:'Ütközés után kitérés',q:'Mit vittél tovább az ütközésből? Tudatosan változtattál, vagy más volt a helyzet?'});
   }
   const picked=stories.slice(0,4);
-  return '<section class="debrief-section"><div class="section-kicker">02 / MI JÖTT UTÁNA?</div><h3>Egy eredmény tovább élhet a következő döntésben.</h3><p class="muted">A táblázat közvetlenül egymást követő saját futamokat számol, azonos játékmódban. A partner változhatott. Egy futampár két résztvevő történetében is szerepelhet; ez leíró adat, nem független statisztikai minta.</p>'+transitionTable(data)+'<p class="trainer-question">Mit vittetek tovább az előző futamból: várakozást, elhatározást, indulatot?</p><div class="turning-points">'+picked.map(({p,t,title,q})=>'<article><p class="eyebrow">'+esc(p.name)+'</p><h4>'+title+'</h4><div class="row">'+raceButton(t.prev,p.events.indexOf(t.prev))+ '<span>→</span>'+raceButton(t.next,p.events.indexOf(t.next))+'</div><p>'+q+'</p></article>').join('')+'</div>'+(picked.length?'':'<p class="muted">Még nincs kiemelhető győzelem → ütközés vagy ütközés → kitérés történet. A riport nem feltételez fordulópontot.</p>')+'<p class="small-text">A megszakított, a szűrésből kieső, a módváltással vagy hiányzó kapcsolati jellel érintett futamokon át nem kötünk össze eredményeket. A sorozat önmagában nem bizonyít tanulást vagy okozati kapcsolatot.</p></section>';
+  return '<section class="debrief-section"><div class="section-kicker">02 / MI JÖTT UTÁNA?</div><h3>Egy eredmény tovább élhet a következő döntésben.</h3><p class="muted">A táblázat közvetlenül egymást követő saját futamokat számol, azonos játékmódban. A partner változhatott. Egy futampár két résztvevő történetében is szerepelhet; ez leíró adat, nem független statisztikai minta.</p>'+transitionSummary(data)+'<p class="trainer-question">Mit vittetek tovább az előző futamból: várakozást, elhatározást, indulatot?</p><div class="turning-points">'+picked.map(({p,t,title,q})=>'<article><p class="eyebrow">'+esc(p.name)+'</p><h4>'+title+'</h4><div class="row">'+raceButton(t.prev,p.events.indexOf(t.prev))+ '<span>→</span>'+raceButton(t.next,p.events.indexOf(t.next))+'</div><p>'+q+'</p></article>').join('')+'</div>'+(picked.length?'':'<p class="muted">Még nincs kiemelhető győzelem → ütközés vagy ütközés → kitérés történet. A riport nem feltételez fordulópontot.</p>')+'<p class="small-text">A megszakított, a szűrésből kieső, a módváltással vagy hiányzó kapcsolati jellel érintett futamokon át nem kötünk össze eredményeket. A sorozat önmagában nem bizonyít tanulást vagy okozati kapcsolatot.</p></section>';
 }
 export function learningGuide(opened = new Set()){
   const stages=[
@@ -116,4 +116,54 @@ export function learningProjection(state,target='group'){
     return '<section class="learning-screen"><p class="eyebrow">CHICKEN RUN / EGY JÁTÉKOS TÖRTÉNETE</p><h1>Egy ember.<br>'+events.length+' döntési helyzet.</h1><div class="projection-medals">'+Object.keys(MEDALS).map(k=>tag(k,p.medals[k])).join('')+'</div><div class="race-ribbon projected-ribbon">'+events.map((e,i)=>raceButton(e,i,true)).join('')+'</div><p class="screen-question">Mikor változott meg,<br>amit a másiktól vártál?</p><p class="small-text">GY · Győztes / V · Vesztes / K · Kórház / D · Döntetlen · A távolság a futam lezárásának mérési pontja. ! · Hiányzó kapcsolati jel.</p></section>';
   }
   return '<section class="learning-screen">'+learningOverview(data,true)+'<p class="screen-question">Ki teremtette meg a győzelem feltételét?<br>És ő mit kapott érte?</p><p class="small-text">Egy futam egy közös kimenetel. Az egyoldalú kitérés egyik résztvevőnek Győztes, a másiknak Vesztes medált jelent.</p></section>';
+}
+
+export function transitionSummary(data) {
+ const n=Object.values(data.transitions).flatMap(Object.values).reduce((a,b)=>a+b,0);
+ const eligible=data.players.reduce((sum,p)=>sum+p.transitions.length,0);
+ if(!n) return '<p class="report-empty">Még nincs összevethető, közvetlenül egymást követő két saját futam ebben a szűrésben. '+data.races.length+' lezárt futam · '+data.unlinked+' azonosítás nélkül · '+data.gaps+' kapcsolati jelhiánnyal. A köztes tesztfutam, megszakítás vagy módváltás is kizárhat egy átmenetet. Próbáld a Mind szűrőt, ha tesztjátékossal is játszottatok.</p>';
+ const entries=Object.entries(data.transitions).flatMap(([from,values])=>Object.entries(values).filter(([,v])=>v).map(([to,n])=>({from,to,n}))).sort((a,b)=>b.n-a.n);
+ const top=entries[0];
+ return '<p class="transition-explanation"><strong>'+eligible+' megfigyelt eredményátmenet.</strong> Például: '+top.n+' alkalommal '+MEDALS[top.from]+' után '+MEDALS[top.to]+' következett ugyanannál a játékosnál. A sor az előző, az oszlop a következő saját futam medálja.</p>'+transitionTable(data);
+}
+export function presentationView(state,p) {
+ const data=analyse(state.pairs,state.roster,p.scope);
+ const scope={human:'Ember–ember',test:'Tesztjátékosos',all:'Minden futam'}[p.scope];
+ const label=person=>p.names?esc(person.name):'Játékos '+String(person.number).padStart(2,'0');
+ let body='',pages=1,page=p.page;
+ if(p.target==='group') body=learningOverview(data,true)+'<p class="screen-question">Ki teremtette meg a győzelem feltételét?</p>';
+ if(p.target==='person') {
+  const person=data.players.find(x=>x.number===p.person);
+  if(!person)body='<h1>A játékos története még nem érhető el.</h1>';
+  else {
+   const events=person.events.filter(e=>e.included);pages=Math.max(1,Math.ceil(events.length/12));page=Math.min(page,pages-1);
+   body='<h1>'+label(person)+'</h1><div class="outcome-strip personal-strip">'+Object.keys(MEDALS).map(k=>'<div class="medal-'+k+'"><b>'+person.medals[k]+'</b><span>'+MEDALS[k]+'</span></div>').join('')+'</div><div class="race-ribbon projected-ribbon">'+events.slice(page*12,page*12+12).map((e,i)=>raceButton(e,page*12+i,true)).join('')+'</div><p class="screen-question">Mikor változott meg, amit a másiktól vártál?</p>';
+  }
+ }
+ if(p.target==='people') {
+  const players=data.players.filter(x=>x.events.some(e=>e.included));
+  // Six readable lanes per page; an independent page for each ten-race segment.
+  const chunks=[];
+  for(let start=0;start<players.length;start+=6){const group=players.slice(start,start+6);const rounds=Math.max(...group.map(x=>Math.ceil(x.events.filter(e=>e.included).length/10)),1);for(let segment=0;segment<rounds;segment++)chunks.push({group,segment});}
+  pages=Math.max(1,chunks.length);page=Math.min(page,pages-1);
+  const chunk=chunks[page];
+  body='<h1>Személyes futamsorok</h1>'+(chunk?'<p>'+ (chunk.segment*10+1)+'–'+(chunk.segment*10+10)+'. saját futam · GY Győztes / V Vesztes / K Kórház / D Döntetlen</p><div class="projected-lanes">'+chunk.group.map(person=>'<article><h3>'+label(person)+'</h3><div class="race-ribbon">'+person.events.filter(e=>e.included).slice(chunk.segment*10,chunk.segment*10+10).map((e,i)=>raceButton(e,chunk.segment*10+i,true)).join('')+'</div></article>').join('')+'</div>':'<p>Még nincs lezárt futamsor.</p>');
+ }
+ if(p.target==='transitions') body='<h1>Mi jött utána?</h1>'+transitionSummary(data)+'<p class="screen-question">Mit vittél tovább az előző futamból?</p>';
+ if(p.target==='guide') {
+  const slides=[['Egy konkrét döntés','Mit akartál elérni? Mire számítottál a másiktól, és mire alapoztad ezt?'],['A győzelem másik oldala','A másik kitérése mit tett lehetővé neked? Aki Vesztest kapott, mit védett meg?'],['Mit hittél el?','Miből következtettél arra, hogy a másik engedni fog?'],['Ki viseli az engedés terhét?','Hol várjuk újra és újra ugyanattól az embertől, hogy engedjen?'],['Építsetek lámpát.','Milyen szabályt fogadnál el akkor is, ha legközelebb te kapnál pirosat?'],['Próbáljátok ki.','Kivel, mikor próbálod ki a szabályt, és miből látjátok majd, hogy működik?']];
+  pages=slides.length;page=Math.min(page,pages-1);body='<p class="hero-number"><strong>0'+(page+1)+'</strong></p><h1>'+slides[page][0]+'</h1><p class="screen-question">'+slides[page][1]+'</p>';
+ }
+ return '<section class="learning-screen presentation-screen"><p class="eyebrow">'+scope+' / '+(p.names?'Nevekkel':'Név nélkül')+'</p>'+body+'<nav class="presentation-pager" aria-label="Kivetített oldalak"><button class="button secondary" data-do="projection-page" data-by="-1"'+(!page?' disabled':'')+'>← Előző</button><span>'+(page+1)+' / '+pages+'</span><button class="button secondary" data-do="projection-page" data-by="1"'+(page>=pages-1?' disabled':'')+'>Következő →</button></nav></section>';
+}
+export function presentationPages(state,p) {
+ const data=analyse(state.pairs,state.roster,p.scope);
+ if(p.target==='guide')return 6;
+ if(p.target==='person')return Math.max(1,Math.ceil((data.players.find(x=>x.number===p.person)?.events.filter(e=>e.included).length??0)/12));
+ if(p.target==='people'){
+  const people=data.players.filter(x=>x.events.some(e=>e.included));let pages=0;
+  for(let i=0;i<people.length;i+=6)pages+=Math.max(...people.slice(i,i+6).map(x=>Math.ceil(x.events.filter(e=>e.included).length/10)));
+  return Math.max(1,pages);
+ }
+ return 1;
 }

@@ -571,3 +571,14 @@ button.race-stamp{cursor:pointer}button.race-stamp:hover{background:#303c30;tran
 [data-surface="projector"] .screening-story{background:transparent;border-top:1px solid #4a573e;min-height:160px}
 @media(max-width:760px){.debrief-hero{padding:1.6rem 1.2rem;min-height:240px;gap:1rem}.hero-number strong{font-size:4rem}.debrief-section{padding:1.5rem 1rem}.debrief-tools{padding:1rem}.scope-note,.data-notes{padding-left:1rem;padding-right:1rem}.turning-points,.guide-grid{grid-template-columns:1fr}.debrief-dashboard .report-workspace{grid-template-columns:1fr}.driver-heading{gap:.5rem}.driver-medals{gap:.5rem}.outcome-strip>div{padding:.8rem}.learning-screen .debrief-hero{min-height:200px}.projection-medals{gap:1rem}.learning-screen{gap:1.2rem}}
 @media(prefers-reduced-motion:reduce){.outcome-strip>div{transition:none}button.race-stamp:hover{transform:none}}
+/* One persistent projection desk across every trainer tab. */
+.projection-desk{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;border:1px solid var(--line);border-left:4px solid var(--gold);padding:.8rem 1rem;margin:.7rem 0;background:var(--paper)}
+.projection-desk>div:first-child{display:grid;gap:.2rem;margin-right:auto}.projection-desk strong{font:800 1.3rem var(--display)}
+.projection-desk [aria-pressed="true"]{background:var(--gold);color:#231a0e}.section-project{padding:.7rem 1.8rem}
+.personal-strip>div{flex:1;background:#1c2821;color:var(--medal);border-top:4px solid var(--medal)}
+.presentation-pager{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-top:auto;font:.85rem var(--mono)}
+.projected-lanes{display:grid;gap:.55rem}.projected-lanes article{display:grid;grid-template-columns:150px minmax(0,1fr);align-items:center;gap:1rem;border-bottom:1px solid #374239}
+.projected-lanes h3{font-size:1.5rem;overflow-wrap:anywhere}.projected-lanes .race-ribbon{padding-bottom:.5rem;gap:.35rem}.projected-lanes .race-stamp{flex:1;min-width:46px;min-height:60px}.projected-lanes .race-stamp b{font-size:1.25rem}
+.presentation-screen:has(.projected-lanes){gap:.8rem;justify-content:flex-start}.presentation-screen:has(.projected-lanes) h1{font-size:clamp(2rem,4vw,3.4rem)}
+.transition-explanation{line-height:1.6;max-width:65rem}.presentation-screen .transition-table{font-size:1.1rem}.presentation-screen .transition-value{font-size:2.2rem}
+@media(max-width:700px){.projected-lanes article{grid-template-columns:90px minmax(0,1fr)}.projected-lanes h3{font-size:1.1rem}.projected-lanes .race-ribbon{overflow-x:auto}.projected-lanes .race-stamp{flex:0 0 50px}.projection-desk{gap:.5rem}}

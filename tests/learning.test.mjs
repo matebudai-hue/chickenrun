@@ -47,3 +47,27 @@ test('dashboard renders populated and empty states with existing case projection
  assert.match(html,/data-do="project-pair"/);assert.match(html,/Játékelméleti háttér/);
  assert.doesNotThrow(()=>trainer({...s,pairs:[]},context));
 });
+
+test('presentation preserves name preference, scopes, and chronological transitions',async()=>{
+ const {normalizePresentation,changePresentation}=await import('../docs/presentation.js');
+ const {presentationView,transitionSummary}=await import('../docs/learning.js');
+ let p=normalizePresentation({target:'person',person:1,names:true,scope:'all'});
+ p=changePresentation(p,{target:'people'});
+ assert.equal(p.names,true);assert.equal(p.scope,'all');
+ const state={pairs:[race(1,'a'),race(2,'crash'),race(3,'both')],roster};
+ assert.match(presentationView(state,p),/Azonos &lt;név&gt;/);
+ assert.doesNotMatch(presentationView(state,{...p,names:false}),/Azonos/);
+ assert.match(presentationView(state,{...p,names:false}),/Játékos 01/);
+ assert.match(transitionSummary(analyse(state.pairs,roster)),/4 megfigyelt eredményátmenet/);
+ assert.match(transitionSummary(analyse([],roster)),/Még nincs összevethető/);
+});
+test('20 players paginate into four readable groups, without losing the final players',async()=>{
+ const {presentationView,presentationPages}=await import('../docs/learning.js');
+ const people=Array.from({length:20},(_,i)=>({number:i+1,name:'Person '+(i+1)}));
+ const pairs=Array.from({length:10},(_,i)=>race(i+1,'a',{playerNumbers:[i*2+1,i*2+2],names:people.slice(i*2,i*2+2).map(p=>p.name)}));
+ const state={pairs,roster:people};const p={target:'people',names:true,scope:'human',page:0};
+ assert.equal(presentationPages(state,p),4);
+ assert.equal((presentationView(state,p).match(/<article>/g)||[]).length,6);
+ const last=presentationView(state,{...p,page:3});assert.match(last,/Person 20/);assert.doesNotMatch(last,/Person 18/);
+ assert.equal(presentationPages(state,{...p,target:'guide'}),6);
+});

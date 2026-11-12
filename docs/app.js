@@ -1,7 +1,9 @@
+import { presentationPages } from "./learning.js?v=21";
+import { normalizePresentation, changePresentation } from "./presentation.js?v=21";
 import { animateRace } from "./live-race.js?v=15";
 import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=15";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=20";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=21";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -27,7 +29,7 @@ const projectionModeKey = "cr:projection-mode:"+room;
 let auth = saved.get(roomKey);
 let state, signature, loadFailure, errorRetry, pollTimer;
 let busy = false, polling = false, generation = 0, lastPulse = 0;
-let selectedTab = "overview", filter = "human", reportPair, reportPlayer, draft = "", messageRequest, confirmAction;
+let selectedTab = "overview", filter = "human", reportPair, reportPlayer, onlyMessages = false, draft = "", messageRequest, confirmAction;
 let reveal, revealTimer, finishRoadHeight, screeningCase, medalFilter;
 const screenPositions = new Map();
 let selectedGameMode = "steps";
@@ -36,6 +38,49 @@ let chatPending, chatNotice = "", turnAck;
 let selection = readSelection();
 let showPairings = saved.get(projectionModeKey) === "pairings";
 let reportTarget = saved.get(projectionModeKey)?.startsWith("learning:") ? saved.get(projectionModeKey).slice(9) : undefined;
+const presentationKey = "cr:presentation:"+room;
+let presentation;
+try { presentation = normalizePresentation(JSON.parse(saved.get(presentationKey) || "{}")); } catch { presentation = normalizePresentation(); }
+selection = presentation.target === "case" ? [{number:presentation.number,quotes:presentation.quotes}] : [];
+let projectorWindow;
+const projectionChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(presentationKey) : null;
+function adoptPresentation(value) {
+ const next = normalizePresentation(value);
+ if (next.revision < presentation.revision) return;
+ presentation = next;
+ selection = next.target === "case" ? [{number:next.number,quotes:next.quotes}] : [];
+ screeningCase = next.number;
+ screenPositions.set(next.number,next.step);
+ if (state) render();
+}
+function publishPresentation(patch,open = false) {
+ presentation = changePresentation(presentation,patch);
+ if(state) presentation.page=Math.min(presentation.page,presentationPages(state,presentation)-1);
+ saved.set(presentationKey,JSON.stringify(presentation));
+ projectionChannel?.postMessage(presentation);
+ if(projectorWindow && !projectorWindow.closed) projectorWindow.postMessage({kind:presentationKey,value:presentation},location.origin);
+ adoptPresentation(presentation);
+ if(open) openProjector();
+}
+function openProjector() {
+ if(projectorWindow && !projectorWindow.closed) { projectorWindow.focus(); return; }
+ projectorWindow = window.open(roomLink(room,"projector"),"chicken-projector-"+room);
+ if(!projectorWindow) showNotice("A böngésző letiltotta a kivetítőablakot. Engedélyezd a felugró ablakot, majd kattints a Kivetítő megnyitása gombra.");
+ else showNotice();
+}
+projectionChannel?.addEventListener("message",event=>adoptPresentation(event.data));
+window.addEventListener("message",event=>{
+ if(event.origin!==location.origin || event.data?.kind!==presentationKey) return;
+ adoptPresentation(event.data.value);
+});
+if(mode === "projector") {
+ selection = presentation.target === "case" ? [{number:presentation.number,quotes:presentation.quotes}] : [];
+ screeningCase = presentation.number;
+ screenPositions.set(presentation.number,presentation.step);
+ setInterval(()=>{
+  try { const next=JSON.parse(saved.get(presentationKey)||"{}"); if(next.revision>presentation.revision) adoptPresentation(next); } catch {}
+ },700);
+}
 let pendingDecision;
 try { pendingDecision = JSON.parse(saved.get(decisionKey)); } catch {}
 const transcriptCache = new Map();
@@ -57,21 +102,12 @@ function readSelection() {
   } catch { return []; }
 }
 
-function selectStory(number, quote) {
-  const current = state.pairs.find(pair => pair.number === number && pair.result);
-  if (!current) return;
-  const next = changeSelection(selection,number,quote);
-  if (next === selection) {
-    if (quote === undefined) showNotice("A kivetítőn két eset fér el. Előbb vegyél le egyet.");
-    return;
-  }
-  selection = next;
-  showPairings = false;
-  reportTarget = undefined;
-  saved.remove(projectionModeKey);
-  saved.set(selectionKey,JSON.stringify(selection));
-  showNotice();
-  render();
+function selectStory(number,quote) {
+ const pair=state.pairs.find(p=>p.number===number&&p.result);
+ if(!pair)return;
+ let quotes=presentation.target==='case'&&presentation.number===number?presentation.quotes.slice():[];
+ if(quote!==undefined) quotes=quotes.includes(quote)?quotes.filter(q=>q!==quote):[...quotes,quote];
+ publishPresentation({target:'case',number,quotes,scope:filter,page:0,step:quote===undefined?0:presentation.step},quote===undefined);
 }
 
 function endpoint(action) {
@@ -432,7 +468,7 @@ function revealTitle(pair, event, names) {
 }
 
 function paintScreening(target, pair, frames, index, loading) {
-  const names = ["Játékos A","Játékos B"];
+  const names = presentation.names ? pair.names.map((name,i)=>pair.bot&&i===1?"Másik játékos":escape(name)) : ["Játékos A","Játékos B"];
   const event = frames[index];
   const closing = event.kind === "reveal" && index === frames.length-1 && pair.result !== "stopped";
   const meters = closing && pair.result === "crash" ? 0 : event.distance;
@@ -459,7 +495,7 @@ function paintScreening(target, pair, frames, index, loading) {
       '<button type="button" id="screen-next" class="button primary" data-do="screen-step" data-by="1">Következő pillanat →</button></div>';
   }
   target.querySelector("[data-screen-distance]").textContent = Number.isFinite(meters) ? meters+" m" : "";
-  target.querySelector("[data-screen-title]").textContent = title;
+  target.querySelector("[data-screen-title]").innerHTML = title;
   target.querySelector("[data-screen-detail]").innerHTML = detail;
   const road = target.querySelector(".screening-road");
   road.style.setProperty("--gap", (29*Math.pow(Math.min(1500,Math.max(0,meters ?? 1000))/1500,.62))+"%");
@@ -526,6 +562,7 @@ function stepScreening(by) {
   const index = Math.max(0,Math.min(current.frames.length-1,current.index+by));
   if (index === current.index) return;
   current.index = index;
+  publishPresentation({step:index});
   screenPositions.set(current.pair.number,index);
   paintScreening(section.querySelector("[data-transcript-body]"),current.pair,current.frames,index,false);
 }
@@ -633,7 +670,7 @@ function render() {
   const caseScroll = screen.querySelector("#report-cases")?.scrollTop;
   const storyScroll = screen.querySelector("#report-events")?.scrollTop;
   const storyNumber = screen.querySelector("[data-report-story]")?.dataset.transcript;
-  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reportPair, reportPlayer, reportTarget, reveal, showPairings, selectedGameMode, turnPending, medalFilter };
+  const context = { room, roomLink, opened, tab:selectedTab, pendingDecision, selection, filter, reportPair, reportPlayer, reportTarget, presentation, onlyMessages, reveal, showPairings, selectedGameMode, turnPending, medalFilter };
   if (!room) {
     const previous = saved.get("cr:last-host");
     screen.innerHTML = mode === "player" ? enterCode() : home(codeValid.test(previous ?? "") ? previous : null, roomLink);
@@ -648,7 +685,7 @@ function render() {
   } else if (!state) {
     screen.innerHTML = waitingPage(room,"Kapcsolódás…","A futam állását töltjük be.");
   } else if (mode === "projector") {
-    screen.innerHTML = projector(state,room,selection,showPairings,screeningCase,reportTarget);
+    screen.innerHTML = projector(state,room,selection,false,screeningCase,undefined,presentation);
     paintPairStories();
   } else if (isTrainer) {
     screen.innerHTML = trainer(state,context);
@@ -764,27 +801,30 @@ screen.addEventListener("click", event => {
     render();
     screen.querySelector("#learning-person")?.scrollIntoView({block:"nearest"});
   } else if (action === "project-learning") {
-    reportTarget = button.dataset.player;
-    showPairings = false;
-    saved.set(projectionModeKey,"learning:"+reportTarget);
-    showNotice("A kiválasztott történet megjelent a kivetítőn, név nélkül.");
-    render();
-  } else if (action === "report-case") {
+    const value=button.dataset.player;
+    publishPresentation({target:value==='group'?'group':'person',person:Number(value)||0,scope:filter,page:0},true);
+  } else if(action === "open-projector") openProjector();
+  else if(action === "projection-names") publishPresentation({names:!presentation.names});
+  else if(action === "project-section") publishPresentation({target:button.dataset.target,scope:filter,page:0},true);
+  else if(action === "projection-page") publishPresentation({page:Math.max(0,presentation.page+Number(button.dataset.by))});
+  else if(action === "project-step") {
+    const pair=state.pairs.find(p=>p.number===presentation.number);
+    if(pair){const frames=screeningFrames(pair,transcriptCache.get(pair.number)?.messages??[],presentation.quotes);publishPresentation({step:Math.max(0,Math.min(frames.length-1,presentation.step+Number(button.dataset.by)))});}
+  }
+  else if (action === "report-case") {
     reportPair = Number(button.dataset.number);
+    selectedTab = "report";
     render();
     screen.querySelector("#case-section")?.scrollIntoView({block:"start"});
+  } else if (action === "report-messages") {
+    onlyMessages = !onlyMessages;
+    render();
   } else if (action === "filter") {
     filter = button.dataset.filter;
-    render();
+    publishPresentation({scope:filter,page:0});
   } else if (action === "project-pair") selectStory(Number(button.dataset.number));
   else if (action === "project-quote") selectStory(Number(button.dataset.number),Number(button.dataset.quote));
-  else if (action === "project-pairings") {
-    reportTarget = undefined;
-    showPairings = !showPairings;
-    if (showPairings) saved.set(projectionModeKey,"pairings");
-    else saved.remove(projectionModeKey);
-    render();
-  }
+  else if (action === "project-pairings") publishPresentation({names:!presentation.names});
 });
 screen.addEventListener("toggle", event => {
   if (event.target.id === "night-chat" && event.target.open) {
@@ -803,18 +843,9 @@ dialog.addEventListener("click", event => {
   }
   if ("copy" in button.dataset) void copyLink(button);
 });
-window.addEventListener("storage", event => {
-  if (!isTrainer) return;
-  if (event.key === selectionKey) {
-    selection = readSelection();
-    screenPositions.clear();
-  }
-  else if (event.key === projectionModeKey) {
-    showPairings = saved.get(projectionModeKey) === "pairings";
-    reportTarget = saved.get(projectionModeKey)?.startsWith("learning:") ? saved.get(projectionModeKey).slice(9) : undefined;
-  }
-  else return;
-  if (state) render();
+window.addEventListener("storage",event=>{
+ if(event.key!==presentationKey || !event.newValue)return;
+ try{adoptPresentation(JSON.parse(event.newValue));}catch{}
 });
 if (mode === "projector") window.addEventListener("keydown", event => {
   if (!screen.querySelector(".screening") || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
