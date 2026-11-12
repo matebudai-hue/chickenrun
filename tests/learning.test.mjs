@@ -78,3 +78,25 @@ test('20 players paginate into four readable groups, without losing the final pl
  const last=presentationView(state,{...p,page:3});assert.match(last,/Person 20/);assert.doesNotMatch(last,/Person 18/);
  assert.equal(presentationPages(state,{...p,target:'guide'}),6);
 });
+
+test('projected timelines hold 18 runs and put the 19th on the following slide',async()=>{
+ const {presentationView,presentationPages}=await import('../docs/learning.js');
+ const state={pairs:Array.from({length:19},(_,i)=>race(i+1,'a')),roster};
+ const p={target:'people',names:false,scope:'human',page:0};
+ assert.equal(presentationPages(state,p),2);
+ assert.match(presentationView(state,p),/1–18\. saját futam/);
+ assert.doesNotMatch(presentationView(state,p),/#19 ·/);
+ assert.match(presentationView(state,{...p,page:1}),/19\. saját futam · #19/);
+});
+
+test('individual transition projection counts only the chosen player and respects name visibility',async()=>{
+ const {presentationView}=await import('../docs/learning.js');
+ const state={pairs:[race(1,'a'),race(2,'crash'),race(3,'both')],roster};
+ const p={target:'transitions',person:1,names:false,scope:'human',page:0};
+ const individual=presentationView(state,p);
+ assert.match(individual,/2 megfigyelt eredményátmenet/);
+ assert.match(individual,/Játékos 01/);
+ assert.doesNotMatch(individual,/Azonos/);
+ assert.match(presentationView(state,{...p,names:true}),/Azonos &lt;név&gt;/);
+ assert.match(presentationView(state,{...p,person:0}),/4 megfigyelt eredményátmenet/);
+});

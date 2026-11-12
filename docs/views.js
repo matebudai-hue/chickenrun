@@ -1,5 +1,5 @@
-import { analyse, outcomeReport, learningPeople, learningDetail, learningPatterns, learningGuide, learningProjection, presentationView } from "./learning.js?v=24";
-import { carPositions, pairGroups, legacyPoints } from "./story.js?v=24";
+import { analyse, outcomeReport, learningPeople, learningDetail, learningPatterns, learningGuide, learningProjection, presentationView } from "./learning.js?v=25";
+import { carPositions, pairGroups, legacyPoints } from "./story.js?v=25";
 import { nightRoad } from "./live-race.js?v=15";
 
 export const moves = { go: "Halad", yield: "Kitér" };
@@ -188,7 +188,7 @@ function reportWorkspace(cases, chosen, selection) {
     projectionButton(current,selected(current))+'</div><div id="report-events" data-transcript-body></div></section></div>';
 }
 export function trainer(s, context) {
-  const { room, tab, opened, roomLink, selection, filter, selectedGameMode, reportPair, reportPlayer, outcomePlayer, onlyMessages, projectionPicker, projectionChoice, presentation = {target:"group",names:false,scope:"human",page:0} } = context;
+  const { room, tab, opened, roomLink, selection, filter, selectedGameMode, reportPair, reportPlayer, outcomePlayer, transitionPerson, onlyMessages, projectionPicker, projectionChoice, presentation = {target:"group",names:false,scope:"human",page:0} } = context;
   const lobby = s.phase === "lobby", closed = s.phase === "closed", active = s.pairs.filter(p => !p.result);
   const online = s.roster?.filter(p => p.online).length ?? 0;
   const hasPresence = s.roster?.some(p => p.online !== undefined);
@@ -226,7 +226,7 @@ export function trainer(s, context) {
       '</p><div class="data-notes">'+data.active+' folyamatban · '+data.stopped+' félbemaradt · '+data.test+' tesztjátékosos · '+data.gaps+' hiányzó kapcsolati jellel'+
       (data.unlinked ? '<p>'+data.unlinked+' futamhoz még nincs résztvevő-azonosítás. Frissítsd az oldalt; név alapján nem vonunk össze játékosokat.</p>' : "")+'</div>'+
       '<section class="debrief-section"><div class="section-kicker">01 / SZEMÉLYES FUTAMSOROK</div><h3>Ugyanaz az ember. Változó helyzetek.</h3><p class="muted">Névre kattintva egyéni történet, medálra kattintva konkrét futam nyílik. Balról jobbra a kiválasztott futamok sorrendje; az egyes sorok azonos sorszámai nem feltétlenül egyidejűek. GY · Győztes / V · Vesztes / K · Kórház / D · Döntetlen. A méter a futam lezárását mutatja, a ! hiányzó kapcsolati jelet.</p>'+
-      action("project-section","Futamsorok kivetítése","secondary") .replace('data-do="project-section"','data-do="project-section" data-target="people"')+learningPeople(data,reportPlayer)+learningDetail(data,reportPlayer)+'</section>'+projectSection('transitions','Mi jött utána? · Kivetítés')+learningPatterns(data)+
+      action("project-section","Futamsorok kivetítése","secondary") .replace('data-do="project-section"','data-do="project-section" data-target="people"')+learningPeople(data,reportPlayer)+learningDetail(data,reportPlayer)+'</section>'+learningPatterns(data,transitionPerson)+
       '<section class="debrief-section" id="case-section"><div class="section-kicker">03 / EGY FUTAM KÉT OLDALA</div>'+card("Döntések és jelzések", '<div class="row between report-tools"><p class="small-text">Kivetítő · '+(presentation.names?'Nevekkel':'Név nélkül')+'</p><div class="row">'+
       action("download-host","Döntések és üzenetek · CSV","small secondary",!s.pairs.some(p=>p.result))+'</div></div>'+
       '<button class="button secondary small" data-do="report-messages" aria-pressed="'+!!onlyMessages+'">'+(onlyMessages?"Minden eset mutatása":"Csak üzenetváltással")+'</button>'+reportWorkspace(cases,reportPair,selection),"trainer-report")+'<p class="trainer-question">Mire számítottál ezen a ponton, és miért? Mit tudtál akkor a másik szándékáról?</p></section>'+projectSection('guide','Kivezetési kérdések kivetítése')+learningGuide(opened)+'</div>';
@@ -241,7 +241,7 @@ export function trainer(s, context) {
     body = queueOverview(s)+card("Párok és döntések",
       pairList([...active,...s.pairs.filter(p=>p.result).slice().reverse()],opened,selection,true));
   }
-  return '<div class="cockpit"><header class="trainer-sticky">'+toolbar+'<div class="trainer-navigation">'+nav+raceFilters(filter)+'</div>'+projectionControls(s,filter,presentation,projectionPicker,projectionChoice,{reportPair,reportPlayer,outcomePlayer})+'</header><div class="control-overview">'+metrics+chooser+'</div>'+body+'</div>';
+  return '<div class="cockpit"><header class="trainer-sticky">'+toolbar+'<div class="trainer-navigation">'+nav+raceFilters(filter)+'</div>'+projectionControls(s,filter,presentation,projectionPicker,projectionChoice,{reportPair,reportPlayer,outcomePlayer,transitionPerson})+'</header><div class="control-overview">'+metrics+chooser+'</div>'+body+'</div>';
 }
 
 function namedPairings(pairs) {
@@ -388,15 +388,18 @@ function reportCases(pairs, filter) {
 }
 function projectionSelection(state, filter, p, picker, choice, report) {
   if (!picker) return "";
-  const individual = picker === "person";
+  const transitions = picker === "transitions";
+  const individual = picker === "person" || transitions;
   const items = individual
     ? analyse(state.pairs,state.roster,filter).players.filter(player => player.events.some(event => event.included))
         .map(player => [player.number, player.name+" · R"+String(player.number).padStart(2,"0")])
     : reportCases(state.pairs,filter).slice().reverse().map(pair =>
         [pair.number,"#"+pair.number+" · "+pair.names.join(" ↔ ")+(pair.messageCount ? " · "+pair.messageCount+" üzenet" : "")]);
-  const selected = choice ?? (individual ? report.outcomePlayer ?? report.reportPlayer ?? p.person : report.reportPair ?? p.number);
+  if (transitions) items.unshift([0,"Csoport"]);
+  const selected = choice ?? (transitions ? report.transitionPerson : individual
+    ? report.outcomePlayer ?? report.reportPlayer ?? p.person : report.reportPair ?? p.number);
   const options = items.map(([number,label]) => '<option value="'+number+'"'+(number === selected ? ' selected' : '')+'>'+escape(label)+'</option>').join("");
-  return '<form id="projection-picker" class="projection-picker"><label for="projection-choice">'+(individual?"Játékos":"Futam")+'</label>'+
+  return '<form id="projection-picker" class="projection-picker"><label for="projection-choice">'+(transitions?"Kinek a futamai?":individual?"Játékos":"Futam")+'</label>'+
     '<select id="projection-choice" name="choice"'+(items.length?'':' disabled')+'>'+
     (options || '<option>'+(individual?"Ebben a szűrésben még nincs egyéni eredmény.":"Ebben a szűrésben még nincs lezárt futam.")+'</option>')+
     '</select><button class="button secondary small" type="submit"'+(items.length?'':' disabled')+'>Kivetítem</button></form>';
@@ -409,7 +412,7 @@ function projectionControls(state,filter,p,picker,choice,report) {
     (step?'':'<span>'+(p.page+1)+'. oldal</span>')+'<button class="button secondary small" data-do="'+(step?'project-step':'projection-page')+'" data-by="1">'+(step?'Pillanat →':'Oldal →')+'</button></div>' : '';
   const shortcuts = state.phase === "lobby" ? '' : '<div class="projection-shortcuts" role="group" aria-label="Kivetíthető nézetek">'+
     Object.entries(labels).map(([target,label]) => {
-      const opensPicker = target === "person" || target === "case";
+      const opensPicker = ["person","case","transitions"].includes(target);
       const stateAttributes = opensPicker ? ' aria-expanded="'+(picker===target)+'"' : ' aria-pressed="'+(p.target===target)+'"';
       return '<button type="button" id="projection-shortcut-'+target+'" class="button secondary small" data-do="'+
         (opensPicker?'projection-pick':'project-section')+'" data-target="'+target+'"'+stateAttributes+'>'+label+'</button>';

@@ -654,3 +654,8 @@ button.race-stamp{cursor:pointer}button.race-stamp:hover{background:#303c30;tran
 .projection-picker label{font-size:.8rem}
 .projection-picker select{min-width:0;max-width:min(100%,34rem);min-height:32px;border:1px solid var(--rule);background:var(--paper);color:var(--ink);font:inherit;font-size:.85rem}
 .debrief-section,.learning-person{scroll-margin-top:16rem}
+
+.presentation-screen .projected-lanes .race-ribbon{display:grid;grid-template-columns:repeat(var(--race-columns),minmax(0,1fr));gap:clamp(2px,.27vw,4px)}
+.transition-subject{font:800 clamp(1.15rem,4vh,2.4rem) var(--display);color:var(--gold);overflow-wrap:anywhere}
+.transition-controls{display:flex;align-items:center;flex-wrap:wrap;gap:.4rem .75rem}
+.transition-controls select{min-height:32px;max-width:100%;border:1px solid var(--rule);background:var(--paper);color:var(--ink);font:inherit}
