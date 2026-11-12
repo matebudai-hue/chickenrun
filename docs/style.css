@@ -396,12 +396,14 @@ dialog::backdrop{background:#161b14cc}
   .night-road{min-height:174px}
   .night-game{--vehicle-scale:.8}
 }
-body[data-keyboard="true"] .night-playing .night-console{
-  position:fixed;z-index:5;left:50%;translate:-50% 0;bottom:var(--keyboard-inset,0px);
-  width:min(100%,610px);border-top:1px solid #60665a;padding-bottom:6px
-}
-body[data-keyboard="true"] .night-playing .night-road{min-height:0;max-height:max(90px,calc(var(--visual-height) - 245px))}
-body[data-keyboard="true"] .night-playing{--vehicle-scale:.75}
+/* Chat stays above the road; driving stays below it, including with the keyboard open. */
+[data-surface="player"] .mast{justify-content:flex-end}
+.night-playing>.night-comms{padding:4px 10px 10px;background:#172323;border-bottom:2px solid var(--night-ice);flex:none}
+.night-playing>.night-comms .chat-form button{background:#b7e6ef;color:#152428;border-color:#b7e6ef;min-width:84px}
+.night-playing .night-drive-controls{border-top:2px solid var(--night-amber);padding-top:8px}
+body[data-keyboard="true"] #app:has(.night-playing){min-height:var(--visual-height,100svh);height:var(--visual-height,100svh)}
+body[data-keyboard="true"] .night-playing .night-road{min-height:100px;max-height:none}
+body[data-keyboard="true"] .night-playing{--vehicle-scale:.65}
 @media(prefers-reduced-motion:reduce){
   .night-road .night-vehicle svg>path{transition:none}
   [data-night-crash][data-night-reveal] .night-road::after{display:none}

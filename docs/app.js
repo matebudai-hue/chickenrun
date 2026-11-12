@@ -1,7 +1,7 @@
 import { animateRace } from "./live-race.js?v=15";
 import { changeSelection, nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=15";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=19";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=20";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -16,6 +16,7 @@ const codeValid = /^[23456789A-HJ-NP-Z]{8}$/;
 const mode = params.get("view");
 const isTrainer = mode === "host" || mode === "projector";
 document.body.dataset.surface = mode === "projector" ? "projector" : !isTrainer && (room || mode === "player") ? "player" : "trainer";
+if (document.body.dataset.surface === "player") document.querySelector(".mast .brand")?.remove();
 const roomKey = "cr:"+(isTrainer ? "host" : "player")+":"+room;
 const decisionKey = "cr:pending-decision:"+room;
 const joinKey = "cr:pending-join:"+room;
