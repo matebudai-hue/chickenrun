@@ -1,5 +1,5 @@
 import { injuryCard } from "./injuries.js?v=1";
-import { analyse, outcomeReport, learningPeople, learningPatterns, learningGuide, learningProjection, presentationView } from "./learning.js?v=32";
+import { analyse, outcomeReport, learningPeople, learningPatterns, learningGuide, learningProjection, presentationView, scoreReport } from "./learning.js?v=33";
 import { carPositions, pairGroups, legacyPoints } from "./story.js?v=27";
 import { nightRoad } from "./live-race.js?v=15";
 
@@ -212,7 +212,7 @@ export function trainer(s, context) {
   const cta = lobby ? action("start", "Játék indítása", "primary", !s.count)
     : closed ? action("create", "Új tréningfutam", "primary") : action("stop", "Futam lezárása", "secondary danger");
   const nav = '<nav class="section-nav" aria-label="Tréneri nézetek">'+
-    [["overview","Áttekintés"],["report","Riport"]].map(([id,label]) =>
+    [["overview","Áttekintés"],["report","Riport"],["scores","Pontszámok"]].map(([id,label]) =>
       '<button type="button" id="trainer-tab-'+id+'" class="section-tab" data-do="tab" data-tab="'+id+'" aria-pressed="'+(tab===id)+'">'+label+'</button>').join("")+'</nav>';
   const toolbar = '<section class="control"><div class="control-title"><h1>Tréneri pult</h1>'+
     '<span class="control-code" aria-label="Szobakód: '+room+'">'+room+'</span>'+
@@ -233,7 +233,9 @@ export function trainer(s, context) {
       '<label><input id="mode-'+id+'" type="radio" name="game-mode" value="'+id+'"'+(selectedGameMode === id ? " checked" : "")+
       '>'+title+'</label>').join("")+'</div>' : "";
   let body;
-  if (tab === "report") {
+  if (tab === "scores") {
+    body = scoreReport(analyse(s.pairs,s.roster,filter),presentation,lobby);
+  } else if (tab === "report") {
     const data = analyse(s.pairs,s.roster,filter === "stopped" ? "human" : filter);
     const cases = reportCases(s.pairs,filter).filter(pair=>!onlyMessages||pair.messageCount>0);
     const scope = {all:"Minden futam",human:"Ember–ember",test:"Tesztjátékosos"}[filter] ?? "Ember–ember";
@@ -267,7 +269,7 @@ export function trainer(s, context) {
       pairList([...active,...s.pairs.filter(p=>p.result).slice().reverse()],opened,selection,true))+
       '<footer>'+action("download-diagnostics","Hibakeresési riport · JSON","small secondary",!s.pairs.length)+'</footer>';
   }
-  return '<div class="cockpit"><header class="trainer-sticky">'+toolbar+projectionControls(s,filter,presentation,projectionPicker,projectionChoice,{reportPair,reportPlayer,outcomePlayer,transitionPerson})+'</header><div class="trainer-content">'+(tab === "report" && !lobby ? '' : '<div class="control-overview">'+metrics+chooser+'</div>')+body+'</div></div>';
+  return '<div class="cockpit"><header class="trainer-sticky">'+toolbar+projectionControls(s,filter,presentation,projectionPicker,projectionChoice,{reportPair,reportPlayer,outcomePlayer,transitionPerson})+'</header><div class="trainer-content">'+((tab === "report" && !lobby) || tab === "scores" ? '' : '<div class="control-overview">'+metrics+chooser+'</div>')+body+'</div></div>';
 }
 
 function connectionsCard(state) {
@@ -440,9 +442,9 @@ function projectionSelection(state, filter, p, picker, choice, report) {
     '</select><button class="button secondary small" type="submit"'+(items.length?'':' disabled')+'>Kivetítem</button></form>';
 }
 function projectionControls(state,filter,p,picker,choice,report) {
-  const labels = {group:'Csoportkép',person:'Egyéni eredmények',people:'Személyes futamsorok',transitions:'Mi jött utána?',case:'Egy futam két oldala',guide:'Kivezetési kérdések'};
+  const labels = {group:'Csoportkép',person:'Egyéni eredmények',people:'Személyes futamsorok',transitions:'Mi jött utána?',case:'Egy futam két oldala',guide:'Kivezetési kérdések',scores:'Pontszámok'};
   const step = p.target === 'case';
-  const paged = ['guide','person','people'].includes(p.target);
+  const paged = ['guide','person','people','scores'].includes(p.target);
   const navigation = step || paged ? '<div class="row"><button class="button secondary small" data-do="'+(step?'project-step':'projection-page')+'" data-by="-1">'+(step?'← Pillanat':'← Oldal')+'</button>'+
     (step?'':'<span>'+(p.page+1)+'. oldal</span>')+'<button class="button secondary small" data-do="'+(step?'project-step':'projection-page')+'" data-by="1">'+(step?'Pillanat →':'Oldal →')+'</button></div>' : '';
   const shortcuts = state.phase === "lobby" ? '' : '<div class="projection-shortcuts" role="group" aria-label="Kivetíthető nézetek">'+

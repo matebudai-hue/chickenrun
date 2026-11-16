@@ -48,6 +48,53 @@ export function analyse(pairs,roster=[],scope='human') {
     gaps:races.filter(p=>p.connectionGap?.some(Boolean)).length,
     active:ordered.filter(p=>!p.result).length};
 }
+const SCORE_MEDALS = [['win',2],['lose',0],['crash',-1],['both',1]];
+const SCORE_PAGE_SIZE = 12;
+const SCORE_QUESTION = 'Két játékosnak ugyanannyi pontja lett? Milyen futamokból jött össze ugyanaz az eredmény?';
+const scoreValue = value => value < 0 ? '−'+Math.abs(value) : String(value);
+const signedWeight = weight => weight > 0 ? '+'+weight : scoreValue(weight);
+
+export function scoreRows(data, {names=false, scoreOrder='roster'} = {}) {
+  const rows = data.players.map(player => ({
+    ...player,
+    score: SCORE_MEDALS.reduce((total,[medal,weight]) => total + player.medals[medal]*weight,0),
+    races: SCORE_MEDALS.reduce((total,[medal]) => total + player.medals[medal],0)
+  }));
+  const byRoster = (a,b) => (names ? (a.name ?? '').localeCompare(b.name ?? '', 'hu') : 0) || a.number-b.number;
+  return rows.sort((a,b) => {
+    if (scoreOrder === 'points') return b.score-a.score || a.number-b.number;
+    return byRoster(a,b);
+  });
+}
+
+function scoreTable(rows,names) {
+  if (!rows.length) return '<p>Még nincs játékos a névsorban.</p>';
+  return '<table class="score-table"><thead><tr><th scope="col">Játékos</th>'+
+    SCORE_MEDALS.map(([key,weight]) => '<th scope="col" class="medal-'+key+'">'+MEDALS[key]+
+      '<small>'+signedWeight(weight)+' pont</small></th>').join('')+
+    '<th scope="col">Futam</th><th scope="col" class="score-total">Pont</th></tr></thead><tbody>'+
+    rows.map(player => '<tr><th scope="row">'+(names ? esc(player.name) : 'Játékos '+String(player.number).padStart(2,'0'))+'</th>'+
+      SCORE_MEDALS.map(([key]) => '<td>'+player.medals[key]+'</td>').join('')+
+      '<td>'+player.races+'</td><td class="score-total">'+scoreValue(player.score)+'</td></tr>').join('')+
+    '</tbody></table>';
+}
+
+function scoreCoverage(data) {
+  return data.unlinked ? '<p class="score-note">'+data.unlinked+' futamhoz hiányzik a résztvevő azonosítója, így annak eredménye hiányzik az egyéni pontokból.</p>' : '';
+}
+
+export function scoreReport(data,p,lobby) {
+  const order = p.scoreOrder ?? 'roster';
+  return '<section class="score-panel" id="report-scores" tabindex="-1"><div class="report-section-head">'+
+    '<div><h2>Pontszámok</h2><p>Az összpontot a medálokból számoljuk. A Futam oszlop mutatja, hány lezárt futamból állt össze.</p></div>'+
+    '<button class="button secondary small" data-do="project-section" data-target="scores"'+(lobby?' disabled':'')+'>Pontszámok kivetítése</button></div>'+
+    '<div class="score-order" role="group" aria-label="Rendezés">'+
+    [['roster',p.names?'Névsor':'Játékosszám szerint'],['points','Pont szerint']].map(([value,label]) =>
+      '<button type="button" id="score-order-'+value+'" class="button secondary small" data-do="score-order" data-order="'+value+
+      '" aria-pressed="'+(order===value)+'">'+label+'</button>').join('')+
+    '</div><div class="score-table-wrap">'+scoreTable(scoreRows(data,p),p.names)+'</div>'+scoreCoverage(data)+'</section>';
+}
+
 const tag = (key,n) => '<span class="medal-count medal-'+key+'"><b>'+n+'</b> '+MEDALS[key]+'</span>';
 function distanceLabel(e){return e.medal==='crash'?'Ütközés':Number.isFinite(e.distance)?e.distance+' m':'Nincs mérési adat';}
 function raceButton(e,index,projected=false){
@@ -137,10 +184,11 @@ export function learningGuide(opened = new Set()){
     ['Kölcsönös függés','A győztes történetéhez kell a kitérő története is.','A másik kitérése mit tett lehetővé neked? Aki Vesztest kapott, mit védett meg?','Ugyanazt a futamot mindkét fél nézőpontjából dolgozzátok fel. A kitérés lehet önvédelem, kockázatkezelés vagy megállapodás is.'],
     ['Jelzés és következtetés','Nézzétek meg az üzenetet a döntés előtt.','Mit hittél el? Miből következtettél arra, hogy a másik engedni fog?','Válaszd külön az elküldött üzenetet és a ténylegesen megértett jelzést. A „nem térek ki” szöveg még nem visszavonhatatlan elköteleződés.'],
     ['Eloszló teher','A biztonságot ki teremtette meg?','Hol várjuk újra és újra ugyanattól az embertől, hogy engedjen?','A saját medálsor kérdésindító. Változó, névtelen partnerek mellett a sok Vesztesből nem következik állandó alárendelt szerep.'],
+    ['Pontszámok','Hasonlítsatok össze két medálsort.',SCORE_QUESTION,'A Pontszámok menüben nézzétek meg a medálokat és a futamszámot. Egy egyoldalú és egy kölcsönös kitérés is összesen 2 pontot ad a párnak, de különböző az eloszlás.'],
     ['Közös szabály','Építsetek lámpát a szervezeti helyzethez.','Milyen szabályt fogadnál el akkor is, ha legközelebb te kapnál pirosat?','Nevezzétek meg: milyen helyzetben, ki és milyen szempont alapján enged; mikor vált a prioritás; mi a kivétel és ki dönt vitában.'],
     ['Kipróbálás','Egy saját munkahelyi helyzetben teszteljétek.','Kivel, mikor próbálod ki a szabályt, és miből látjátok majd, hogy működik?','Rögzítsetek egy megfigyelhető jelet: például ismételt sürgős felülírások száma vagy az engedés terhének eloszlása. A játék önmagában nem bizonyít munkahelyi változást.']
   ];
-  return '<section class="debrief-section report-panel guide" id="report-guide" tabindex="-1"><div class="report-section-head"><h3>Kivezetési kérdések</h3><button class="button secondary small" data-do="project-section" data-target="guide">Kivezetési kérdések kivetítése</button></div><p>Lehetséges tanulási cél: a résztvevő képes legyen felismerni a kölcsönös függést, ellenőrizni a másikra vonatkozó feltételezését, és közös eljárást javasolni az engedés rendezésére.</p><div class="guide-grid">'+stages.map(([label,title,q,note],i)=>'<article><span class="guide-number">0'+(i+1)+'</span><div><p class="eyebrow">'+label+'</p><h4>'+title+'</h4><p class="trainer-question">'+q+'</p><p class="small-text">'+note+'</p></div></article>').join('')+'</div><details id="learning-theory"'+(opened.has('learning-theory')?' open':'')+'><summary>Játékelméleti háttér és értelmezési határok</summary><div class="stack"><p>A klasszikus Chicken sorrendje: egyoldalú győzelem &gt; kölcsönös kitérés &gt; egyoldalú kitérés &gt; ütközés. A jobb válasz a másik döntésétől függ. Két tiszta Nash-egyensúlya az egyoldalú kitérés két esete; a kölcsönös kitérés egy egyszeri játékban nem tiszta Nash-egyensúly.</p><p>A kézikönyv 4–3–1–0 példapontozásában a kölcsönös kitérés összesen 6 pontot ér, az egyoldalú 5-öt. A jelen játék medálokat gyűjt: ebből nem számolunk utólag kitalált hasznosságot vagy együttműködési pontszámot. Előbb kérdezd meg, nekik mit ért az egyes eredmény.</p><p>A mérési pontok, a kommunikáció és az időnyomás kibővítik az egyszeri modellt. A Döntetlen ugyanazon mérési pontban rögzített két kitérés; nem bizonyít azonos kattintási időt vagy előzetes egyezséget. A győztes tervezett későbbi kitérését nem ismerjük. Változó, névtelen partnereknél nincs automatikusan partnerhez kötött reputáció vagy megtorlás.</p><p>A sok győzelem nem önmagában jó döntés, a Kórház nem önmagában jellemhiba. Vizsgáld az akkori információt és a technikai körülményeket. Tíz futam beszélgetési alap, nem személyiségteszt.</p><p>Alap: Budai Máté: Együttműködés-fejlesztés, kézikönyv 8. oldal és tréneri forgatókönyv. <a href="https://homes.cs.washington.edu/~karlin/GameTheoryBook.pdf" target="_blank" rel="noopener">Karlin–Peres: Game Theory, Alive, 4.2.3</a> · <a href="https://pubmed.ncbi.nlm.nih.gov/17574196/" target="_blank" rel="noopener">Rudolph és mtsai.: Debriefing with good judgment</a>.</p></div></details></section>';
+  return '<section class="debrief-section report-panel guide" id="report-guide" tabindex="-1"><div class="report-section-head"><h3>Kivezetési kérdések</h3><button class="button secondary small" data-do="project-section" data-target="guide">Kivezetési kérdések kivetítése</button></div><p>Lehetséges tanulási cél: a résztvevő képes legyen felismerni a kölcsönös függést, ellenőrizni a másikra vonatkozó feltételezését, és közös eljárást javasolni az engedés rendezésére.</p><div class="guide-grid">'+stages.map(([label,title,q,note],i)=>'<article><span class="guide-number">0'+(i+1)+'</span><div><p class="eyebrow">'+label+'</p><h4>'+title+'</h4><p class="trainer-question">'+q+'</p><p class="small-text">'+note+'</p></div></article>').join('')+'</div><button class="button secondary small" data-do="tab" data-tab="scores">Pontszámok megnyitása</button><details id="learning-theory"'+(opened.has('learning-theory')?' open':'')+'><summary>Játékelméleti háttér és értelmezési határok</summary><div class="stack"><p>A klasszikus Chicken sorrendje: egyoldalú győzelem &gt; kölcsönös kitérés &gt; egyoldalú kitérés &gt; ütközés. A jobb válasz a másik döntésétől függ. Két tiszta Nash-egyensúlya az egyoldalú kitérés két esete; a kölcsönös kitérés egy egyszeri játékban nem tiszta Nash-egyensúly.</p><p>A kézikönyv 4–3–1–0 példapontozásában a kölcsönös kitérés összesen 6 pontot ér, az egyoldalú 5-öt. A Padlógáz utólagos pontozásában a Győztes +2, a Vesztes 0, a Kórház −1, a Döntetlen +1. Kérdezd meg, nekik mit ért az egyes eredmény, és milyen árat fizettek érte.</p><p>A mérési pontok, a kommunikáció és az időnyomás kibővítik az egyszeri modellt. A Döntetlen ugyanazon mérési pontban rögzített két kitérés; nem bizonyít azonos kattintási időt vagy előzetes egyezséget. A győztes tervezett későbbi kitérését nem ismerjük. Változó, névtelen partnereknél nincs automatikusan partnerhez kötött reputáció vagy megtorlás.</p><p>A sok győzelem nem önmagában jó döntés, a Kórház nem önmagában jellemhiba. Vizsgáld az akkori információt és a technikai körülményeket. Tíz futam beszélgetési alap, nem személyiségteszt.</p><p>Alap: Budai Máté: Együttműködés-fejlesztés, kézikönyv 8. oldal és tréneri forgatókönyv. <a href="https://homes.cs.washington.edu/~karlin/GameTheoryBook.pdf" target="_blank" rel="noopener">Karlin–Peres: Game Theory, Alive, 4.2.3</a> · <a href="https://pubmed.ncbi.nlm.nih.gov/17574196/" target="_blank" rel="noopener">Rudolph és mtsai.: Debriefing with good judgment</a>.</p></div></details></section>';
 }
 export function learningProjection(state,target='group'){
   const data=analyse(state.pairs,state.roster,'human');
@@ -197,15 +245,23 @@ export function presentationView(state,p) {
   body = '<h1>Mi jött utána?</h1>'+(person ? '<p class="transition-subject">'+label(person)+'</p>' : '')+
     transitionSummary(data,person)+'<p class="screen-question">Mit vittél tovább az előző futamból?</p>';
  }
+ if(p.target==='scores') {
+  const rows = scoreRows(data,p);
+  pages = Math.max(1,Math.ceil(rows.length/SCORE_PAGE_SIZE));
+  page = Math.min(page,pages-1);
+  body = '<h1>Pontszámok</h1><p class="score-note">'+(p.scoreOrder === 'points' ? 'Pont szerint' : p.names ? 'Névsor' : 'Játékosszám szerint')+'</p>'+
+    scoreTable(rows.slice(page*SCORE_PAGE_SIZE,(page+1)*SCORE_PAGE_SIZE),p.names)+scoreCoverage(data);
+ }
  if(p.target==='guide') {
-  const slides=[['Egy konkrét döntés','Mit akartál elérni? Mire számítottál a másiktól, és mire alapoztad ezt?'],['A győzelem másik oldala','A másik kitérése mit tett lehetővé neked? Aki Vesztest kapott, mit védett meg?'],['Mit hittél el?','Miből következtettél arra, hogy a másik engedni fog?'],['Ki viseli az engedés terhét?','Hol várjuk újra és újra ugyanattól az embertől, hogy engedjen?'],['Építsetek lámpát.','Milyen szabályt fogadnál el akkor is, ha legközelebb te kapnál pirosat?'],['Próbáljátok ki.','Kivel, mikor próbálod ki a szabályt, és miből látjátok majd, hogy működik?']];
+  const slides=[['Egy konkrét döntés','Mit akartál elérni? Mire számítottál a másiktól, és mire alapoztad ezt?'],['A győzelem másik oldala','A másik kitérése mit tett lehetővé neked? Aki Vesztest kapott, mit védett meg?'],['Mit hittél el?','Miből következtettél arra, hogy a másik engedni fog?'],['Ki viseli az engedés terhét?','Hol várjuk újra és újra ugyanattól az embertől, hogy engedjen?'],['Hasonlítsatok össze két medálsort.',SCORE_QUESTION],['Építsetek lámpát.','Milyen szabályt fogadnál el akkor is, ha legközelebb te kapnál pirosat?'],['Próbáljátok ki.','Kivel, mikor próbálod ki a szabályt, és miből látjátok majd, hogy működik?']];
   pages=slides.length;page=Math.min(page,pages-1);body='<p class="hero-number"><strong>0'+(page+1)+'</strong></p><h1>'+slides[page][0]+'</h1><p class="screen-question">'+slides[page][1]+'</p>';
  }
  return '<section class="learning-screen presentation-screen" data-slide="'+p.target+'"><p class="eyebrow">'+scope+' / '+(p.names?'Nevekkel':'Név nélkül')+'</p>'+body+(pages>1?'<nav class="presentation-pager" aria-label="Kivetített oldalak"><button class="button secondary" data-do="projection-page" data-by="-1"'+(!page?' disabled':'')+'>← Előző</button><span>'+(page+1)+' / '+pages+'</span><button class="button secondary" data-do="projection-page" data-by="1"'+(page>=pages-1?' disabled':'')+'>Következő →</button></nav>':'')+'</section>';
 }
 export function presentationPages(state,p) {
  const data=analyse(state.pairs,state.roster,p.scope);
- if(p.target==='guide')return 6;
+ if(p.target==='guide')return 7;
+ if(p.target==='scores')return Math.max(1,Math.ceil(data.players.length/SCORE_PAGE_SIZE));
  if(p.target==='person')return Math.max(1,Math.ceil((data.players.find(x=>x.number===p.person)?.events.filter(e=>e.included).length??0)/12));
  if(p.target==='people')return Math.max(1,timelinePages(data.players).length);
  return 1;

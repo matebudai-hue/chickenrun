@@ -505,7 +505,7 @@ body[data-keyboard="true"] .night-playing{--vehicle-scale:.65}
 @media(prefers-reduced-motion:reduce){.screening-car{transition:none}}
 
 /* Debrief: a night-race editorial wall, with data as the main graphic. */
-body[data-surface="trainer"]:has(.debrief-dashboard){color-scheme:dark;--ink:#f4f1df;--muted:#aeb6aa;--accent:#f5c35c;--paper:#151c19;--bg:#0b110f;--line:#374239;--rule:#728274;--band:#243129;background:#0b110f}
+body[data-surface="trainer"]:has(.debrief-dashboard,.score-panel){color-scheme:dark;--ink:#f4f1df;--muted:#aeb6aa;--accent:#f5c35c;--paper:#151c19;--bg:#0b110f;--line:#374239;--rule:#728274;--band:#243129;background:#0b110f}
 .debrief-dashboard,.learning-screen{--ink:#f4f1df;--muted:#aeb6aa;--accent:#f5c35c;--paper:#151c19;--line:#374239;--rule:#728274;--band:#243129;color:var(--ink);background:#101713;overflow:hidden}
 .debrief-dashboard{border:1px solid #374239}
 .debrief-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:2rem;min-height:290px;padding:2.5rem 2rem;background:linear-gradient(90deg,#101713 8%,#101713c9 55%,#10171360),url('./road.jpg') center 48%/cover;border-bottom:1px solid #48523d;position:relative}
@@ -780,3 +780,26 @@ body[data-keyboard="true"] .night-playing .injury-card{--injury-icon:27px;--inju
 @media(max-width:560px){
   .personal-result-summary{grid-template-columns:minmax(0,1fr)}
 }
+
+/* Trainer scores and their full-screen projection share the same outcome columns. */
+.score-panel{padding:clamp(.8rem,2vw,1.5rem);border:1px solid #3d4c43;border-radius:5px;background:#151d19}
+.score-panel .report-section-head{flex-wrap:wrap}
+.score-panel .report-section-head p,.score-note{margin:0;color:var(--muted)}
+.score-order{display:flex;flex-wrap:wrap;gap:.4rem;margin:.8rem 0}
+.score-order [aria-pressed="true"]{color:#18180b;background:#ecc45c;border-color:#ecc45c}
+.score-table-wrap{overflow-x:auto}
+.score-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.score-panel .score-table{min-width:570px}
+.score-table th,.score-table td{border-bottom:1px solid #3d4c43;padding:.55em .65em;text-align:right}
+.score-table th:first-child{text-align:left;overflow-wrap:anywhere}
+.score-table thead th:not(:first-child){white-space:nowrap}
+.score-table thead th small{display:block;font-size:.74em;font-weight:normal}
+.score-table .score-total{color:#f4cf72;background:#29291c;font-weight:700}
+.score-table tbody tr:nth-child(even){background:#ffffff05}
+.score-table+.score-note,.score-table-wrap+.score-note{margin-top:.7rem}
+.presentation-screen[data-slide="scores"]{gap:clamp(.3rem,1.2vh,1rem)}
+.presentation-screen[data-slide="scores"]>h1{font-size:clamp(1.75rem,6vh,4rem)}
+.presentation-screen .score-table{table-layout:fixed;font-size:clamp(.68rem,min(2.35vw,2.5vh),1.45rem)}
+.presentation-screen .score-table th,.presentation-screen .score-table td{padding:.28em .45em}
+.presentation-screen .score-table th:first-child{width:30%}
+.presentation-screen .score-table thead th:not(:first-child){white-space:normal;overflow-wrap:anywhere}

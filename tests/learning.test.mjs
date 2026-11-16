@@ -76,7 +76,7 @@ test('20 players paginate into four readable groups, without losing the final pl
  assert.equal(presentationPages(state,p),4);
  assert.equal((presentationView(state,p).match(/<article>/g)||[]).length,6);
  const last=presentationView(state,{...p,page:3});assert.match(last,/Person 20/);assert.doesNotMatch(last,/Person 18/);
- assert.equal(presentationPages(state,{...p,target:'guide'}),6);
+ assert.equal(presentationPages(state,{...p,target:'guide'}),7);
 });
 
 test('projected timelines hold 18 runs and put the 19th on the following slide',async()=>{
@@ -126,4 +126,37 @@ test('the selected report and its projection show the same cumulative injuries a
  assert.doesNotMatch(projected,/Azonos/);
  assert.match(projected,/Sérülések<\/span><strong>15<\/strong>.*A szoba összes futama/);
  assert.doesNotMatch(presentationView(state,{target:'group',scope:'human',names:false,page:0}),/injury-card/);
+});
+
+test('scoreboard sums the four medals, uses the race scope and retains zero-race players',async()=>{
+ const {scoreRows}=await import('../docs/learning.js');
+ const people=[{number:1,name:'Zita'},{number:2,name:'Anna'},{number:3,name:'Béla'}];
+ const pairs=[race(1,'a'),race(2,'both'),race(3,'crash'),race(4,'crash'),race(5,'stopped'),
+   race(6,'b',{bot:true,playerNumbers:[1,null]}),race(7,'b',{playerNumbers:undefined})];
+ const summarize = rows => rows.map(({number,score,races})=>[number,score,races]);
+ const human=analyse(pairs,people);
+ assert.deepEqual(summarize(scoreRows(human)),[[1,-1,4],[2,1,4],[3,0,0]]);
+ assert.deepEqual(summarize(scoreRows(human,{names:true})),[[2,1,4],[3,0,0],[1,-1,4]]);
+ assert.deepEqual(summarize(scoreRows(human,{scoreOrder:'points'})),[[2,1,4],[3,0,0],[1,-1,4]]);
+ assert.deepEqual(summarize(scoreRows(analyse(pairs,people,'test'))),[[1,2,1],[2,0,0],[3,0,0]]);
+ assert.deepEqual(summarize(scoreRows(analyse(pairs,people,'all'),{scoreOrder:'points'})),[[1,1,5],[2,1,4],[3,0,0]]);
+});
+
+test('scoreboard has its own trainer tab and paginates anonymously on the projector',async()=>{
+ const {presentationView,presentationPages}=await import('../docs/learning.js');
+ const {normalizePresentation}=await import('../docs/presentation.js');
+ const people=Array.from({length:20},(_,i)=>({number:i+1,name:'Privát <név> '+(i+1)}));
+ const state={phase:'closed',count:20,queue:[],roster:people,pairs:[race(1,'a')]};
+ const p=normalizePresentation({target:'scores',scoreOrder:'points',page:1});
+ assert.equal(p.target,'scores');
+ assert.equal(presentationPages(state,p),2);
+ const last=presentationView(state,p);
+ assert.match(last,/Játékos 20/);
+ assert.doesNotMatch(last,/Privát|Játékos 02/);
+ assert.match(presentationView(state,{...p,names:true,page:0}),/Privát &lt;név&gt; 2/);
+ const html=trainer(state,{room:'ABCDEFGH',opened:new Set(),tab:'scores',filter:p.scope,presentation:p});
+ assert.match(html,/id="trainer-tab-scores"[^>]*aria-pressed="true"/);
+ assert.match(html,/id="score-order-points"[^>]*aria-pressed="true"/);
+ assert.match(html,/Győztes.*Vesztes.*Kórház.*Döntetlen.*Pont/);
+ assert.match(html,/id="projection-shortcut-scores"/);
 });

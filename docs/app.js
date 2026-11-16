@@ -1,9 +1,9 @@
-import { presentationPages } from "./learning.js?v=32";
-import { normalizePresentation, changePresentation } from "./presentation.js?v=27";
+import { presentationPages } from "./learning.js?v=33";
+import { normalizePresentation, changePresentation } from "./presentation.js?v=28";
 import { animateRace } from "./live-race.js?v=15";
 import { nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=27";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=33";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=34";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -99,7 +99,7 @@ function roomLink(code, view) {
 
 const projectionSections = {
   group:"report-results", person:"report-results", people:"report-timelines",
-  transitions:"report-transitions", case:"case-section", guide:"report-guide"
+  transitions:"report-transitions", case:"case-section", guide:"report-guide", scores:"report-scores"
 };
 
 function scrollToReportSection(id) {
@@ -920,7 +920,7 @@ screen.addEventListener("click", event => {
     projectionPicker = projectionChoice = undefined;
     render();
     window.scrollTo(0,0);
-    screen.querySelector('[data-tab="'+selectedTab+'"]').focus();
+    screen.querySelector('#trainer-tab-'+selectedTab)?.focus({preventScroll:true});
   } else if (action === "share") share();
   else if (action === "copy") void copyLink(button);
   else if (action === "download-diagnostics") void downloadDiagnostics(button);
@@ -951,7 +951,12 @@ screen.addEventListener("click", event => {
   } else if (action === "project-transitions") {
     publishPresentation({target:"transitions",person:transitionPerson,scope:filter,page:0});
   } else if(action === "open-projector") openProjector();
-  else if(action === "projection-names") publishPresentation({names:!presentation.names});
+  else if(action === "projection-names") publishPresentation({
+    names:!presentation.names,...(presentation.target==="scores"?{page:0}:{})
+  });
+  else if(action === "score-order") publishPresentation({
+    scoreOrder:button.dataset.order,...(presentation.target==="scores"?{page:0}:{})
+  });
   else if (action === "projection-pick") {
     const target = button.dataset.target;
     projectionPicker = projectionPicker === target ? undefined : target;
@@ -965,7 +970,7 @@ screen.addEventListener("click", event => {
     const target = button.dataset.target;
     const shortcut = button.id === "projection-shortcut-"+target;
     if (shortcut) {
-      selectedTab = "report";
+      selectedTab = target === "scores" ? "scores" : "report";
       if (target === "group") outcomePlayer = undefined;
     }
     publishPresentation({target,scope:filter,page:0});
