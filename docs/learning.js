@@ -48,6 +48,67 @@ export function analyse(pairs,roster=[],scope='human') {
     gaps:races.filter(p=>p.connectionGap?.some(Boolean)).length,
     active:ordered.filter(p=>!p.result).length};
 }
+const TIMED_POINTS = [1000,800,600,400,200,100,50,10];
+
+export function turnReport(races,person=0) {
+  const buckets = new Map();
+  let crashes = 0;
+  let unknown = 0;
+  for (const race of races) {
+    if (person && !race.playerNumbers?.includes(person)) continue;
+    if (race.result === 'crash') {
+      crashes++;
+      continue;
+    }
+    const row = race.history?.at(-1);
+    const seats = race.result === 'both' ? [0,1] : [race.result === 'a' ? 0 : 1];
+    for (const seat of seats) {
+      if (person && race.playerNumbers?.[seat] !== person) continue;
+      const distance = row?.distance;
+      if (!Number.isFinite(distance) || distance <= 0) {
+        unknown++;
+        continue;
+      }
+      if (!buckets.has(distance)) buckets.set(distance,[]);
+      buckets.get(distance).push(race);
+    }
+  }
+  const timed = races.some(race => race.timed);
+  const stepPoints = races.filter(race=>!race.timed).flatMap(race=>race.distances ?? []);
+  const points = [...new Set([...(timed?TIMED_POINTS:[]),...stepPoints,...buckets.keys()])]
+    .filter(distance=>Number.isFinite(distance)&&distance>0).sort((a,b)=>b-a)
+    .map(distance=>({distance,races:buckets.get(distance)??[]}));
+  return {points,crashes,unknown,total:[...buckets.values()].reduce((sum,items)=>sum+items.length,0)};
+}
+
+export function turnChart(data,person=0,selected=0,projected=false) {
+  const {points,crashes,total,unknown} = turnReport(data.races,person);
+  const max = Math.max(0,...points.map(point=>point.races.length));
+  const leaders = points.filter(point=>max>0 && point.races.length===max);
+  const active = points.find(point=>point.distance===selected) ?? leaders.at(-1);
+  const marks = points.map(point=>{
+    const count = point.races.length;
+    const isActive = point===active;
+    const label = 'aria-label="'+point.distance+' méter, '+count+' kitérés"';
+    const content = '<span class="turn-plot">'+(count?'<i class="turn-beam"></i><b>'+count+'</b>':'')+
+      (isActive?'<i class="turn-arrow" aria-hidden="true">↗</i>':'')+'</span><span class="turn-meter">'+point.distance+' m</span>';
+    const style = ' class="turn-point'+(isActive?' selected':'')+'" style="--turn-value:'+(max?count/max:0)+'" ';
+    return projected ? '<div'+style+'role="img" '+label+'>'+content+'</div>' :
+      '<button type="button" id="turn-mark-'+point.distance+'"'+style+label+' data-do="report-turn-point" data-distance="'+point.distance+'" aria-pressed="'+isActive+'">'+content+'</button>';
+  }).join('');
+  const peak = leaders.length===1 ? leaders[0] : null;
+  const insights = projected && peak ? '<div class="turn-insight"><strong>'+Math.round(100*max/total)+'%</strong><span>'+
+    (peak.distance===points.at(-1)?.distance?'A kitérések aránya az utolsó mérési ponton.':'A kitérések aránya a leggyakoribb mérési ponton.')+
+    '<small>'+peak.distance+' m · '+max+' kitérés</small></span></div>' : '';
+  const list = active ? [...new Map(active.races.map(race=>[race.number,race])).values()] : [];
+  const cases = active && !projected ? '<div class="turn-cases"><strong>'+active.distance+' m</strong> · '+list.length+' futam'+
+    (list.length?'<div>'+list.map(race=>'<button type="button" class="button secondary small" data-do="report-case" data-number="'+race.number+'">#'+race.number+
+      (race.messageCount?' · '+race.messageCount+' üzenet':'')+'</button>').join('')+'</div>':'')+'</div>' : '';
+  return '<div class="turn-chart">'+
+    '<p class="turn-totals">'+total+' kitérés · '+crashes+' ütközés'+(unknown?' · '+unknown+' kitérés mérési pont nélkül':'')+'</p>'+
+    insights+(points.length?'<div class="turn-road" style="--turn-columns:'+points.length+'" aria-label="Kitérések mérési pontonként">'+marks+'</div><div class="turn-axis"><span>Rajt felől</span><span>Mérési pontok</span><span>Ütközés felé →</span></div>':'<p>Még nincs mérési adat.</p>')+cases+'</div>';
+}
+
 const SCORE_MEDALS = [['win',2],['lose',0],['crash',-1],['both',1]];
 const SCORE_PAGE_SIZE = 12;
 const SCORE_QUESTION = 'Két játékosnak ugyanannyi pontja lett? Milyen futamokból jött össze ugyanaz az eredmény?';
@@ -216,6 +277,10 @@ export function presentationView(state,p) {
  const scope={human:'Ember–ember',test:'Tesztjátékosos',all:'Minden futam'}[p.scope];
  const label=person=>p.names?esc(person.name):'Játékos '+String(person.number).padStart(2,'0');
  let body='',pages=1,page=p.page;
+ if(p.target==='turns') {
+  const person=data.players.find(player=>player.number===p.person);
+  body='<h1>Hol rántották el?</h1>'+(person?'<p>'+label(person)+'</p>':'')+turnChart(data,p.person,p.distance,true);
+ }
  if(p.target==='group') body=learningOverview(data,true)+'<p class="screen-question">Ki teremtette meg a győzelem feltételét?</p>';
  if(p.target==='person') {
   const person=data.players.find(x=>x.number===p.person);

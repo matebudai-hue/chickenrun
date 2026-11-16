@@ -44,13 +44,14 @@ test('dashboard renders populated and empty states with existing case projection
  const s={phase:'finished',pairs:[race(1,'a')],roster,count:2,queue:[]};
  const html=trainer(s,context);
  assert.match(html,/debrief-dashboard/);assert.match(html,/data-do="project-learning"/);
- assert.match(html,/data-do="project-pair"/);assert.match(html,/Játékelméleti háttér/);
+ assert.match(trainer(s,{...context,reportView:"cases"}),/data-do="project-pair"/);
+ assert.match(trainer(s,{...context,reportView:"guide"}),/Játékelméleti háttér/);
  assert.match(html,/id="outcome-player"/);
  assert.match(trainer(s,{...context,outcomePlayer:1}),/0 Győztes, 1 Vesztes, 0 Kórház, 0 Döntetlen/);
  for (const tab of ['overview','players']) {
   const view = trainer(s,{...context,tab});
   assert.doesNotMatch(view,/compact-outcomes/);
-  assert.match(view,/<header class="trainer-sticky">.*id="filter-human".*<\/header>/);
+  assert.match(view,/trainer-live-alerts/);
  }
  assert.doesNotThrow(()=>trainer({...s,pairs:[]},context));
 });
@@ -159,4 +160,40 @@ test('scoreboard has its own trainer tab and paginates anonymously on the projec
  assert.match(html,/id="score-order-points"[^>]*aria-pressed="true"/);
  assert.match(html,/Győztes.*Vesztes.*Kórház.*Döntetlen.*Pont/);
  assert.match(html,/id="projection-shortcut-scores"/);
+});
+
+test('turn chart counts executed exits, extracts personal decisions and handles early requests that never executed',async()=>{
+ const {turnReport,presentationView}=await import('../docs/learning.js');
+ const pairs=[
+  race(1,'a',{timed:true,turns:[{distance:120,target:100},{distance:70,target:50}]}),
+  race(2,'both',{timed:true,history:[{distance:10,choices:['yield','yield']}]}),
+  race(3,'crash',{timed:true}),
+  race(4,'stopped',{timed:true}),
+  race(5,'b',{timed:true,bot:true,playerNumbers:[1,null]}),
+  race(6,'b',{timed:true,history:[]}),
+ ];
+ const data=analyse(pairs,roster,'human');
+ const group=turnReport(data.races);
+ assert.equal(group.total,3);
+ assert.equal(group.crashes,1);
+ assert.equal(group.unknown,1);
+ assert.equal(group.points.find(point=>point.distance===10).races.length,2);
+ assert.equal(group.points.find(point=>point.distance===50).races.length,0);
+ assert.equal(turnReport(data.races,2).total,1);
+ assert.equal(turnReport(data.races,2).unknown,1);
+ const projection=presentationView({pairs,roster},{target:'turns',names:false,scope:'human',person:2,distance:10});
+ assert.match(projection,/Játékos 02/);
+ assert.doesNotMatch(projection,/Azonos|report-case/);
+});
+
+test('two-sided dialogue filter uses distinct senders and quotes are HTML-escaped',()=>{
+ const s={phase:'closed',pairs:[race(1,'a',{messageCount:2}),race(2,'crash',{messageCount:2})],roster,count:2,queue:[]};
+ const dialogue={filter:'both',outcome:'',queue:[],messages:new Map([
+  [1,[{seat:0,text:'Ezt'},{seat:0,text:'És ezt'}]],
+  [2,[{seat:0,text:'<img>'},{seat:1,text:'Válasz'}]],
+ ])};
+ const html=trainer(s,{room:'ABCDEFGH',tab:'report',reportView:'dialogues',opened:new Set(),selection:[],filter:'human',dialogue});
+ assert.doesNotMatch(html,/id="report-case-1"/);
+ assert.match(html,/id="report-case-2"/);
+ assert.match(html,/&lt;img&gt; ↔ Válasz/);
 });
