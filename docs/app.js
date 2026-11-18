@@ -3,7 +3,7 @@ import { normalizePresentation, changePresentation } from "./presentation.js?v=4
 import { animateRace } from "./live-race.js?v=15";
 import { nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=27";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=42";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=43";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -33,7 +33,7 @@ let reveal, revealTimer, finishRoadHeight, screeningCase, medalFilter;
 const screenPositions = new Map();
 let selectedGameMode = "timed";
 let raceOffset = Date.now() - performance.now(), stopAnimation, turnPending = false;
-let chatPending, chatNotice = "", lastReadIncomingId, turnAck;
+let chatPending, chatNotice = "", latestIncoming, incomingFlash, turnAck;
 let showPairings = saved.get(projectionModeKey) === "pairings";
 let reportTarget = saved.get(projectionModeKey)?.startsWith("learning:") ? saved.get(projectionModeKey).slice(9) : undefined;
 const presentationKey = "cr:presentation:"+room;
@@ -186,7 +186,8 @@ function update(next, started = performance.now()) {
     turnAck = undefined;
     turnPending = false;
     chatNotice = "";
-    lastReadIncomingId = undefined;
+    latestIncoming = undefined;
+    incomingFlash?.cancel();
     draft = "";
     messageRequest = undefined;
   }
@@ -747,22 +748,28 @@ function keyboardInset() {
 }
 
 function paintChat() {
-  const chat = screen.querySelector("#night-chat");
-  const log = chat?.querySelector("#messages");
+  const log = screen.querySelector("#messages");
   if (!log) return;
   const bottom = log.scrollHeight - log.clientHeight - log.scrollTop < 36;
   const scrollTop = log.scrollTop;
   const incoming = state.messages.findLast(item => !item.own);
-  if (chat.open && incoming) lastReadIncomingId = incoming.id;
-  const unread = Boolean(incoming && incoming.id !== lastReadIncomingId);
-  chat.toggleAttribute("data-unread", unread);
-  const latest = unread ? incoming : state.messages.at(-1);
-  const sender = chat.querySelector("#latest-sender");
-  const preview = chat.querySelector("#latest-message");
-  const label = unread ? "Új üzenet" : latest ? latest.own ? "Te" : "A másik autó" : "Üzenetek";
-  const message = latest?.text ?? "Még nincs üzenet.";
-  if (sender.textContent !== label) sender.textContent = label;
-  if (preview.textContent !== message) preview.textContent = message;
+  const arrived = incoming && incoming.id !== latestIncoming?.id;
+  if (arrived) latestIncoming = incoming;
+  const banner = screen.querySelector(".night-incoming");
+  if (latestIncoming && banner.dataset.messageId !== latestIncoming.id) {
+    banner.dataset.messageId = latestIncoming.id;
+    const sender = banner.querySelector("#latest-sender");
+    sender.textContent = state.result ? "A másik autó" : "Új üzenet";
+    sender.hidden = false;
+    banner.querySelector("#latest-message").textContent = latestIncoming.text;
+    if (arrived && !state.result && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      incomingFlash?.cancel();
+      incomingFlash = banner.animate([
+        {backgroundColor:"#c3f3fc",color:"#132a32",boxShadow:"0 0 16px #b7e6ef80"},
+        {backgroundColor:"#203337",color:"#f5efe1",boxShadow:"0 0 0 transparent"},
+      ],{duration:650,easing:"ease-out"});
+    }
+  }
   log.replaceChildren();
   if (!state.messages.length) log.innerHTML = '<p class="muted">Még nincs üzenet.</p>';
   for (const item of state.messages) {
@@ -773,8 +780,6 @@ function paintChat() {
     line.append(label,document.createTextNode(item.text));
     log.append(line);
   }
-  const input = document.querySelector("#message-input");
-  if (input && input.value !== draft) input.value = draft;
   log.scrollTop = bottom ? log.scrollHeight : scrollTop;
   paintChatControls();
 }
@@ -855,6 +860,8 @@ function render() {
     }
   } else {
     screen.innerHTML = player(state,context);
+    const input = screen.querySelector("#message-input");
+    if (input) input.value = draft;
     if (state.result && finishRoadHeight) {
       screen.querySelector(".night-game")?.style.setProperty("--finish-road-height",finishRoadHeight+"px");
     }
@@ -1084,7 +1091,6 @@ screen.addEventListener("change", event => {
 screen.addEventListener("toggle", event => {
   if (event.target.id === "night-chat" && event.target.open) {
     if (!screen.contains(event.target)) return;
-    paintChat();
     const log = event.target.querySelector("#messages");
     log.scrollTop = log.scrollHeight;
   } else if (event.target.matches("details[open]")) paintPairStories();

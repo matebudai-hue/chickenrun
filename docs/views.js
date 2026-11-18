@@ -394,10 +394,12 @@ function rematch(s) {
 
 function conversation(opened, finished) {
   const input = '<form id="chat-form" class="chat-form"><input id="message-input" name="message" aria-label="Üzeneted" placeholder="Üzenet a párodnak…" maxlength="240" autocomplete="off" enterkeyhint="send" required><button type="submit" class="button secondary" aria-label="Mehet, üzenet küldése">Mehet</button></form><p id="chat-status" class="muted" role="status" hidden></p>';
-  return '<div class="night-comms"><details id="night-chat"'+(opened.has("night-chat") ? " open" : "")+
-    '><summary aria-label="Üzenetelőzmények"><span id="latest-sender" class="night-sender">Üzenetek</span><span id="latest-message" aria-live="polite">Még nincs üzenet.</span></summary>'+
+  return '<div class="night-comms"><div class="night-message-slot"><div class="night-incoming-slot">'+
+    '<div class="night-incoming" role="status"><span id="latest-sender" class="night-sender" hidden></span><span id="latest-message">Még nincs beérkező üzenet.</span></div></div>'+
+    '<details id="night-chat"'+(opened.has("night-chat") ? " open" : "")+
+    '><summary aria-label="Üzenetelőzmények"></summary>'+
     '<div class="night-chat-history"><p class="chat-privacy">Az üzeneteket a párod és a tréner látja.</p><div class="messages" id="messages" aria-label="Párbeszéd"></div></div>'+
-    '</details>'+(finished ? "" : input)+'</div>';
+    '</details></div>'+(finished ? "" : input)+'</div>';
 }
 function timedControls(s, turnPending) {
   if (s.race.startsAt === null) return '<p class="night-status" role="status">'+

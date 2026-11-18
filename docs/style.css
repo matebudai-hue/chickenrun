@@ -318,24 +318,34 @@ dialog::backdrop{background:#161b14cc}
   display:grid;gap:6px;padding:6px 10px max(8px,env(safe-area-inset-bottom));background:#161918;min-width:0
 }
 .night-comms{position:relative;min-width:0}
-.night-comms details{background:none;border:0}
+.night-message-slot{
+  position:relative;display:grid;grid-template-columns:minmax(0,1fr) 38px;
+  gap:5px;align-items:end;min-height:38px
+}
+.night-incoming-slot{position:relative;min-width:0;min-height:38px}
+.night-incoming{
+  display:grid;align-content:center;gap:2px;min-height:38px;box-sizing:border-box;padding:5px 8px;
+  background:#1e2421;color:var(--night-muted);border:1px solid #60665a;
+  font-size:.86rem;line-height:1.2;overflow-wrap:anywhere
+}
+.night-playing .night-incoming{position:absolute;z-index:3;inset:auto 0 0}
+.night-incoming[data-message-id]{background:#203337;color:#f5efe1;border-color:var(--night-ice)}
+.night-comms details{position:static;background:none;border:0}
 .night-comms summary{
-  min-height:32px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;
-  gap:7px;padding:4px 3px;cursor:pointer;font-size:.83rem;list-style:none
+  min-height:38px;display:grid;place-items:center;padding:0;cursor:pointer;
+  background:#1e2421;border:1px solid #60665a;list-style:none
 }
 .night-comms summary::before,.night-comms details[open]>summary::before{content:none}
 .night-comms summary::-webkit-details-marker{display:none}
-.night-comms summary::after{content:"▾";font-size:1rem;line-height:1;color:var(--night-ice);margin:0}
-.night-comms details[open] summary::after{content:"▴"}
+.night-comms summary::after{content:"☰";font-size:.95rem;line-height:1;color:var(--night-ice)}
+.night-comms details[open] summary::after{content:"×";font-size:1.25rem}
 .night-sender{
-  color:var(--night-ice);font:700 .64rem/1.15 var(--mono);text-transform:uppercase;letter-spacing:.045em
+  font:750 .66rem/1 var(--mono);text-transform:uppercase;letter-spacing:.045em
 }
-#latest-message{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.night-comms [data-unread]>summary{background:var(--night-ice);color:#132a32;padding-inline:8px}
-.night-comms [data-unread]>summary::after{color:inherit}
-.night-comms [data-unread] .night-sender{background:#17313b;color:#e1f8ff;padding:.32em .45em}
-.night-comms [data-unread] #latest-message{font-weight:750}
-.night-chat-history{background:#1e2421;border:1px solid #60665a;padding:4px 7px;margin-bottom:5px}
+.night-chat-history{
+  position:absolute;z-index:4;inset:auto 0 calc(100% + 5px);
+  background:#1e2421;border:1px solid #60665a;padding:4px 7px
+}
 .night-chat-history .messages{
   height:auto;max-height:clamp(32px,10svh,88px);margin-top:.15rem;padding-block:3px;overscroll-behavior:contain
 }

@@ -111,6 +111,7 @@ test("the 2D player puts chat and its send button between the road and the drivi
   const context = {room:"ABCDEFGH",opened:new Set()};
   for (const race of [undefined,{startsAt:1,marks:[[1000,0]],target:null}]) {
     const html = player({...state,race},context);
+    assert.match(html,/class="night-incoming" role="status"[^>]*>[\s\S]+id="latest-message"[\s\S]+<details id="night-chat"/);
     assert.match(html,/data-night-road[\s\S]+<form id="chat-form"[\s\S]+enterkeyhint="send"[\s\S]+<button type="submit"[^>]+>Mehet<\/button><\/form>[\s\S]+class="night-drive-controls"[\s\S]+Kitérek/);
   }
 });
