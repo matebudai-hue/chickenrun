@@ -849,8 +849,9 @@ button.turn-point{cursor:pointer}
 .debrief-case-story{display:grid;grid-template-columns:minmax(0,1.46fr) minmax(0,1fr);gap:clamp(1rem,3vw,2.5rem);align-items:start}
 .debrief-case-story p,.debrief-case-questions p{margin:0}
 .debrief-case-story p+p{margin-top:.7em}
-.debrief-case-moment blockquote{margin:0 0 .75em;padding:.7em .85em;border-left:3px solid #aacbd2;background:#203239}
-.debrief-case-moment blockquote strong{color:#c6e2e7}
+.debrief-case-moment blockquote{margin:0 0 .85em;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:.55em .8em}
+.debrief-case-moment blockquote p{display:grid;grid-template-columns:subgrid;grid-column:1/-1;margin:0}
+.debrief-case-moment blockquote strong{font-weight:750}
 .debrief-case-prompt{padding:.7em .85em;border-left:3px solid #e9b86e;background:#30291e}
 .debrief-case-questions{margin:0;padding-inline-start:1.55em;display:grid;gap:.8em}
 .debrief-case-questions li{padding-inline-start:.22em}
