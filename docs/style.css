@@ -325,17 +325,22 @@ dialog::backdrop{background:#161b14cc}
 }
 .night-comms summary::before,.night-comms details[open]>summary::before{content:none}
 .night-comms summary::-webkit-details-marker{display:none}
-.night-comms summary::after{content:"▴";font-size:1rem;line-height:1;color:var(--night-ice);margin:0}
-.night-comms details[open] summary::after{content:"▾"}
+.night-comms summary::after{content:"▾";font-size:1rem;line-height:1;color:var(--night-ice);margin:0}
+.night-comms details[open] summary::after{content:"▴"}
 .night-sender{
   color:var(--night-ice);font:700 .64rem/1.15 var(--mono);text-transform:uppercase;letter-spacing:.045em
 }
 #latest-message{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.night-comms [data-unread]>summary{background:var(--night-ice);color:#132a32;padding-inline:8px}
+.night-comms [data-unread]>summary::after{color:inherit}
+.night-comms [data-unread] .night-sender{background:#17313b;color:#e1f8ff;padding:.32em .45em}
+.night-comms [data-unread] #latest-message{font-weight:750}
 .night-chat-history{background:#1e2421;border:1px solid #60665a;padding:4px 7px;margin-bottom:5px}
 .night-chat-history .messages{
   height:auto;max-height:clamp(32px,10svh,88px);margin-top:.15rem;padding-block:3px;overscroll-behavior:contain
 }
 .night-chat-history .chat-privacy{font-size:.68rem}
+.night-comms .chat-form{margin-top:3px}
 .night-comms .chat-form input{min-width:0;font-size:16px;min-height:44px;padding:5px 8px}
 .night-comms .chat-form button{min-height:44px;min-width:62px}
 .night-drive-controls{display:grid;gap:6px;align-content:start;min-height:50px}
@@ -396,11 +401,10 @@ dialog::backdrop{background:#161b14cc}
   .night-road{min-height:174px}
   .night-game{--vehicle-scale:.8}
 }
-/* Chat stays above the road; driving stays below it, including with the keyboard open. */
+/* The composer and driving controls have separate touch targets. */
 [data-surface="player"] .mast{justify-content:flex-end}
-.night-playing>.night-comms{padding:4px 10px 10px;background:#172323;border-bottom:2px solid var(--night-ice);flex:none}
-.night-playing>.night-comms .chat-form button{background:#b7e6ef;color:#152428;border-color:#b7e6ef;min-width:84px}
-.night-playing .night-drive-controls{border-top:2px solid var(--night-amber);padding-top:8px}
+.night-playing .night-console{gap:10px}
+.night-playing .night-comms .chat-form button{background:var(--night-ice);color:#152428;border-color:var(--night-ice);min-width:84px}
 body[data-keyboard="true"] #app:has(.night-playing){min-height:var(--visual-height,100svh);height:var(--visual-height,100svh)}
 body[data-keyboard="true"] .night-playing .night-road{min-height:100px;max-height:none}
 body[data-keyboard="true"] .night-playing{--vehicle-scale:.65}
@@ -764,8 +768,6 @@ button.race-stamp{cursor:pointer}button.race-stamp:hover{background:#303c30;tran
 .injury-card.marked strong,.injury-card.worn strong,.injury-update{color:var(--injury-accent)}
 .injury-update,.injury-scope{display:block;margin-top:3px;font:700 .69rem/1.3 var(--mono)}
 .injury-scope{color:#d5cfbd}
-.night-playing .night-console .injury-card{border-bottom:0}
-.night-playing .injury-card+.night-drive-controls{border-top:0;padding-top:0}
 body[data-keyboard="true"] .night-playing .injury-card{--injury-icon:27px;--injury-number:1.3rem}
 .personal-result-summary{
   display:grid;grid-template-columns:minmax(0,1fr) minmax(12rem,22%);align-items:center;gap:.8rem

@@ -106,6 +106,15 @@ test("the player sees the four medal totals and the current medal after the reve
   assert.doesNotMatch(player(state,{...context,reveal:{}}),/night-medals/);
 });
 
+test("the 2D player puts chat and its send button between the road and the driving controls", () => {
+  const state = {phase:"running",number:1,step:0,distance:1000,messages:[],report:[]};
+  const context = {room:"ABCDEFGH",opened:new Set()};
+  for (const race of [undefined,{startsAt:1,marks:[[1000,0]],target:null}]) {
+    const html = player({...state,race},context);
+    assert.match(html,/data-night-road[\s\S]+<form id="chat-form"[\s\S]+enterkeyhint="send"[\s\S]+<button type="submit"[^>]+>Mehet<\/button><\/form>[\s\S]+class="night-drive-controls"[\s\S]+Kitérek/);
+  }
+});
+
 test("medal filters show only matching races and the checkpoint where each race ended", () => {
   const report = [
     {number:1,outcome:"other",timed:true,history:[{distance:200,own:"go",other:"yield"}]},

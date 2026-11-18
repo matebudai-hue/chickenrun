@@ -393,7 +393,7 @@ function rematch(s) {
 }
 
 function conversation(opened, finished) {
-  const input = '<form id="chat-form" class="chat-form"><input id="message-input" name="message" aria-label="Üzeneted" placeholder="Üzenet a párodnak…" maxlength="240" autocomplete="off" required><button type="submit" class="button secondary" aria-label="Üzenet küldése">Küldés</button></form><p id="chat-status" class="muted" role="status" hidden></p>';
+  const input = '<form id="chat-form" class="chat-form"><input id="message-input" name="message" aria-label="Üzeneted" placeholder="Üzenet a párodnak…" maxlength="240" autocomplete="off" enterkeyhint="send" required><button type="submit" class="button secondary" aria-label="Mehet, üzenet küldése">Mehet</button></form><p id="chat-status" class="muted" role="status" hidden></p>';
   return '<div class="night-comms"><details id="night-chat"'+(opened.has("night-chat") ? " open" : "")+
     '><summary aria-label="Üzenetelőzmények"><span id="latest-sender" class="night-sender">Üzenetek</span><span id="latest-message" aria-live="polite">Még nincs üzenet.</span></summary>'+
     '<div class="night-chat-history"><p class="chat-privacy">Az üzeneteket a párod és a tréner látja.</p><div class="messages" id="messages" aria-label="Párbeszéd"></div></div>'+
@@ -452,11 +452,10 @@ function nightPlayer(s, {room,opened,turnPending,pendingDecision,reveal,medalFil
     '" aria-label="Padlógáz · '+(s.race ? "Folyamatos futam" : "Döntési pontonként")+
     '"'+(s.race ? ' data-timed' : '')+(reveal ? ' data-night-reveal' : '')+(s.result === "crash" ? ' data-night-crash' : '')+'>'+
     '<div class="night-id"><span>PADLÓGÁZ · FUTAM / '+String(s.number).padStart(2,"0")+'</span></div>'+
-    (!finished ? conversation(opened,false) : "")+
     nightRoad(s.distance,timeLabel,s.race || finished ? "" : s.distance+" M",Boolean(s.race && !finished))+
-    '<div class="night-console">'+(finished && !reveal && s.messages.length ? conversation(opened,true) : "")+
-    (finished ? finishControls : injuryCard(counts.crash)+'<div class="night-drive-controls">'+
-      (s.race ? timedControls(s,turnPending) : stepControls(s,pendingDecision,reveal))+'</div>')+
+    '<div class="night-console">'+(!finished || (!reveal && s.messages.length) ? conversation(opened,finished) : "")+
+    (finished ? finishControls : '<div class="night-drive-controls">'+
+      (s.race ? timedControls(s,turnPending) : stepControls(s,pendingDecision,reveal))+'</div>'+injuryCard(counts.crash))+
     '</div>'+report+'</section>';
 }
 export function player(s, context) {

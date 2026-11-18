@@ -3,7 +3,7 @@ import { normalizePresentation, changePresentation } from "./presentation.js?v=4
 import { animateRace } from "./live-race.js?v=15";
 import { nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=27";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=40";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=42";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");
@@ -33,7 +33,7 @@ let reveal, revealTimer, finishRoadHeight, screeningCase, medalFilter;
 const screenPositions = new Map();
 let selectedGameMode = "timed";
 let raceOffset = Date.now() - performance.now(), stopAnimation, turnPending = false;
-let chatPending, chatNotice = "", turnAck;
+let chatPending, chatNotice = "", lastReadIncomingId, turnAck;
 let showPairings = saved.get(projectionModeKey) === "pairings";
 let reportTarget = saved.get(projectionModeKey)?.startsWith("learning:") ? saved.get(projectionModeKey).slice(9) : undefined;
 const presentationKey = "cr:presentation:"+room;
@@ -186,6 +186,7 @@ function update(next, started = performance.now()) {
     turnAck = undefined;
     turnPending = false;
     chatNotice = "";
+    lastReadIncomingId = undefined;
     draft = "";
     messageRequest = undefined;
   }
@@ -320,7 +321,7 @@ function paintChatControls() {
   const button = screen.querySelector("#chat-form button");
   if (button) {
     button.disabled = Boolean(chatPending);
-    button.textContent = chatPending ? "Küldés…" : "Küldés";
+    button.textContent = chatPending ? "Küldés…" : "Mehet";
   }
   const status = screen.querySelector("#chat-status");
   if (status) {
@@ -746,14 +747,19 @@ function keyboardInset() {
 }
 
 function paintChat() {
-  const log = document.querySelector("#messages");
+  const chat = screen.querySelector("#night-chat");
+  const log = chat?.querySelector("#messages");
   if (!log) return;
   const bottom = log.scrollHeight - log.clientHeight - log.scrollTop < 36;
   const scrollTop = log.scrollTop;
-  const latest = state.messages.at(-1);
-  const sender = document.querySelector("#latest-sender");
-  const preview = document.querySelector("#latest-message");
-  const label = latest ? latest.own ? "Te" : "A másik autó" : "Üzenetek";
+  const incoming = state.messages.findLast(item => !item.own);
+  if (chat.open && incoming) lastReadIncomingId = incoming.id;
+  const unread = Boolean(incoming && incoming.id !== lastReadIncomingId);
+  chat.toggleAttribute("data-unread", unread);
+  const latest = unread ? incoming : state.messages.at(-1);
+  const sender = chat.querySelector("#latest-sender");
+  const preview = chat.querySelector("#latest-message");
+  const label = unread ? "Új üzenet" : latest ? latest.own ? "Te" : "A másik autó" : "Üzenetek";
   const message = latest?.text ?? "Még nincs üzenet.";
   if (sender.textContent !== label) sender.textContent = label;
   if (preview.textContent !== message) preview.textContent = message;
@@ -916,8 +922,11 @@ screen.addEventListener("submit", event => {
     loadFailure = undefined;
     joinRoom(String(data.get("player-label")).trim());
   }
-  if (event.target.id === "chat-form" && draft.trim()) {
+  if (event.target.id === "chat-form") {
+    if (chatPending || state.result) return;
+    draft = String(data.get("message") ?? "");
     const text = draft.trim();
+    if (!text) return;
     const number = state.number;
     const step = state.step;
     if (!messageRequest || messageRequest.text !== text || messageRequest.number !== number || messageRequest.step !== step) {
@@ -1074,6 +1083,8 @@ screen.addEventListener("change", event => {
 });
 screen.addEventListener("toggle", event => {
   if (event.target.id === "night-chat" && event.target.open) {
+    if (!screen.contains(event.target)) return;
+    paintChat();
     const log = event.target.querySelector("#messages");
     log.scrollTop = log.scrollHeight;
   } else if (event.target.matches("details[open]")) paintPairStories();

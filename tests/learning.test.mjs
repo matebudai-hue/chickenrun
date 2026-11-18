@@ -117,7 +117,8 @@ test('the selected report and its projection show the same cumulative injuries a
  assert.match(cockpit,/\+1 sérülés ebben a futamban/);
  assert.match(cockpit,/data-do="requeue"/);
  const running=player({phase:'running',number:16,step:0,distance:1000,messages:[],report},context);
- assert.match(running,/Sérülések<\/span><strong>15<\/strong>.*data-do="yield"/);
+ assert.match(running,/Sérülések<\/span><strong>15<\/strong>/);
+ assert.match(running,/data-do="yield"/);
  assert.doesNotMatch(running,/\+1 sérülés ebben a futamban/);
  const summary=trainer(state,context);
  assert.match(summary,/Sérülések<\/span><strong>15<\/strong>.*A szoba összes futama/);
