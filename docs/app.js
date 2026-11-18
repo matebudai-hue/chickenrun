@@ -1,9 +1,9 @@
 import { presentationPages } from "./learning.js?v=34";
-import { normalizePresentation, changePresentation } from "./presentation.js?v=29";
+import { normalizePresentation, changePresentation } from "./presentation.js?v=40";
 import { animateRace } from "./live-race.js?v=15";
 import { nextReveal, pairStory, legacyPoints, revealDuration, screeningFrames } from "./story.js?v=27";
 import { command, readState, saved, secret } from "./connection.js?v=5";
-import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=35";
+import { enterCode, escape, home, join, moves, outcomes, player, projector, time, trainer, waitingPage } from "./views.js?v=40";
 
 const screen = document.querySelector("#screen");
 const connection = document.querySelector("#connection");

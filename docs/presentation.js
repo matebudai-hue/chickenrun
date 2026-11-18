@@ -1,5 +1,5 @@
 export function normalizePresentation(value={}) {
- const targets=['group','people','transitions','guide','person','case','scores','turns'];
+ const targets=['group','people','transitions','guide','person','case','scores','turns','debrief-story','debrief-questions'];
  return {target:targets.includes(value.target)?value.target:'group',names:!!value.names,
  scoreOrder:value.scoreOrder==='points'?'points':'roster',
  distance:Math.max(0,Number(value.distance)||0),

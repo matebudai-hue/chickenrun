@@ -1,3 +1,4 @@
+import { debriefCasePanel, debriefCaseSlide } from "./debrief-case.js?v=1";
 import { injuryCard } from "./injuries.js?v=1";
 import { analyse, outcomeReport, learningPeople, learningPatterns, learningGuide, learningProjection, presentationView, scoreReport, turnChart } from "./learning.js?v=34";
 import { carPositions, pairGroups, legacyPoints } from "./story.js?v=27";
@@ -232,7 +233,8 @@ export function trainer(s, context) {
     badge(stage, lobby ? "warm" : "good")+(!lobby ? badge(s.mode === "timed" ? "45 mp" : "Lépésenként","warm") : "")+
     '</div><div class="control-actions">'+cta+nav+
     action("share", "QR és belépés", "secondary")+
-    action("open-projector","Kivetítő megnyitása","secondary")+'</div></section>';
+    action("open-projector","Kivetítő megnyitása","secondary")+
+    (closed ? '<button type="button" id="trainer-tab-debrief-case" class="button secondary" data-do="tab" data-tab="debrief-case" aria-pressed="'+(tab==="debrief-case")+'">Esettanulmány</button>' : '')+'</div></section>';
   const stats = [["Résztvevő",s.count,hasPresence ? online+" online" : ""],
     [lobby ? "Induló pár" : "Aktív pár",lobby ? Math.ceil(s.count/2) : active.length,""],
     lobby ? ["Tesztjátékos",s.count%2,""] : ["Új partnerre vár",s.queue.length,""]];
@@ -247,7 +249,9 @@ export function trainer(s, context) {
       '>'+title+'</label>').join("")+'</div>' : "";
   const {reportView='results',turnPoint, dialogue} = context;
   let body;
-  if (tab === "scores") {
+  if (closed && tab === "debrief-case") {
+    body = debriefCasePanel(presentation.target);
+  } else if (tab === "scores") {
     body = raceFilters(filter)+scoreReport(analyse(s.pairs,s.roster,filter),presentation,lobby);
   } else if (tab === "report") {
     const data = analyse(s.pairs,s.roster,filter);
@@ -333,6 +337,9 @@ function namedPairings(pairs) {
 
 export function projector(s, room, selection, showPairings = false, screeningCase, reportTarget, presentation) {
   if(presentation && s.phase !== "lobby") {
+    if (s.phase === "closed" && (presentation.target === "debrief-story" || presentation.target === "debrief-questions")) {
+      return debriefCaseSlide(presentation.target === "debrief-questions");
+    }
     if(presentation.target !== "case") return presentationView(s,presentation);
     const pair=s.pairs.find(p=>p.number===presentation.number&&p.result);
     return pair ? '<div class="projection"><div class="screening-head"><h1>'+(presentation.names?pair.names.map((name,i)=>escape(pair.bot&&i===1?"Másik játékos":name)).join(" ↔ "):"Egy futam két oldala")+'</h1></div><section class="screening" data-transcript="'+pair.number+'"><div data-transcript-body></div></section></div>' : '<p>A kiválasztott futam még nem érhető el.</p>';
@@ -505,7 +512,7 @@ function projectionControls(state,filter,p,picker,choice,report,opened) {
     '<button type="button" id="projection-names" class="button secondary small" data-do="projection-names" aria-pressed="'+p.names+'">'+
     (p.names?'Nevek látszanak':'Név nélkül')+'</button>'+
     '<div class="projection-status-line"><span class="eyebrow">Kivetítő</span><strong>'+
-    (state.phase === "lobby" ? "Belépés" : step ? "Futam #"+p.number : labels[p.target])+'</strong>'+
+    (state.phase === "lobby" ? "Belépés" : step ? "Futam #"+p.number : p.target==="debrief-story" ? "Esettanulmány" : p.target==="debrief-questions" ? "Az eset kérdései" : labels[p.target])+'</strong>'+
     (state.phase === "lobby" ? '' : navigation)+'</div>'+
     (shortcuts?'<details class="projection-switch" id="projection-switch"'+(opened.has('projection-switch')?' open':'')+'><summary>Váltás</summary>'+shortcuts+'</details>':'')+'</div>'+
     (state.phase === "lobby" ? '' : projectionSelection(state,filter,p,picker,choice,report))+'</section>';
