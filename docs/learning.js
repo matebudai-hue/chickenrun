@@ -246,7 +246,7 @@ const reflectionQuestions = [
 ];
 
 function reflectionList() {
-  return '<ol>'+reflectionQuestions.map(question => '<li><p>'+question+'</p></li>').join('')+'</ol>';
+  return '<p><strong>„Én tértem ki. Azt akartam, hogy mindketten megússzuk. Ez sikerült.”</strong></p><ol>'+reflectionQuestions.map(question => '<li><p>'+question+'</p></li>').join('')+'</ol>';
 }
 
 export function learningGuide(opened = new Set()){
